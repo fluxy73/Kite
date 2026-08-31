@@ -229,10 +229,11 @@ func (a *api) handleShell(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	wJSON(w, 200, map[string]any{
-		"users":       a.store.state.Users,
-		"chats":       a.store.chatsFor(uid),
-		"communities": a.communitiesFor(uid, true),
-		"calls":       a.store.state.Calls,
+		"users":          a.store.state.Users,
+		"chats":          a.store.chatsFor(uid),
+		"communities":    a.communitiesFor(uid, true),
+		"calls":          a.store.state.Calls,
+		"scheduledCalls": a.store.scheduledCallsFor(uid),
 	})
 }
 
@@ -317,6 +318,86 @@ func (a *api) handleCallLog(w http.ResponseWriter, r *http.Request) {
 }
 
 // ---------- Actions sur messages ----------
+
+// ---------- Appels planifiés ----------
+
+func (a *api) handleScheduledCalls(w http.ResponseWriter, r *http.Request) {
+	uid, ok := a.userOrError(w, r)
+	if !ok {
+		return
+	}
+	switch r.Method {
+	case http.MethodGet:
+		wJSON(w, 200, a.store.scheduledCallsFor(uid))
+	case http.MethodPost:
+		var body struct {
+			Title       string   `json:"title"`
+			ScheduledAt int64    `json:"scheduledAt"`
+			Kind        string   `json:"kind"`
+			MemberIDs   []string `json:"memberIds"`
+			ChatID      string   `json:"chatId"`
+			Reminder    bool     `json:"reminder"`
+		}
+		if err := readJSON(r, &body); err != nil {
+			httpError(w, 400, "corps invalide: "+err.Error())
+			return
+		}
+		if strings.TrimSpace(body.Title) == "" {
+			httpError(w, 400, "title requis")
+			return
+		}
+		if body.ScheduledAt == 0 {
+			body.ScheduledAt = time.Now().Add(24 * time.Hour).UnixMilli()
+		}
+		kind := body.Kind
+		if kind != "video" {
+			kind = "audio"
+		}
+		sc := a.store.addScheduledCall(ScheduledCall{
+			Title:       strings.TrimSpace(body.Title),
+			UserID:      uid,
+			MemberIDs:   body.MemberIDs,
+			ChatID:      body.ChatID,
+			ScheduledAt: body.ScheduledAt,
+			Kind:        kind,
+			Reminder:    body.Reminder,
+		})
+		a.broadcastShell(uid)
+		wJSON(w, 201, sc)
+	case http.MethodPatch:
+		var body struct {
+			ID string `json:"id"`
+		}
+		if err := readJSON(r, &body); err != nil {
+			httpError(w, 400, "corps invalide")
+			return
+		}
+		updated, ok := a.store.toggleScheduledReminder(body.ID)
+		if !ok {
+			httpError(w, 404, "appel planifié introuvable")
+			return
+		}
+		wJSON(w, 200, updated)
+	case http.MethodDelete:
+		id := strings.TrimPrefix(r.URL.Path, "/api/scheduled-calls/")
+		if id == "" {
+			httpError(w, 400, "id requis")
+			return
+		}
+		if !a.store.deleteScheduledCall(id) {
+			httpError(w, 404, "appel planifié introuvable")
+			return
+		}
+		wJSON(w, 200, map[string]bool{"deleted": true})
+	default:
+		httpError(w, 405, "méthode non supportée")
+	}
+}
+
+// broadcastShell publie un event "shell" (UI : rafraîchit les données agrégées).
+func (a *api) broadcastShell(uid string) {
+	a.hub.broadcastToUsers(a.store.userList(), Event{Type: "shell", ChatID: "", Data: mustJSON(map[string]string{"userId": uid})})
+}
 
 // ---------- Appels (signalisation temps réel) ----------
 

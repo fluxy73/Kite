@@ -157,6 +157,45 @@ class KiteApi {
     });
   }
 
+  // ---------- Appels planifiés ----------
+
+  /// Liste les appels planifiés visibles pour moi.
+  Future<List<ScheduledCall>> fetchScheduledCalls() async {
+    final raw = await _send('GET', '/api/scheduled-calls', query: {'userId': meId});
+    return (raw as List).map((e) => ScheduledCall.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  /// Crée un appel planifié (titre, date/heure, participants, rappel).
+  Future<ScheduledCall> createScheduledCall({
+    required String title,
+    required int scheduledAt,
+    String kind = 'audio',
+    List<String> memberIds = const [],
+    String chatId = '',
+    bool reminder = false,
+  }) async {
+    final raw = await _send('POST', '/api/scheduled-calls', query: {'userId': meId}, body: {
+      'title': title,
+      'scheduledAt': scheduledAt,
+      'kind': kind,
+      'memberIds': memberIds,
+      'chatId': chatId,
+      'reminder': reminder,
+    });
+    return ScheduledCall.fromJson(raw as Map<String, dynamic>);
+  }
+
+  /// Active/désactive le rappel d'un appel planifié.
+  Future<ScheduledCall> toggleScheduledReminder(String id) async {
+    final raw = await _send('PATCH', '/api/scheduled-calls', query: {'userId': meId}, body: {'id': id});
+    return ScheduledCall.fromJson(raw as Map<String, dynamic>);
+  }
+
+  /// Supprime un appel planifié.
+  Future<void> deleteScheduledCall(String id) async {
+    await _send('DELETE', '/api/scheduled-calls/$id', query: {'userId': meId});
+  }
+
   // ---------- Temps réel (WebSocket, repli SSE) ----------
 
   String _wsUrl(String path, [Map<String, String>? query]) {

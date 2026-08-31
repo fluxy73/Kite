@@ -10,6 +10,7 @@ tools/
 # Serveur — binaires & données
 server/kite-server.exe
 server/kite-server-linux
+server/*.exe
 server/kite-server
 server/data/
 server/*.log

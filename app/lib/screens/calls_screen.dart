@@ -32,9 +32,19 @@ class CallsScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _Header(onDemoCall: () => _simulateIncoming(context)),
+            _Header(
+              onDemoCall: () => _simulateIncoming(context),
+              onSchedule: () => _planCall(context),
+            ),
             const _SectionTitle('Favoris'),
             _favoritesRow(context, favorites),
+            const _SectionTitle('Planifiés'),
+            _ScheduledSection(
+              calls: shell.scheduledCalls,
+              onToggleReminder: (sc) => _toggleReminder(context, sc),
+              onDelete: (sc) => _deleteScheduled(context, sc),
+              onPlan: () => _planCall(context),
+            ),
             const _SectionTitle('Récents'),
             Expanded(child: _recents(context)),
           ],
@@ -178,6 +188,194 @@ class CallsScreen extends StatelessWidget {
     });
   }
 
+  /// Ouvre le formulaire de planification (titre, date/heure, participants, rappel).
+  void _planCall(BuildContext context) {
+    final titleCtrl = TextEditingController();
+    final contacts = shell.users.where((u) => u.id != api.meId).toList();
+    bool video = false;
+    bool reminder = false;
+    final selected = <String>{};
+    DateTime picked = DateTime.now().add(const Duration(hours: 1));
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: KiteColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetCtx) {
+        return StatefulBuilder(
+          builder: (sheetCtx, setSheet) {
+            void submit() async {
+              final title = titleCtrl.text.trim();
+              if (title.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Le titre est requis')));
+                return;
+              }
+              Navigator.pop(sheetCtx);
+              try {
+                await api.createScheduledCall(
+                  title: title,
+                  scheduledAt: picked.millisecondsSinceEpoch,
+                  kind: video ? 'video' : 'audio',
+                  memberIds: selected.toList(),
+                  chatId: '',
+                  reminder: reminder,
+                );
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Appel planifié ✅')));
+                }
+                await onRefresh();
+              } catch (_) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Serveur injoignable')));
+                }
+              }
+            }
+            return SafeArea(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Planifier un appel', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: titleCtrl,
+                      style: const TextStyle(color: KiteColors.fg),
+                      decoration: const InputDecoration(
+                        labelText: 'Titre',
+                        hintText: "Ex. Point d'équipe",
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () async {
+                              final d = await showDatePicker(
+                                context: sheetCtx,
+                                initialDate: picked,
+                                firstDate: DateTime.now(),
+                                lastDate: DateTime.now().add(const Duration(days: 365)),
+                              );
+                              if (d != null) {
+                                setSheet(() => picked = DateTime(d.year, d.month, d.day, picked.hour, picked.minute));
+                              }
+                            },
+                            icon: const Icon(Icons.calendar_today, size: 16),
+                            label: const Text('Date'),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () async {
+                              final t = await showTimePicker(context: sheetCtx, initialTime: TimeOfDay.fromDateTime(picked));
+                              if (t != null) {
+                                setSheet(() => picked = DateTime(picked.year, picked.month, picked.day, t.hour, t.minute));
+                              }
+                            },
+                            icon: const Icon(Icons.schedule, size: 16),
+                            label: const Text('Heure'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(_ScheduledCard.fmt(dt: picked), style: const TextStyle(color: KiteColors.accent, fontSize: 13)),
+                    const SizedBox(height: 12),
+                    SegmentedButton<bool>(
+                      segments: const [
+                        ButtonSegment(value: false, icon: Icon(Icons.call), label: Text('Audio')),
+                        ButtonSegment(value: true, icon: Icon(Icons.videocam), label: Text('Vidéo')),
+                      ],
+                      selected: {video},
+                      onSelectionChanged: (sel) => setSheet(() => video = sel.first),
+                    ),
+                    const SizedBox(height: 12),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      value: reminder,
+                      onChanged: (v) => setSheet(() => reminder = v),
+                      title: const Text('Rappel', style: TextStyle(color: KiteColors.fg)),
+                      subtitle: const Text("Notifier avant l'appel", style: TextStyle(color: KiteColors.muted, fontSize: 12)),
+                      secondary: const Icon(Icons.notifications_outlined),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text('Participants', style: TextStyle(color: KiteColors.muted, fontWeight: FontWeight.w600, fontSize: 13)),
+                    const SizedBox(height: 4),
+                    ...contacts.map((u) => CheckboxListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          value: selected.contains(u.id),
+                          onChanged: (v) => setSheet(() {
+                            if (v == true) {
+                              selected.add(u.id);
+                            } else {
+                              selected.remove(u.id);
+                            }
+                          }),
+                          title: Text(u.name, style: const TextStyle(color: KiteColors.fg)),
+                        )),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
+                        style: FilledButton.styleFrom(backgroundColor: KiteColors.accent),
+                        onPressed: submit,
+                        child: const Text('Planifier', style: TextStyle(color: KiteColors.accentInk)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  /// Bascule le rappel d'un appel planifié puis re-synchronise le shell.
+  Future<void> _toggleReminder(BuildContext context, ScheduledCall sc) async {
+    try {
+      await api.toggleScheduledReminder(sc.id);
+      await onRefresh();
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Serveur injoignable')));
+      }
+    }
+  }
+
+  /// Supprime un appel planifié (après confirmation) puis re-synchronise le shell.
+  Future<void> _deleteScheduled(BuildContext context, ScheduledCall sc) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dCtx) => AlertDialog(
+        backgroundColor: KiteColors.surface,
+        title: const Text("Supprimer l'appel ?"),
+        content: Text('« ${sc.title} » sera supprimé.', style: const TextStyle(color: KiteColors.fg)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dCtx, false), child: const Text('Annuler')),
+          TextButton(onPressed: () => Navigator.pop(dCtx, true), child: const Text('Supprimer', style: TextStyle(color: KiteColors.danger))),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await api.deleteScheduledCall(sc.id);
+      await onRefresh();
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Serveur injoignable')));
+      }
+    }
+  }
+
   /// Démarre un appel (mock) et journalise l'appel dans la conversation (branché serveur).
   void _contactCall(BuildContext context, String id,
       {required String name, bool group = false, bool video = false}) {
@@ -223,10 +421,13 @@ class CallsScreen extends StatelessWidget {
 }
 
 class _Header extends StatelessWidget {
-  const _Header({this.onDemoCall});
+  const _Header({this.onDemoCall, this.onSchedule});
 
   /// Déclenche un appel entrant simulé (démo du flux temps réel).
   final VoidCallback? onDemoCall;
+
+  /// Ouvre le formulaire de planification d'un appel.
+  final VoidCallback? onSchedule;
 
   @override
   Widget build(BuildContext context) {
@@ -248,6 +449,11 @@ class _Header extends StatelessWidget {
             icon: const Icon(Icons.link),
             tooltip: 'Créer un lien d’appel',
             onPressed: () => _linkSheet(context),
+          ),
+          IconButton(
+            icon: const Icon(Icons.event_outlined),
+            tooltip: 'Planifier un appel',
+            onPressed: onSchedule,
           ),
           IconButton(
             icon: const Icon(Icons.phone_in_talk_outlined),
@@ -311,6 +517,126 @@ class _SectionTitle extends StatelessWidget {
       child: Text(title,
           style: const TextStyle(color: KiteColors.muted, fontWeight: FontWeight.w600, fontSize: 13)),
     );
+  }
+}
+
+// ---------- Appels planifiés ----------
+
+class _ScheduledSection extends StatelessWidget {
+  const _ScheduledSection({
+    required this.calls,
+    required this.onToggleReminder,
+    required this.onDelete,
+    required this.onPlan,
+  });
+
+  final List<ScheduledCall> calls;
+  final void Function(ScheduledCall) onToggleReminder;
+  final void Function(ScheduledCall) onDelete;
+  final VoidCallback onPlan;
+
+  @override
+  Widget build(BuildContext context) {
+    if (calls.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Row(
+          children: [
+            const Text('Aucun appel planifié', style: TextStyle(color: KiteColors.muted)),
+            const Spacer(),
+            TextButton.icon(onPressed: onPlan, icon: const Icon(Icons.event, size: 16), label: const Text('Planifier')),
+          ],
+        ),
+      );
+    }
+    final sorted = [...calls]..sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
+    return SizedBox(
+      height: 132,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        children: [
+          for (final sc in sorted)
+            Padding(
+              padding: const EdgeInsets.only(right: 10),
+              child: _ScheduledCard(
+                call: sc,
+                onToggleReminder: () => onToggleReminder(sc),
+                onDelete: () => onDelete(sc),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ScheduledCard extends StatelessWidget {
+  const _ScheduledCard({required this.call, required this.onToggleReminder, required this.onDelete});
+
+  final ScheduledCall call;
+  final VoidCallback onToggleReminder;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final dt = DateTime.fromMillisecondsSinceEpoch(call.scheduledAt);
+    final isPast = dt.isBefore(DateTime.now());
+    return Container(
+      width: 178,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: KiteColors.surface2,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isPast ? KiteColors.border : KiteColors.accent.withValues(alpha: 0.4)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(call.kind == 'video' ? Icons.videocam : Icons.call, size: 16, color: KiteColors.accent),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(call.title, maxLines: 1, overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w600, color: KiteColors.fg)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(fmt(dt: dt), style: const TextStyle(color: KiteColors.muted, fontSize: 12)),
+          const SizedBox(height: 2),
+          Text(call.memberIds.isEmpty ? 'Juste moi' : '${call.memberIds.length} participant(s)',
+              style: const TextStyle(color: KiteColors.muted, fontSize: 11)),
+          const Spacer(),
+          Row(
+            children: [
+              InkWell(
+                onTap: onToggleReminder,
+                child: Row(
+                  children: [
+                    Icon(call.reminder ? Icons.notifications_active : Icons.notifications_none,
+                        size: 16, color: call.reminder ? KiteColors.tint2 : KiteColors.muted),
+                    const SizedBox(width: 4),
+                    const Text('Rappel', style: TextStyle(color: KiteColors.muted, fontSize: 11)),
+                  ],
+                ),
+              ),
+              const Spacer(),
+              InkWell(onTap: onDelete, child: const Icon(Icons.delete_outline, size: 18, color: KiteColors.danger)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  static String fmt({required DateTime dt}) {
+    final m = dt.month.toString().padLeft(2, '0');
+    final d = dt.day.toString().padLeft(2, '0');
+    final h = dt.hour.toString().padLeft(2, '0');
+    final min = dt.minute.toString().padLeft(2, '0');
+    return '${dt.year}-$m-$d $h:$min';
   }
 }
 

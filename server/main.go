@@ -33,6 +33,8 @@ func main() {
 	mux.HandleFunc("/api/calls/log", cors(a.handleCallLog))
 	mux.HandleFunc("/api/calls/initiate", cors(a.handleCallInitiate))
 	mux.HandleFunc("/api/calls/respond", cors(a.handleCallRespond))
+	mux.HandleFunc("/api/scheduled-calls", cors(a.handleScheduledCalls))
+	mux.HandleFunc("/api/scheduled-calls/", cors(a.handleScheduledCalls))
 
 	srv := &http.Server{
 		Addr:              addr,
