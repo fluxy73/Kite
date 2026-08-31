@@ -698,8 +698,12 @@ class _CallRow extends StatelessWidget {
                   const SizedBox(height: 2),
                   Row(
                     children: [
-                      Icon(_directionIcon(call.direction), size: 14, color: color),
-                      const SizedBox(width: 4),
+                      if (call.direction == 'missed')
+                        _missedBadge()
+                      else ...[
+                        Icon(_directionIcon(call.direction), size: 14, color: color),
+                        const SizedBox(width: 4),
+                      ],
                       Text(_directionLabel(call),
                           style: TextStyle(color: color, fontSize: 13)),
                     ],
@@ -724,8 +728,25 @@ class _CallRow extends StatelessWidget {
   }
 
   static String _directionLabel(CallLog c) {
-    final d = c.direction == 'missed' ? 'Manqué' : (c.direction == 'outgoing' ? 'Sortant' : 'Entrant');
+    if (c.direction == 'missed') {
+      return 'Appel ${c.isVideo ? 'vidéo' : 'audio'} sans réponse';
+    }
+    final d = c.direction == 'outgoing' ? 'Sortant' : 'Entrant';
     return '${c.isVideo ? 'Vidéo' : 'Audio'} · $d';
+  }
+
+  /// Badge « Manqué » pour les appels entrants expirés (timeout 30 s).
+  static Widget _missedBadge() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
+      decoration: BoxDecoration(
+        color: KiteColors.danger.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: const Text('Manqué',
+          style: TextStyle(
+              color: KiteColors.danger, fontSize: 11, fontWeight: FontWeight.w600)),
+    );
   }
 
   static String _timeOf(int ms) {

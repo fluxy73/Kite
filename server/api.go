@@ -461,6 +461,23 @@ func (a *api) handleCallRespond(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	chat, _ := a.store.chatByID(updated.ChatID)
+	if body.Status == "missed" {
+		name := updated.CallerName
+		isGroup := chat != nil && chat.Type == "group"
+		if isGroup {
+			name = chat.Name
+		}
+		a.store.addCallLog(CallLog{
+			ID:        newID("cl"),
+			Type:      updated.Kind,
+			UserID:    updated.CallerID,
+			Name:      name,
+			Group:     isGroup,
+			Direction: "missed",
+			IsVideo:   updated.Kind == "video",
+			CreatedAt: time.Now().UnixMilli(),
+		})
+	}
 	a.hub.broadcastToUsers(chat.MemberIDs, Event{Type: "call_respond", ChatID: updated.ChatID, Data: mustJSON(updated)})
 	wJSON(w, 200, updated)
 }

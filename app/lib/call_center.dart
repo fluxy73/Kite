@@ -39,6 +39,9 @@ class CallCenter {
   static final CallCenter instance = CallCenter._();
 
   final ValueNotifier<IncomingCall?> current = ValueNotifier<IncomingCall?>(null);
+
+  /// Incrémenté quand un appel expire (manqué) : le shell recharge la liste des appels.
+  final ValueNotifier<int> callsRevision = ValueNotifier<int>(0);
   StreamSubscription<ServerEvent>? _sub;
   final Set<String> _seen = {};
 
@@ -57,6 +60,11 @@ class CallCenter {
 
   void dismiss() {
     current.value = null;
+  }
+
+  /// Notifie qu'un appel a expiré (manqué) pour rafraîchir la section Récents.
+  void notifyMissed() {
+    callsRevision.value++;
   }
 
   void dispose() {
