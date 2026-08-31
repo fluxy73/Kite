@@ -349,6 +349,14 @@ func (s *Store) respondCall(callID, status string) (*CallRecord, bool) {
 	}
 	return nil, false
 }
+
+func (s *Store) addCallLog(c CallLog) CallLog {
+	s.mu.Lock()
+	s.state.Calls = append(s.state.Calls, c)
+	s.mu.Unlock()
+	_ = s.save()
+	return c
+}
 func (s *Store) addChat(typ, name string, memberIDs, adminIDs []string) Chat {
 	c := Chat{
 		ID:        newID("c"),

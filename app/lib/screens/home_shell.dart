@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../api.dart';
+import '../call_center.dart';
 import '../models.dart';
 import '../theme.dart';
 import 'calls_screen.dart';
@@ -25,7 +26,14 @@ class _HomeShellState extends State<HomeShell> {
   @override
   void initState() {
     super.initState();
+    CallCenter.instance.callsRevision.addListener(_load);
     _load();
+  }
+
+  @override
+  void dispose() {
+    CallCenter.instance.callsRevision.removeListener(_load);
+    super.dispose();
   }
 
   Future<void> _load() async {

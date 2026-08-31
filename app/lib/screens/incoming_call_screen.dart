@@ -90,6 +90,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
     _vibration?.cancel();
     final call = widget.call;
     await widget.api.respondCall(call.id, 'missed').catchError((_) => null);
+    CallCenter.instance.notifyMissed();
     CallCenter.instance.dismiss();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
