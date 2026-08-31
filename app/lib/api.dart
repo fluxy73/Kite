@@ -77,6 +77,23 @@ class KiteApi {
     });
   }
 
+  /// Signalisation temps réel : initie un appel (broadcast WebSocket/SSE).
+  Future<Map<String, dynamic>> initiateCall(String chatId, {String kind = 'audio'}) async {
+    final raw = await _send('POST', '/api/calls/initiate', query: {'userId': meId}, body: {
+      'chatId': chatId,
+      'kind': kind,
+    });
+    return (raw as Map).cast<String, dynamic>();
+  }
+
+  /// Répond à un appel entrant (accepted | declined) — broadcast temps réel.
+  Future<void> respondCall(String callId, String status) async {
+    await _send('POST', '/api/calls/respond', query: {'userId': meId}, body: {
+      'callId': callId,
+      'status': status,
+    });
+  }
+
   Future<List<Message>> fetchMessages(String chatId) async {
     final raw = await _send('GET', '/api/chats/$chatId/messages', query: {'userId': meId});
     return (raw as List).map((e) => Message.fromJson(e as Map<String, dynamic>)).toList();

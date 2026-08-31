@@ -41,6 +41,18 @@ type CallLog struct {
 	CompletedAt int64  `json:"completedAt"`
 }
 
+// CallRecord tracks an in-flight call (signaling temps réel).
+type CallRecord struct {
+	ID         string `json:"id"`
+	ChatID     string `json:"chatId"`
+	CallerID   string `json:"callerId"`
+	CallerName string `json:"callerName"`
+	Kind       string `json:"kind"`   // audio | video
+	Status     string `json:"status"` // ringing | accepted | declined | ended
+	CreatedAt  int64  `json:"createdAt"`
+	UpdatedAt  int64  `json:"updatedAt"`
+}
+
 type Chat struct {
 	ID        string   `json:"id"`
 	Type      string   `json:"type"` // dm | group | community
@@ -73,18 +85,19 @@ type Pending struct {
 }
 
 type State struct {
-	Users       []User      `json:"users"`
-	Chats       []Chat      `json:"chats"`
-	Messages    []Message   `json:"messages"`
-	Pending     []Pending   `json:"pending"`
-	Communities []Community `json:"communities"`
-	Calls       []CallLog   `json:"calls"`
-	SeedVersion int         `json:"seedVersion"`
+	Users       []User       `json:"users"`
+	Chats       []Chat       `json:"chats"`
+	Messages    []Message    `json:"messages"`
+	Pending     []Pending    `json:"pending"`
+	Communities []Community  `json:"communities"`
+	Calls       []CallLog    `json:"calls"`
+	CallRecords []CallRecord `json:"callRecords"`
+	SeedVersion int          `json:"seedVersion"`
 }
 
 // seedVersion is bumped whenever the shape of seedState() changes, so an
 // existing data file is regenerated on the next start.
-const seedVersion = 3
+const seedVersion = 4
 
 // ---------- Store ----------
 
@@ -281,6 +294,38 @@ func (s *Store) addCommunity(cm Community) {
 	_ = s.save()
 }
 
+func (s *Store) createCall(chatID, callerID, callerName, kind string) CallRecord {
+	c := CallRecord{
+		ID:         newID("call"),
+		ChatID:     chatID,
+		CallerID:   callerID,
+		CallerName: callerName,
+		Kind:       kind,
+		Status:     "ringing",
+		CreatedAt:  time.Now().UnixMilli(),
+		UpdatedAt:  time.Now().UnixMilli(),
+	}
+	s.mu.Lock()
+	s.state.CallRecords = append(s.state.CallRecords, c)
+	s.mu.Unlock()
+	_ = s.save()
+	return c
+}
+
+func (s *Store) respondCall(callID, status string) (*CallRecord, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i := range s.state.CallRecords {
+		c := &s.state.CallRecords[i]
+		if c.ID == callID {
+			c.Status = status
+			c.UpdatedAt = time.Now().UnixMilli()
+			_ = s.save()
+			return c, true
+		}
+	}
+	return nil, false
+}
 func (s *Store) addChat(typ, name string, memberIDs, adminIDs []string) Chat {
 	c := Chat{
 		ID:        newID("c"),
