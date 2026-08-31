@@ -32,7 +32,7 @@ class CallsScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const _Header(),
+            _Header(onDemoCall: () => _simulateIncoming(context)),
             const _SectionTitle('Favoris'),
             _favoritesRow(context, favorites),
             const _SectionTitle('Récents'),
@@ -165,6 +165,19 @@ class CallsScreen extends StatelessWidget {
     );
   }
 
+  /// Simule un appel entrant réel : Lucas (u-lucas) initie un appel dans
+  /// c-lucas -> le serveur broadcast l'event "call" -> l'écran qui sonne s'affiche.
+  void _simulateIncoming(BuildContext context) {
+    api.initiateCall('c-lucas', kind: 'video').catchError((_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Serveur injoignable : lancez le serveur Go')),
+        );
+      }
+      return <String, dynamic>{};
+    });
+  }
+
   /// Démarre un appel (mock) et journalise l'appel dans la conversation (branché serveur).
   void _contactCall(BuildContext context, String id,
       {required String name, bool group = false, bool video = false}) {
@@ -210,7 +223,10 @@ class CallsScreen extends StatelessWidget {
 }
 
 class _Header extends StatelessWidget {
-  const _Header();
+  const _Header({this.onDemoCall});
+
+  /// Déclenche un appel entrant simulé (démo du flux temps réel).
+  final VoidCallback? onDemoCall;
 
   @override
   Widget build(BuildContext context) {
@@ -232,6 +248,11 @@ class _Header extends StatelessWidget {
             icon: const Icon(Icons.link),
             tooltip: 'Créer un lien d’appel',
             onPressed: () => _linkSheet(context),
+          ),
+          IconButton(
+            icon: const Icon(Icons.phone_in_talk_outlined),
+            tooltip: 'Simuler un appel entrant (démo)',
+            onPressed: onDemoCall,
           ),
         ],
       ),

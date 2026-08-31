@@ -317,6 +317,73 @@ func (a *api) handleCallLog(w http.ResponseWriter, r *http.Request) {
 }
 
 // ---------- Actions sur messages ----------
+
+// ---------- Appels (signalisation temps réel) ----------
+
+func (a *api) handleCallInitiate(w http.ResponseWriter, r *http.Request) {
+	uid, ok := a.userOrError(w, r)
+	if !ok {
+		return
+	}
+	var body struct {
+		ChatID string `json:"chatId"`
+		Kind   string `json:"kind"` // audio | video
+	}
+	if err := readJSON(r, &body); err != nil {
+		httpError(w, 400, "corps invalide: "+err.Error())
+		return
+	}
+	if body.ChatID == "" {
+		httpError(w, 400, "chatId requis")
+		return
+	}
+	chat, ok := a.store.chatByID(body.ChatID)
+	if !ok || !inSlice(chat.MemberIDs, uid) {
+		httpError(w, 403, "pas membre de cette conversation")
+		return
+	}
+	if body.Kind == "" {
+		body.Kind = "audio"
+	}
+	callerName := uid
+	if u, ok := a.store.userByID(uid); ok {
+		callerName = u.Name
+	}
+	c := a.store.createCall(chat.ID, uid, callerName, body.Kind)
+	// Diffusion à tous les membres (sauf l'appelant) : événement "call" temps réel.
+	members := []string{}
+	for _, m := range chat.MemberIDs {
+		if m != uid {
+			members = append(members, m)
+		}
+	}
+	a.hub.broadcastToUsers(members, Event{Type: "call", ChatID: chat.ID, Data: mustJSON(c)})
+	wJSON(w, 201, c)
+}
+
+func (a *api) handleCallRespond(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		CallID string `json:"callId"`
+		Status string `json:"status"` // accepted | declined
+	}
+	if err := readJSON(r, &body); err != nil {
+		httpError(w, 400, "corps invalide: "+err.Error())
+		return
+	}
+	if body.Status != "accepted" && body.Status != "declined" {
+		httpError(w, 400, "status doit être accepted ou declined")
+		return
+	}
+	updated, ok := a.store.respondCall(body.CallID, body.Status)
+	if !ok {
+		httpError(w, 404, "appel introuvable")
+		return
+	}
+	chat, _ := a.store.chatByID(updated.ChatID)
+	a.hub.broadcastToUsers(chat.MemberIDs, Event{Type: "call_respond", ChatID: updated.ChatID, Data: mustJSON(updated)})
+	wJSON(w, 200, updated)
+}
+
 // ---------- SSE (temps réel + messages en attente) ----------
 
 func (a *api) handleEvents(w http.ResponseWriter, r *http.Request) {

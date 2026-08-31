@@ -31,6 +31,8 @@ func main() {
 	mux.HandleFunc("/api/shell", cors(a.handleShell))
 	mux.HandleFunc("/api/communities", cors(a.handleCommunities))
 	mux.HandleFunc("/api/calls/log", cors(a.handleCallLog))
+	mux.HandleFunc("/api/calls/initiate", cors(a.handleCallInitiate))
+	mux.HandleFunc("/api/calls/respond", cors(a.handleCallRespond))
 
 	srv := &http.Server{
 		Addr:              addr,

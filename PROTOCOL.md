@@ -19,6 +19,8 @@ identifié par `userId` (query param pour REST/SSE, même param pour le WS).
 | GET | `/api/shell` | `?userId=` | agrégat Appels + Communautés + Discussions (`{users,chats,communities,calls}`) |
 | GET/POST | `/api/communities` | `?userId=` · `{name,description,groupIds}` | liste / crée une communauté (avec groupes join) |
 | POST | `/api/calls/log` | `{userId,chatId,kind,direction}` | journalise un appel (message `call` dans le chat) |
+| POST | `/api/calls/initiate` | `{userId,chatId,kind}` | initie un appel → broadcast WebSocket/SSE `{type:"call"}` (sonnerie) |
+| POST | `/api/calls/respond` | `{userId,callId,status: accepted|declined}` | répond à un appel entrant → broadcast `{type:"call_respond"}` |
 
 Codes : `200/201` OK · `400` paramètre manquant · `403` action interdite
 (non-expéditeur, non-membre) · `404` ressource inconnue.
