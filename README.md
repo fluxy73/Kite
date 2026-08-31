@@ -94,6 +94,45 @@ cd server && go vet ./... && go build ./...
 cd app && flutter analyze && flutter test && flutter build bundle
 ```
 
+## Déploiement (VPS Linux + Cloudflare Tunnel)
+
+Le serveur Go tourne en service **systemd** et est exposé via un **tunnel
+Cloudflare** (HTTPS inclus, aucune porte ouverte sur le pare-feu) :
+
+```bash
+# Service systemd pour le serveur Go — config complète dans DEPLOY.md
+sudo tee /etc/systemd/system/kite.service >/dev/null <<'UNIT'
+[Unit]
+Description=Kite server (Go)
+After=network-online.target
+[Service]
+WorkingDirectory=/opt/kite/server
+ExecStart=/opt/kite/server/kite-server
+Environment=KITE_ADDR=:8080
+Environment=KITE_DATA=/opt/kite/server/data/kite.json
+Restart=always
+RestartSec=3
+[Install]
+WantedBy=multi-user.target
+UNIT
+sudo systemctl daemon-reload && sudo systemctl enable --now kite
+
+# Tunnel Cloudflare nommé → http://localhost:8080
+cloudflared tunnel create kite
+sudo cloudflared service install        # lit /etc/cloudflared/config.yml
+cloudflared tunnel route dns kite kite.votre-domaine.com
+```
+
+App connectée à distance :
+
+```bash
+flutter run --dart-define=KITE_API=https://kite.votre-domaine.com
+```
+
+Guide complet (config.yml, credentials, WebSocket /api/ws, mise à jour,
+dépannage) : **`DEPLOY.md`**.
+
+
 ## Structure
 
 ```
