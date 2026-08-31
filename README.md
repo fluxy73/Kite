@@ -107,3 +107,35 @@ screens/      maquettes HTML historiques
 ```
 
 Détails du protocole (formats JSON, événements, codes HTTP) : voir `PROTOCOL.md`.
+
+## Roadmap / Fonctionnalités à venir
+
+Fonctionnalités prévues (non implémentées aujourd'hui, le prototype reste en
+state local mocké) :
+
+**Communication réelle**
+- Audio/vidéo réels (WebRTC) à la place des flux simulés.
+- Chiffrement de bout en bout réel (clés, sessions).
+- Notifications push (appels entrants et messages hors app).
+
+**Backend**
+- Authentification réelle (comptes, sessions) au lieu de `?userId=`.
+- Persistance multi-utilisateurs (base de données), historique illimité.
+- Gestion des messages en attente côté serveur (files par utilisateur).
+
+**Messagerie**
+- Recherche globale (messages, contacts), archivage et sauvegarde.
+- Enregistrement vocal et vidéo réels, statuts de lecture précis.
+- Sondages avancés, réactions multiples, épinglés persistés.
+
+**Appels**
+- Appel entrant hors application (push + sonnerie système).
+- Journal d'appels complet (durée, sens, manqués) côté serveur.
+- Rappels récurrents pour les appels planifiés.
+
+**Plateformes & distribution**
+- Builds finalisés Android/iOS/Windows/Linux, PWA.
+- Synchronisation multi-appareils (compte unique).
+
+Chaque item de cette liste sera traité comme une évolution incrémentale de la
+base existante, en conservant le design system actuel.
