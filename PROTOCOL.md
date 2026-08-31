@@ -16,11 +16,14 @@ identifié par `userId` (query param pour REST/SSE, même param pour le WS).
 | POST | `/api/messages/{id}/edit` | `{userId, text}` | modifie (expéditeur seul) |
 | POST | `/api/messages/{id}/delete` | `{userId, mode: "me"\|"all"}` | supprime (all : expéditeur seul) |
 | POST | `/api/messages/{id}/vote` | `{userId, optionIndex}` | vote à un sondage |
-| GET | `/api/shell` | `?userId=` | agrégat Appels + Communautés + Discussions (`{users,chats,communities,calls}`) |
+| GET | `/api/shell` | `?userId=` | agrégat Appels + Communautés + Discussions (`{users,chats,communities,calls,scheduledCalls}`) |
 | GET/POST | `/api/communities` | `?userId=` · `{name,description,groupIds}` | liste / crée une communauté (avec groupes join) |
 | POST | `/api/calls/log` | `{userId,chatId,kind,direction}` | journalise un appel (message `call` dans le chat) |
 | POST | `/api/calls/initiate` | `{userId,chatId,kind}` | initie un appel → broadcast WebSocket/SSE `{type:"call"}` (sonnerie) |
 | POST | `/api/calls/respond` | `{userId,callId,status: accepted|declined}` | répond à un appel entrant → broadcast `{type:"call_respond"}` |
+| GET/POST | `/api/scheduled-calls` | `?userId=` · `{title,scheduledAt,kind,memberIds,chatId,reminder}` | liste / crée un appel planifié |
+| PATCH | `/api/scheduled-calls` | `{userId,id}` | active/désactive le rappel d'un appel planifié |
+| DELETE | `/api/scheduled-calls/{id}` | `?userId=` | supprime un appel planifié |
 
 Codes : `200/201` OK · `400` paramètre manquant · `403` action interdite
 (non-expéditeur, non-membre) · `404` ressource inconnue.

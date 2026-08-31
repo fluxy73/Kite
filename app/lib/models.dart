@@ -74,6 +74,43 @@ class CallLog {
       );
 }
 
+/// Appel planifié pour une date/heure future (onglet Appels).
+class ScheduledCall {
+  const ScheduledCall({
+    required this.id,
+    required this.title,
+    this.userId = '',
+    this.memberIds = const [],
+    this.chatId = '',
+    this.scheduledAt = 0,
+    this.kind = 'audio',
+    this.reminder = false,
+    this.createdAt = 0,
+  });
+
+  final String id;
+  final String title;
+  final String userId; // créateur
+  final List<String> memberIds; // participants
+  final String chatId;
+  final int scheduledAt; // timestamp d'échéance
+  final String kind; // audio | video
+  final bool reminder;
+  final int createdAt;
+
+  factory ScheduledCall.fromJson(Map<String, dynamic> json) => ScheduledCall(
+        id: json['id'] as String,
+        title: json['title'] as String? ?? '',
+        userId: json['userId'] as String? ?? '',
+        memberIds: (json['memberIds'] as List? ?? []).cast<String>(),
+        chatId: json['chatId'] as String? ?? '',
+        scheduledAt: json['scheduledAt'] as int? ?? 0,
+        kind: json['kind'] as String? ?? 'audio',
+        reminder: json['reminder'] as bool? ?? false,
+        createdAt: json['createdAt'] as int? ?? 0,
+      );
+}
+
 /// Payload agrégé de l'écran principal (get /api/shell).
 class AppShell {
   const AppShell({
@@ -81,12 +118,14 @@ class AppShell {
     this.chats = const [],
     this.communities = const [],
     this.calls = const [],
+    this.scheduledCalls = const [],
   });
 
   final List<User> users;
   final List<Chat> chats;
   final List<Community> communities;
   final List<CallLog> calls;
+  final List<ScheduledCall> scheduledCalls;
 
   factory AppShell.fromJson(Map<String, dynamic> json) => AppShell(
         users: (json['users'] as List? ?? [])
@@ -100,6 +139,9 @@ class AppShell {
             .toList(),
         calls: (json['calls'] as List? ?? [])
             .map((e) => CallLog.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        scheduledCalls: (json['scheduledCalls'] as List? ?? [])
+            .map((e) => ScheduledCall.fromJson(e as Map<String, dynamic>))
             .toList(),
       );
 }

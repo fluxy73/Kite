@@ -53,6 +53,19 @@ type CallRecord struct {
 	UpdatedAt  int64  `json:"updatedAt"`
 }
 
+// ScheduledCall is a call planned for a future date/time (Calls tab).
+type ScheduledCall struct {
+	ID          string   `json:"id"`
+	Title       string   `json:"title"`
+	UserID      string   `json:"userId"`      // créateur
+	MemberIDs   []string `json:"memberIds"`   // participants
+	ChatID      string   `json:"chatId"`      // conversation rattachée ('' = générique)
+	ScheduledAt int64    `json:"scheduledAt"` // timestamp de l'échéance
+	Kind        string   `json:"kind"`        // audio | video
+	Reminder    bool     `json:"reminder"`
+	CreatedAt   int64    `json:"createdAt"`
+}
+
 type Chat struct {
 	ID        string   `json:"id"`
 	Type      string   `json:"type"` // dm | group | community
@@ -85,19 +98,20 @@ type Pending struct {
 }
 
 type State struct {
-	Users       []User       `json:"users"`
-	Chats       []Chat       `json:"chats"`
-	Messages    []Message    `json:"messages"`
-	Pending     []Pending    `json:"pending"`
-	Communities []Community  `json:"communities"`
-	Calls       []CallLog    `json:"calls"`
-	CallRecords []CallRecord `json:"callRecords"`
-	SeedVersion int          `json:"seedVersion"`
+	Users          []User          `json:"users"`
+	Chats          []Chat          `json:"chats"`
+	Messages       []Message       `json:"messages"`
+	Pending        []Pending       `json:"pending"`
+	Communities    []Community     `json:"communities"`
+	Calls          []CallLog       `json:"calls"`
+	CallRecords    []CallRecord    `json:"callRecords"`
+	ScheduledCalls []ScheduledCall `json:"scheduledCalls"`
+	SeedVersion    int             `json:"seedVersion"`
 }
 
 // seedVersion is bumped whenever the shape of seedState() changes, so an
 // existing data file is regenerated on the next start.
-const seedVersion = 4
+const seedVersion = 5
 
 // ---------- Store ----------
 
@@ -275,6 +289,15 @@ func (s *Store) unreadCount(chatID, userID string) int {
 	}
 	return n
 }
+func (s *Store) userList() []string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]string, 0, len(s.state.Users))
+	for _, u := range s.state.Users {
+		out = append(out, u.ID)
+	}
+	return out
+}
 
 // ---------- Mutations ----------
 
@@ -340,6 +363,55 @@ func (s *Store) addChat(typ, name string, memberIDs, adminIDs []string) Chat {
 	s.mu.Unlock()
 	_ = s.save()
 	return c
+}
+
+func (s *Store) addScheduledCall(sc ScheduledCall) ScheduledCall {
+	sc.ID = newID("sc")
+	sc.CreatedAt = time.Now().UnixMilli()
+	s.mu.Lock()
+	s.state.ScheduledCalls = append(s.state.ScheduledCalls, sc)
+	s.mu.Unlock()
+	_ = s.save()
+	return sc
+}
+
+func (s *Store) scheduledCallsFor(userID string) []ScheduledCall {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := []ScheduledCall{}
+	for _, sc := range s.state.ScheduledCalls {
+		if sc.UserID == userID || inSlice(sc.MemberIDs, userID) {
+			out = append(out, sc)
+		}
+	}
+	return out
+}
+
+func (s *Store) toggleScheduledReminder(id string) (*ScheduledCall, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i := range s.state.ScheduledCalls {
+		sc := &s.state.ScheduledCalls[i]
+		if sc.ID == id {
+			sc.Reminder = !sc.Reminder
+			_ = s.save()
+			return sc, true
+		}
+	}
+	return nil, false
+}
+
+func (s *Store) deleteScheduledCall(id string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i := range s.state.ScheduledCalls {
+		if s.state.ScheduledCalls[i].ID == id {
+			s.state.ScheduledCalls = append(s.state.ScheduledCalls[:i], s.state.ScheduledCalls[i+1:]...)
+			_ = s.save()
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Store) addMessage(chatID, senderID, typ, text string, media map[string]any, replyTo string) Message {
@@ -593,14 +665,22 @@ func seedState() State {
 		{ID: "cl-6", Type: "audio", UserID: "u-sarah", Name: "Sarah Kacem", Direction: "missed", CreatedAt: min(800)},
 	}
 
+	// --- Appels planifiés (démo) ---
+	hoursLater := func(n int) int64 { return now.Add(time.Duration(n) * time.Hour).UnixMilli() }
+	scheduled := []ScheduledCall{
+		{ID: "sc-demo1", Title: "Point d'équipe", UserID: "u-julien", MemberIDs: []string{"u-lucas", "u-emma", "u-thomas", "u-sarah"}, ChatID: "c-nova", ScheduledAt: hoursLater(24), Kind: "video", Reminder: true},
+		{ID: "sc-demo2", Title: "Catch-up Lucas", UserID: "u-julien", MemberIDs: []string{"u-lucas"}, ChatID: "c-lucas", ScheduledAt: hoursLater(3), Kind: "audio", Reminder: false},
+	}
+
 	state := State{
-		Users:       users,
-		Chats:       chats,
-		Messages:    msgs,
-		Pending:     pending,
-		Communities: communities,
-		Calls:       calls,
-		SeedVersion: seedVersion,
+		Users:          users,
+		Chats:          chats,
+		Messages:       msgs,
+		Pending:        pending,
+		Communities:    communities,
+		Calls:          calls,
+		SeedVersion:    seedVersion,
+		ScheduledCalls: scheduled,
 	}
 	return state
 }
