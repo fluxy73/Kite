@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'api.dart';
 import 'call_center.dart';
+import 'reminder_center.dart';
 import 'screens/home_shell.dart';
 import 'screens/incoming_call_screen.dart';
 import 'theme.dart';
@@ -32,6 +33,8 @@ class _KiteAppState extends State<KiteApp> {
     // Écoute globale des appels entrants via WebSocket/SSE (temps réel).
     CallCenter.instance.start(widget.api);
     CallCenter.instance.current.addListener(_onIncomingCall);
+    ScheduledReminderCenter.instance.start(widget.api);
+    ScheduledReminderCenter.instance.next.addListener(_onScheduledReminder);
   }
 
   void _onIncomingCall() {
@@ -54,7 +57,45 @@ class _KiteAppState extends State<KiteApp> {
   @override
   void dispose() {
     CallCenter.instance.current.removeListener(_onIncomingCall);
+    ScheduledReminderCenter.instance.next.removeListener(_onScheduledReminder);
     super.dispose();
+  }
+
+  /// Popup quand un appel planifié arrive dans moins d'une heure (rappel activé).
+  void _onScheduledReminder() {
+    final sc = ScheduledReminderCenter.instance.next.value;
+    if (sc == null) return;
+    ScheduledReminderCenter.instance.reset();
+    final ctx = _nav.currentState?.context;
+    if (ctx == null) return;
+    showDialog<void>(
+      context: ctx,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: KiteColors.surface,
+        title: const Text('Rappel d’appel'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(sc.title, style: const TextStyle(fontWeight: FontWeight.w600, color: KiteColors.fg)),
+            const SizedBox(height: 6),
+            Text('Dans moins d’une heure · ${_fmtReminder(sc.scheduledAt)}', style: const TextStyle(color: KiteColors.muted, fontSize: 13)),
+            const SizedBox(height: 4),
+            Text(sc.kind == 'video' ? 'Appel vidéo' : 'Appel audio', style: const TextStyle(color: KiteColors.muted, fontSize: 13)),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogCtx), child: const Text('OK')),
+        ],
+      ),
+    );
+  }
+
+  static String _fmtReminder(int ms) {
+    final dt = DateTime.fromMillisecondsSinceEpoch(ms);
+    final h = dt.hour.toString().padLeft(2, '0');
+    final min = dt.minute.toString().padLeft(2, '0');
+    return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')} $h:$min';
   }
 
   @override
