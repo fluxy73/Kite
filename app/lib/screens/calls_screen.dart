@@ -842,6 +842,8 @@ class _InCallScreenState extends State<InCallScreen> {
   bool _videoOn = true;
   bool _sharing = false;
   String? _sharerName;
+  bool _blur = false;
+  bool _portrait = false;
   int _elapsed = 0;
   int _reactionSeq = 0;
   final List<_Reaction> _reactions = [];
@@ -977,7 +979,9 @@ class _InCallScreenState extends State<InCallScreen> {
                 Expanded(
                   child: _sharing
                       ? _sharingLayout(participants)
-                      : _gridLayout(participants),
+                      : (widget.video && !widget.group)
+                          ? _oneToOneLayout(participants)
+                          : _gridLayout(participants),
                 ),
                 _controls(),
                 const SizedBox(height: 14),
@@ -1061,6 +1065,50 @@ class _InCallScreenState extends State<InCallScreen> {
           ),
         );
       },
+    );
+  }
+
+  /// Appel vidéo 1:1 : grande tuile de l'interlocuteur + vignette soi (PiP),
+  /// avec options avancées : flou d'arrière-plan et mode portrait.
+  Widget _oneToOneLayout(List<String> participants) {
+    final remote = participants.firstWhere((p) => p != 'Moi', orElse: () => 'Contact');
+    return Stack(
+      children: [
+        if (_portrait)
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 56),
+              child: AspectRatio(
+                aspectRatio: 3 / 4,
+                child: _ParticipantTile(
+                  name: remote,
+                  isMe: false,
+                  muted: false,
+                  videoOn: true,
+                  speaking: _elapsed % 2 == 0,
+                ),
+              ),
+            ),
+          )
+        else
+          Positioned.fill(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+              child: _ParticipantTile(
+                name: remote,
+                isMe: false,
+                muted: false,
+                videoOn: true,
+                speaking: _elapsed % 2 == 0,
+              ),
+            ),
+          ),
+        Positioned(
+          right: 14,
+          bottom: 14,
+          child: _SelfPip(blur: _blur, muted: _muted, videoOn: _videoOn),
+        ),
+      ],
     );
   }
 
@@ -1149,6 +1197,20 @@ class _InCallScreenState extends State<InCallScreen> {
         active: _speaker,
         onTap: () => setState(() => _speaker = !_speaker),
       ),
+      if (widget.video && !widget.group) ...[
+        _Control(
+          icon: _blur ? Icons.blur_on : Icons.blur_off,
+          label: 'Flou',
+          active: _blur,
+          onTap: () => setState(() => _blur = !_blur),
+        ),
+        _Control(
+          icon: _portrait ? Icons.crop_portrait : Icons.crop_landscape,
+          label: _portrait ? 'Portrait' : 'Paysage',
+          active: _portrait,
+          onTap: () => setState(() => _portrait = !_portrait),
+        ),
+      ],
       _Control(
         icon: _videoOn ? Icons.videocam : Icons.videocam_off,
         label: _videoOn ? 'Vidéo' : 'Caméra off',
@@ -1174,10 +1236,11 @@ class _InCallScreenState extends State<InCallScreen> {
         onTap: _showParticipants,
       ),
     ];
-    return Padding(
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.symmetric(horizontal: 8),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        mainAxisSize: MainAxisSize.min,
         children: items,
       ),
     );
@@ -1289,6 +1352,65 @@ class _FloatingReaction extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(6),
         child: Text(emoji, style: const TextStyle(fontSize: 34)),
+      ),
+    );
+  }
+}
+
+/// Vignette « moi » (PiP) de l'appel vidéo 1:1, avec flou d'arrière-plan simulé.
+class _SelfPip extends StatelessWidget {
+  const _SelfPip({required this.blur, required this.muted, required this.videoOn});
+  final bool blur;
+  final bool muted;
+  final bool videoOn;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 96,
+      height: 128,
+      decoration: BoxDecoration(
+        color: KiteColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: KiteColors.border),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: blur
+                    ? [KiteColors.surface3, KiteColors.surface2, KiteColors.surface3]
+                    : [KiteColors.surface3, KiteColors.surface],
+              ),
+            ),
+          ),
+          Center(
+            child: videoOn
+                ? const _Avatar(name: 'Moi', size: 44)
+                : const Icon(Icons.videocam_off, size: 26, color: KiteColors.muted),
+          ),
+          const Positioned(left: 6, bottom: 5, child: Text('Moi', style: TextStyle(fontSize: 11, color: KiteColors.fg))),
+          if (muted)
+            const Positioned(top: 6, right: 6, child: Icon(Icons.mic_off, size: 14, color: KiteColors.danger)),
+          if (blur)
+            Positioned(
+              top: 6,
+              left: 6,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: const Text('Flou', style: TextStyle(fontSize: 9, color: KiteColors.fg)),
+              ),
+            ),
+        ],
       ),
     );
   }
