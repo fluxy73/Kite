@@ -108,6 +108,23 @@ screens/      maquettes HTML historiques
 
 Détails du protocole (formats JSON, événements, codes HTTP) : voir `PROTOCOL.md`.
 
+## Historique des livraisons
+
+Toutes les fonctionnalités sont mergées dans `main` (squash).
+
+| PR | Livraison | Contenu |
+|---|---|---|
+| #1 | App Flutter branchée sur serveur Go | shell 3 onglets (Discussions/Communautés/Appels), écrans Appels & Communautés, extensions serveur (`communities`, `calls/log`, `/api/shell`), `PROTOCOL.md` |
+| #2 | Appel vidéo de groupe | grille responsive, partage d'écran, réactions en surimpression |
+| #3 | Appel entrant temps réel | WebSocket/SSE, écran qui sonne, accepter/refuser |
+| #4 | Planification d'appels | titre, date/heure, participants, rappel — persistée côté serveur |
+| #5 | Timeout de sonnerie | appel manqué après 30 s (statut `missed` côté serveur) |
+| #6 | Rappel local | popup quand un appel planifié (rappel activé) approche d'une heure |
+| #7 | Badge « Manqué » | badge sur les appels entrants expirés dans la section Récents |
+| #8 | Appel vidéo 1:1 avancé | flou d'arrière-plan, mode portrait, vignette « moi » (PiP) |
+| #9 | README — bilan | architecture, écrans, API, tests, démarrage, structure |
+| #10 | README — roadmap | fonctionnalités à venir par domaine |
+
 ## Roadmap / Fonctionnalités à venir
 
 Fonctionnalités prévues (non implémentées aujourd'hui, le prototype reste en
