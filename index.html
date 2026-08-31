@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="fr" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <title>Kite — Messagerie Premium</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="app.css" />
+  <style>
+    :root {
+      --bg: #0a0a0c;
+      --surface: #141416;
+      --surface-2: #1c1c20;
+      --fg: #ececea;
+      --muted: #8e8e93;
+      --border: #242428;
+      --accent: #d9985f;
+      --accent-ink: #14100c;
+      --font-display: 'Iowan Old Style', 'Charter', Georgia, serif;
+      --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      --font-mono: ui-monospace, 'JetBrains Mono', 'SF Mono', Menlo, monospace;
+    }
+    [data-theme="light"] {
+      --bg: #f5f4f0;
+      --surface: #ffffff;
+      --surface-2: #e8e6e0;
+      --fg: #1a1a1a;
+      --muted: #6b6b6b;
+      --border: #d4d2cc;
+      --accent: #1e4a7c;
+      --accent-ink: #ffffff;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--fg);
+      font-family: var(--font-body); font-size: 15px; line-height: 1.45;
+      -webkit-font-smoothing: antialiased; min-height: 100vh;
+      overflow-x: hidden;
+    }
+    svg { display: block; }
+    button { font: inherit; cursor: pointer; }
+
+    /* ===== Header ===== */
+    .header {
+      position: sticky; top: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      padding: 12px 24px; flex-wrap: wrap;
+      background: color-mix(in oklch, var(--bg) 88%, transparent);
+      backdrop-filter: blur(12px); border-bottom: 1px solid var(--border);
+    }
+    .header .left, .header .right { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+    .brand { display: flex; align-items: center; gap: 10px; }
+    .logo { width: 30px; height: 30px; background: var(--accent); border-radius: 9px; display: grid; place-items: center; }
+    .logo svg { width: 17px; height: 17px; color: var(--accent-ink); }
+    .brand-name { font-family: var(--font-display); font-size: 22px; font-weight: 500; letter-spacing: -0.01em; }
+
+    .screen-selector {
+      max-width: 250px; padding: 8px 12px; border-radius: 999px;
+      border: 1px solid var(--border); background: var(--surface); color: var(--fg);
+      font-size: 13px; cursor: pointer;
+    }
+    .screen-selector:hover { border-color: var(--muted); }
+    .screen-selector:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    .theme-toggle { display: flex; gap: 4px; padding: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: 999px; }
+    .theme-opt {
+      display: grid; place-items: center; width: 32px; height: 32px; padding: 0;
+      border: none; border-radius: 999px; background: transparent; color: var(--muted);
+      transition: color .15s ease, background .15s ease;
+    }
+    .theme-opt:hover { color: var(--fg); }
+    .theme-opt.active { background: var(--accent); color: var(--accent-ink); }
+    .theme-opt svg { width: 15px; height: 15px; }
+
+    /* ===== Gallery ===== */
+    .stage { display: flex; flex-direction: column; gap: 56px; padding: 40px 32px 72px; max-width: 1760px; margin: 0 auto; }
+    .row { display: flex; flex-wrap: wrap; gap: 48px; justify-content: center; align-items: flex-start; }
+    .device-column { display: flex; flex-direction: column; align-items: center; gap: 12px; min-width: 0; }
+    .row-desktop { display: block; width: 100%; }
+    .col-desktop { width: 100%; max-width: 1240px; margin: 0 auto; }
+
+    .device-label {
+      font-family: var(--font-mono); font-size: 11px; letter-spacing: .1em;
+      text-transform: uppercase; color: var(--muted);
+    }
+
+    /* ===== Device shells with integrated chrome ===== */
+    .shell {
+      position: relative;
+      overflow: hidden;
+      background: #0b0b0d;
+      flex: none;
+      display: flex;
+      flex-direction: column;
+    }
+    .shell iframe { display: block; width: 100%; height: 100%; border: none; background: var(--bg); }
+
+    /* iPhone 15 Pro */
+    .shell.iphone {
+      width: 390px; height: 844px;
+      border-radius: 54px;
+      box-shadow: 0 30px 70px -20px rgb(0 0 0 / .55);
+      border: 12px solid #2d2d33;
+    }
+    .shell.iphone .device-notch {
+      position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+      width: 190px; height: 26px; background: #1a1a1d;
+      border-radius: 0 0 24px 24px; z-index: 10;
+    }
+    .shell.iphone .device-notch-small {
+      position: absolute; top: 6px; left: 50%; transform: translateX(-50%);
+      width: 100px; height: 6px; background: #1a1a1d; border-radius: 3px; z-index: 10;
+    }
+    .shell.iphone .screen-wrap {
+      flex: 1;
+      margin: 34px 12px 12px;
+      border-radius: 42px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Android Pixel */
+    .shell.pixel {
+      width: 412px; height: 915px;
+      border-radius: 28px;
+      box-shadow: 0 30px 70px -20px rgb(0 0 0 / .55);
+      border: 8px solid #2a2a30;
+    }
+    .shell.pixel .device-punch {
+      position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+      width: 80px; height: 2px;
+      border-left: 6px solid #2a2a30; border-right: 6px solid #2a2a30;
+      z-index: 10;
+    }
+    .shell.pixel .device-punch-i {
+      position: absolute; top: 18px; left: 50%; transform: translateX(-50%);
+      width: 26px; height: 26px; border-radius: 50%; background: #2a2a30; z-index: 10;
+    }
+    .shell.pixel .screen-wrap {
+      flex: 1;
+      margin: 30px 8px 78px;
+      border-radius: 20px;
+      overflow: hidden;
+      position: relative;
+    }
+    .shell.pixel .device-nav {
+      position: absolute; bottom: 8px; left: 8px; right: 8px; height: 60px;
+      background: #141416; border-radius: 24px;
+      display: flex; align-items: center; justify-content: space-around;
+      border: 1px solid #242428; z-index: 10;
+    }
+    .shell.pixel .device-nav .nb-item {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      width: 48px; height: 40px; color: #8e8e93; font-size: 9px;
+    }
+    .shell.pixel .device-nav .nb-item.active { color: var(--accent); }
+    .shell.pixel .device-nav .nb-item svg { width: 20px; height: 20px; }
+    .shell.pixel .device-gesture {
+      position: absolute; bottom: 38px; left: 50%; transform: translateX(-50%);
+      width: 100px; height: 4px; background: #242428; border-radius: 2px; z-index: 10;
+    }
+
+    /* iPad Pro */
+    .shell.ipad {
+      width: 834px; height: 1194px;
+      border-radius: 24px;
+      box-shadow: 0 30px 70px -20px rgb(0 0 0 / .55);
+      border: 10px solid #252528;
+    }
+    .shell.ipad .screen-wrap {
+      flex: 1;
+      margin: 10px 10px 40px;
+      border-radius: 12px;
+      overflow: hidden;
+      position: relative;
+    }
+    .shell.ipad .device-home {
+      position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
+      width: 160px; height: 4px; background: #242428; border-radius: 2px; z-index: 10;
+    }
+
+    /* MacBook / Desktop */
+    .shell.mac {
+      width: 1240px; height: 780px;
+      border-radius: 14px;
+      box-shadow: 0 40px 90px -24px rgb(0 0 0 / .6);
+      background: #16161a;
+      border: 1px solid #2b2b31;
+    }
+    .shell.mac .device-notch {
+      position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+      width: 180px; height: 22px; background: #0b0b0d;
+      border-radius: 0 0 11px 11px; z-index: 10;
+    }
+    .shell.mac .device-chrome {
+      flex: 0 0 46px;
+      display: flex; align-items: center; gap: 14px;
+      padding: 0 18px;
+      background: #1d1d22;
+      border-bottom: 1px solid #2b2b31;
+    }
+    .shell.mac .device-chrome .dots { display: flex; gap: 8px; }
+    .shell.mac .device-chrome .dot { width: 12px; height: 12px; border-radius: 50%; }
+    .shell.mac .device-chrome .dot.r { background: #ff5f57; }
+    .shell.mac .device-chrome .dot.y { background: #febc2e; }
+    .shell.mac .device-chrome .dot.g { background: #28c840; }
+    .shell.mac .device-chrome .nav-arrows { display: flex; gap: 10px; color: #85858c; }
+    .shell.mac .device-chrome .nav-arrows svg { width: 16px; height: 16px; }
+    .shell.mac .device-chrome .urlbar {
+      flex: 1; max-width: 560px; margin: 0 auto;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      height: 30px; background: #2a2a30; border-radius: 8px;
+      font: 12px/1 ui-monospace, 'SF Mono', Menlo, monospace;
+      color: #b9b9c0; letter-spacing: .02em;
+    }
+    .shell.mac .device-chrome .urlbar svg { width: 11px; height: 11px; color: #28c840; }
+    .shell.mac .screen-wrap {
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+
+    [data-theme="light"] .shell { box-shadow: 0 30px 70px -28px rgb(0 0 0 / .35); }
+    [data-theme="light"] .shell.iphone,
+    [data-theme="light"] .shell.pixel,
+    [data-theme="light"] .shell.ipad { background: #f0f0f2; border-color: #d4d4d8; }
+    [data-theme="light"] .shell.iphone .device-notch { background: #f0f0f2; }
+    [data-theme="light"] .shell.pixel .device-punch { border-color: #d4d4d8; }
+    [data-theme="light"] .shell.pixel .device-punch-i { background: #d4d4d8; }
+    [data-theme="light"] .shell.pixel .device-nav { background: #fff; border-color: #e0e0e4; }
+    [data-theme="light"] .shell.ipad { border-color: #d4d4d8; }
+
+    .hint { text-align: center; color: var(--muted); font-size: 12.5px; font-family: var(--font-mono); letter-spacing: .04em; }
+    .hint kbd { font-family: var(--font-mono); border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 5px; padding: 1px 6px; background: var(--surface); color: var(--fg); }
+
+    @media (max-width: 720px) {
+      .header { padding: 10px 14px; }
+      .stage { padding: 24px 14px 56px; gap: 40px; }
+      .row { gap: 28px; }
+      .screen-selector { max-width: 190px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="header" data-od-id="app-header">
+    <div class="left">
+      <div class="brand">
+        <div class="logo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M21 12a8 8 0 0 1-8 8H5l-2 2V12a8 8 0 0 1 8-8h2a8 8 0 0 1 8 8Z"/>
+            <path d="M8 9h4l2 2"/><circle cx="12" cy="8" r="1"/>
+          </svg>
+        </div>
+        <span class="brand-name">Kite</span>
+      </div>
+
+      <select class="screen-selector" id="screen-select" data-od-id="screen-selector" aria-label="Écran affiché">
+        <optgroup label="Navigation">
+          <option value="screens/chat-list.html">Discussions</option>
+          <option value="screens/communities.html">Communautés</option>
+          <option value="screens/calls.html">Appels</option>
+          <option value="screens/contacts.html">Contacts</option>
+        </optgroup>
+        <optgroup label="Conversation">
+          <option value="screens/conversation.html">Conversation</option>
+          <option value="screens/compose.html">Composer enrichi</option>
+          <option value="screens/search.html">Recherche globale</option>
+          <option value="screens/new-chat.html">Nouvelle discussion</option>
+          <option value="screens/chat-info.html">Infos du chat</option>
+          <option value="screens/contact-info.html">Infos contact</option>
+          <option value="screens/archive.html">Archivées</option>
+        </optgroup>
+        <optgroup label="Médias &amp; saisie">
+          <option value="screens/emoji.html">Emojis</option>
+          <option value="screens/stickers.html">Stickers</option>
+          <option value="screens/gif.html">GIF</option>
+          <option value="screens/media-viewer.html">Visionneuse média</option>
+          <option value="screens/location.html">Localisation</option>
+          <option value="screens/call-screen.html">Appel en cours</option>
+        </optgroup>
+        <optgroup label="Création">
+          <option value="screens/poll-create.html">Créer un sondage</option>
+          <option value="screens/event-create.html">Créer un événement</option>
+        </optgroup>
+        <optgroup label="Système">
+          <option value="screens/settings.html">Paramètres</option>
+          <option value="screens/linked-devices.html">Appareils liés</option>
+        </optgroup>
+      </select>
+    </div>
+
+    <div class="right">
+      <div class="theme-toggle" role="radiogroup" aria-label="Thème" data-od-id="theme-toggle">
+        <button class="theme-opt active" data-tval="dark" aria-label="Thème sombre" title="Sombre">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11Z"/></svg>
+        </button>
+        <button class="theme-opt" data-tval="light" aria-label="Thème clair" title="Clair">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></svg>
+        </button>
+        <button class="theme-opt" data-tval="auto" aria-label="Thème automatique" title="Auto">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="2.5" y="4" width="19" height="13" rx="2.5"/><path d="M8.5 21h7M12 17.5V21"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="stage" id="stage" data-od-id="device-gallery">
+    <!-- Mobile row: iPhone + Pixel -->
+    <div class="row" data-od-id="row-mobiles">
+      <div class="device-column" style="flex:0 1 390px">
+        <span class="device-label">iOS · iPhone 15 Pro</span>
+        <div class="shell iphone" data-od-id="frame-iphone">
+          <div class="device-notch"></div>
+          <div class="device-notch-small"></div>
+          <div class="screen-wrap"><iframe src="screens/chat-list.html" title="Kite sur iPhone" loading="lazy"></iframe></div>
+        </div>
+      </div>
+      <div class="device-column" style="flex:0 1 412px">
+        <span class="device-label">Android · Pixel</span>
+        <div class="shell pixel" data-od-id="frame-android">
+          <div class="device-punch"></div>
+          <div class="device-punch-i"></div>
+          <div class="screen-wrap"><iframe src="screens/chat-list.html" title="Kite sur Pixel" loading="lazy"></iframe></div>
+          <div class="device-nav">
+            <div class="nb-item active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M21 12a8 8 0 0 1-8 8H5l-2 2V12a8 8 0 0 1 8-8h2a8 8 0 0 1 8 8Z"/></svg><span>Discussions</span></div>
+            <div class="nb-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/></svg><span>Communautés</span></div>
+            <div class="nb-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 4h4l2 5-2.5 1.5a12 12 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2Z"/></svg><span>Appels</span></div>
+          </div>
+          <div class="device-gesture"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tablet row -->
+    <div class="row" data-od-id="row-tablet">
+      <div class="device-column" style="flex:0 1 834px">
+        <span class="device-label">Tablette · iPad Pro 11" — interface split-pane dédiée</span>
+        <div class="shell ipad" data-od-id="frame-ipad">
+          <div class="screen-wrap"><iframe src="tablet.html" title="Kite sur iPad" loading="lazy"></iframe></div>
+          <div class="device-home"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Desktop row -->
+    <div class="row row-desktop" data-od-id="row-desktop">
+      <div class="device-column col-desktop">
+        <span class="device-label">Desktop · Safari sur MacBook Pro 14" — interface 3 panneaux</span>
+        <div class="shell mac" data-od-id="frame-macbook">
+          <div class="device-notch"></div>
+          <div class="device-chrome">
+            <div class="dots"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></div>
+            <div class="nav-arrows">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+            </div>
+            <div class="urlbar">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+              kite.chat
+            </div>
+            <div style="width:92px"></div>
+          </div>
+          <div class="screen-wrap"><iframe src="desktop.html" title="Kite sur desktop" loading="lazy"></iframe></div>
+        </div>
+      </div>
+    </div>
+
+    <p class="hint" data-od-id="hint">Touches <kbd>1</kbd>–<kbd>9</kbd> : changer d'écran · Le thème est synchronisé entre tous les écrans</p>
+  </main>
+
+  <script>
+    // ---- Thème (persisté + diffusé via storage) ----
+    const themeBtns = document.querySelectorAll('.theme-opt');
+    const html = document.documentElement;
+    function resolveTheme(t) {
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      return (t === 'dark' || (t === 'auto' && prefersDark)) ? 'dark' : 'light';
+    }
+    function applyTheme(t) {
+      const resolved = resolveTheme(t);
+      html.setAttribute('data-theme', resolved);
+      themeBtns.forEach(b => b.classList.toggle('active', b.dataset.tval === t));
+      try { localStorage.setItem('kite-theme', t); } catch (e) {}
+    }
+    themeBtns.forEach(btn => btn.addEventListener('click', () => applyTheme(btn.dataset.tval)));
+    window.addEventListener('storage', e => {
+      if (e.key === 'kite-theme' && e.newValue) {
+        html.setAttribute('data-theme', resolveTheme(e.newValue));
+        themeBtns.forEach(b => b.classList.toggle('active', b.dataset.tval === e.newValue));
+      }
+    });
+    let saved = 'dark';
+    try { saved = localStorage.getItem('kite-theme') || 'dark'; } catch (e) {}
+    applyTheme(saved);
+
+    /* ---- Mise à l'échelle des devices (shell entier en transform scale) ---- */
+    const NATURAL = {
+      'frame-iphone':  { w: 390, h: 844 },
+      'frame-android': { w: 412, h: 915 },
+      'frame-ipad':    { w: 834, h: 1194 },
+      'frame-macbook': { w: 1240, h: 780 }
+    };
+    function fitFrames() {
+      document.querySelectorAll('.shell[data-od-id]').forEach(shell => {
+        const nat = NATURAL[shell.getAttribute('data-od-id')];
+        if (!nat) return;
+        const col = shell.closest('.device-column');
+        const avail = col ? col.clientWidth : window.innerWidth;
+        const s = Math.min(1, avail / nat.w);
+        shell.style.transformOrigin = 'top center';
+        shell.style.transform = 'scale(' + s + ')';
+        // Le shell garde sa taille naturelle en CSS ; le transform le réduit visuellement
+        // On ajuste la marge pour compenser l'espace perdu
+        const scaledH = nat.h * s;
+        shell.parentElement.style.height = scaledH + 'px';
+      });
+    }
+    window.addEventListener('resize', fitFrames);
+    window.addEventListener('load', fitFrames);
+    fitFrames();
+
+    // ---- Sélecteur d'écran ----
+    const select = document.getElementById('screen-select');
+    try {
+      const last = localStorage.getItem('kite-screen');
+      if (last) { select.value = last; }
+    } catch (e) {}
+    function loadScreen() {
+      const v = select.value;
+      try { localStorage.setItem('kite-screen', v); } catch (e) {}
+      // iPhone + Pixel : même écran
+      document.querySelector('#frame-iphone iframe').src = v;
+      document.querySelector('#frame-android iframe').src = v;
+    }
+    select.addEventListener('change', loadScreen);
+    if (select.value && select.value !== 'screens/chat-list.html') loadScreen();
+
+    // ---- Raccourcis clavier 1–9 ----
+    document.addEventListener('keydown', e => {
+      if (e.target.tagName === 'SELECT' || e.target.tagName === 'INPUT') return;
+      const i = parseInt(e.key, 10) - 1;
+      const opts = select.querySelectorAll('option');
+      if (i >= 0 && i < opts.length) { select.selectedIndex = i; select.dispatchEvent(new Event('change')); }
+    });
+  </script>
+</body>
+</html>

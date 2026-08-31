@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="fr" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <title>Frame — Browser Chrome</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    html,body{margin:0;padding:0;height:100%;background:transparent;font-family:sans-serif}
+    .window{position:relative;width:100%;height:100%;background:#1a1a1d;border-radius:10px;overflow:hidden;border:1px solid #242428;box-sizing:border-box}
+    .chrome{position:absolute;top:0;left:0;right:0;height:46px;background:#1a1a1d;border-bottom:1px solid #242428;display:flex;align-items:center;padding:0 14px;gap:14px;z-index:2}
+    .dots{display:flex;gap:8px}
+    .dot{width:12px;height:12px;border-radius:50%;background:#ff5e57}
+    .dot.g{background:#ffb121}
+    .dot.r{background:#28c844}
+    .url-bar{flex:1;display:flex;align-items:center;background:#242428;border-radius:6px;padding:6px 10px;font-family:ui-monospace;font-size:11px;color:#8e8e93}
+    .url-bar svg{width:13px;height:13px;margin-right:6px}
+    .screen-area{position:absolute;top:46px;left:0;right:0;bottom:0;background:#0a0a0c}
+    .screen-area iframe{display:block;width:100%;height:100%;border:none;background:transparent}
+  </style>
+</head>
+<body>
+  <div class="window">
+    <div class="chrome">
+      <div class="dots">
+        <span class="dot"></span>
+        <span class="dot g"></span>
+        <span class="dot r"></span>
+      </div>
+      <span class="url-bar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg> kite.chat</span>
+    </div>
+    <div class="screen-area">
+      <iframe id="f" loading="lazy"></iframe>
+    </div>
+  </div>
+  <script>
+    const sp = new URLSearchParams(location.search);
+    const s = sp.get('screen') || 'desktop.html';
+    document.getElementById('f').src = '../' + s;
+    const syncTheme = () => { try { document.documentElement.setAttribute('data-theme', localStorage.getItem('kite-theme')||'dark'); } catch(e){} };
+    syncTheme();
+    window.addEventListener('storage', syncTheme);
+  </script>
+</body>
+</html>

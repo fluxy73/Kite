@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="fr" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <title>Localisation — Kite</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="../app.css" />
+  <style>
+    .loc-screen { display: flex; flex-direction: column; height: 100dvh; overflow: hidden; }
+    .loc-header {
+      flex: 0 0 auto; display: flex; align-items: center; gap: 10px;
+      padding: 10px 16px; border-bottom: 1px solid var(--border); background: var(--surface);
+    }
+    .loc-header h1 { flex: 1; font-size: 17px; font-weight: 600; margin: 0; }
+
+    .loc-mode {
+      flex: 0 0 auto; display: flex; padding: 8px 16px; gap: 8px;
+      border-bottom: 1px solid var(--border); background: var(--bg);
+    }
+    .mode-btn {
+      flex: 1; padding: 10px; border-radius: 12px; border: 1px solid var(--border);
+      background: var(--surface); color: var(--muted); font-size: 13px; font-weight: 500;
+      cursor: pointer; transition: all .15s ease; text-align: center;
+    }
+    .mode-btn:hover { color: var(--fg); }
+    .mode-btn.active { background: var(--accent-soft); border-color: color-mix(in oklch, var(--accent) 45%, transparent); color: var(--accent); }
+
+    .loc-map {
+      flex: 1; position: relative; overflow: hidden;
+      background: var(--surface-2);
+    }
+    .map-canvas {
+      width: 100%; height: 100%;
+      background:
+        radial-gradient(ellipse 60% 40% at 45% 40%, color-mix(in oklch, var(--accent) 12%, transparent), transparent 70%),
+        radial-gradient(ellipse 50% 50% at 70% 60%, color-mix(in oklch, var(--tint-2) 10%, transparent), transparent 60%),
+        linear-gradient(180deg, var(--surface-2), var(--border));
+    }
+    .map-grid {
+      position: absolute; inset: 0;
+      background-image:
+        linear-gradient(to right, var(--border) 1px, transparent 1px),
+        linear-gradient(to bottom, var(--border) 1px, transparent 1px);
+      background-size: 40px 40px;
+      opacity: .25;
+    }
+    .map-pin {
+      position: absolute; top: 42%; left: 48%; width: 32px; height: 32px;
+      color: var(--accent); transform: translate(-50%, -100%);
+      filter: drop-shadow(0 2px 4px rgb(0 0 0 / .4));
+    }
+    .map-label {
+      position: absolute; top: calc(42% + 8px); left: 48%; transform: translateX(-50%);
+      background: var(--surface); padding: 4px 10px; border-radius: 8px;
+      font-size: 11px; font-weight: 600; color: var(--fg);
+      border: 1px solid var(--border); white-space: nowrap;
+      box-shadow: 0 2px 8px rgb(0 0 0 / .2);
+    }
+    .map-accuracy {
+      position: absolute; top: 42%; left: 48%; width: 120px; height: 120px;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      background: color-mix(in oklch, var(--accent) 10%, transparent);
+      border: 1px solid color-mix(in oklch, var(--accent) 25%, transparent);
+    }
+
+    .loc-info { padding: 14px 16px 12px; background: var(--surface); border-top: 1px solid var(--border); }
+    .info-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+    .info-row svg { width: 18px; height: 18px; color: var(--accent); flex-shrink: 0; }
+    .info-row span { font-size: 13px; color: var(--muted); }
+
+    .loc-time {
+      background: var(--surface); border-top: 1px solid var(--border);
+      padding: 12px 16px 16px;
+    }
+    .loc-time-label { font-size: 12.5px; color: var(--muted); margin-bottom: 8px; }
+    .loc-dur { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
+    .loc-dur::-webkit-scrollbar { display: none; }
+    .dur-chip {
+      flex: 0 0 auto; padding: 8px 16px; border-radius: 999px;
+      border: 1px solid var(--border); background: transparent; color: var(--muted);
+      font-size: 13px; cursor: pointer; transition: all .15s ease;
+    }
+    .dur-chip:hover { color: var(--fg); }
+    .dur-chip.active { background: var(--accent-soft); border-color: color-mix(in oklch, var(--accent) 45%, transparent); color: var(--accent); }
+
+    .loc-send { padding: 0 16px 16px; background: var(--surface); }
+    .loc-send .send-btn {
+      width: 100%; padding: 14px; border-radius: 999px; border: none;
+      background: var(--accent); color: var(--accent-ink); font-weight: 600; font-size: 15px;
+      cursor: pointer;
+    }
+    .loc-send .send-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+    /* Mode live indicator */
+    .live-badge {
+      position: absolute; top: 12px; left: 12px;
+      display: flex; align-items: center; gap: 6px;
+      background: var(--surface); padding: 6px 12px; border-radius: 999px;
+      font-size: 12px; font-weight: 600; color: var(--accent);
+      border: 1px solid var(--border);
+    }
+    .live-dot {
+      width: 8px; height: 8px; border-radius: 50%; background: var(--accent);
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: .5; transform: scale(1.2); }
+    }
+  </style>
+</head>
+<body>
+  <div class="loc-screen" data-od-id="screen-location">
+    <div class="status-space"></div>
+
+    <header class="loc-header" data-od-id="loc-header">
+      <button class="icon-btn" aria-label="Retour" onclick="location.href='conversation.html'">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m15 18-6-6 6-6"/></svg>
+      </button>
+      <h1 class="title">Localisation</h1>
+      <button class="icon-btn" aria-label="Menu">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="5" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="12" cy="19" r="1.4"/></svg>
+      </button>
+    </header>
+
+    <nav class="loc-mode" data-od-id="loc-mode" aria-label="Mode de partage">
+      <button class="mode-btn active" data-mode="current">Position actuelle</button>
+      <button class="mode-btn" data-mode="live">Partage en direct</button>
+    </nav>
+
+    <div class="loc-map" data-od-id="loc-map">
+      <div class="map-canvas"></div>
+      <div class="map-grid"></div>
+      <div class="map-accuracy"></div>
+      <svg class="map-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+        <path d="M21 10c0 6-9 13-9 13s-9-7-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
+      </svg>
+      <div class="map-label">Café de Flore</div>
+      <div class="live-badge" id="live-badge" style="display:none">
+        <div class="live-dot"></div>
+        <span>En direct</span>
+      </div>
+    </div>
+
+    <div class="loc-info" id="loc-info">
+      <div class="info-row">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M21 10c0 6-9 13-9 13s-9-7-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        <span>Café de Flore, 172 Boulevard Saint-Germain, 75006 Paris</span>
+      </div>
+      <div class="info-row">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+        <span>Mise à jour à l'instant</span>
+      </div>
+    </div>
+
+    <div class="loc-time" id="loc-time" style="display:none">
+      <div class="loc-time-label">Durée du partage en direct</div>
+      <div class="loc-dur" data-od-id="loc-dur">
+        <button class="dur-chip active">15 minutes</button>
+        <button class="dur-chip">1 heure</button>
+        <button class="dur-chip">8 heures</button>
+        <button class="dur-chip">24 heures</button>
+      </div>
+    </div>
+
+    <div class="loc-send">
+      <button class="send-btn" data-od-id="send-location">Envoyer la position</button>
+    </div>
+  </div>
+
+  <script>
+    const saved = localStorage.getItem('kite-theme');
+    if (saved) document.documentElement.setAttribute('data-theme', saved);
+
+    // Toggle mode
+    document.querySelectorAll('.mode-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const mode = btn.dataset.mode;
+        const isLive = mode === 'live';
+        document.getElementById('live-badge').style.display = isLive ? 'flex' : 'none';
+        document.getElementById('loc-time').style.display = isLive ? 'block' : 'none';
+      });
+    });
+
+    // Toggle duration chips
+    document.querySelectorAll('.dur-chip').forEach(c => {
+      c.addEventListener('click', () => {
+        document.querySelectorAll('.dur-chip').forEach(x => x.classList.remove('active'));
+        c.classList.add('active');
+      });
+    });
+  </script>
+  <script src="../theme-sync.js"></script>
+</body>
+</html>

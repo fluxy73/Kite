@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="fr" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <title>GIF — Kite</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="../app.css" />
+  <style>
+    /* === GIF Picker === */
+    .gif-header {
+      flex: 0 0 auto; padding: 10px 16px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 10px;
+    }
+    .gif-header .search { flex: 1; margin: 0; }
+
+    .gif-tabs {
+      display: flex; gap: 4px; padding: 8px 16px; border-bottom: 1px solid var(--border);
+      overflow-x: auto; scrollbar-width: none; flex: 0 0 auto;
+    }
+    .gif-tabs::-webkit-scrollbar { display: none; }
+    .gif-tab {
+      padding: 6px 14px; border-radius: 999px; border: 1px solid var(--border);
+      background: var(--surface); color: var(--muted); font-size: 12px; font-weight: 500;
+      white-space: nowrap; cursor: pointer; transition: all .15s ease;
+    }
+    .gif-tab:hover { color: var(--fg); border-color: var(--muted); }
+    .gif-tab.active { background: var(--accent-soft); border-color: color-mix(in oklch, var(--accent) 45%, transparent); color: var(--accent); }
+
+    .gif-grid {
+      flex: 1; overflow-y: auto; padding: 10px;
+    }
+    .gif-page { display: none; }
+    .gif-page.active { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .gif-item {
+      aspect-ratio: 1.4; background: var(--surface-2); border-radius: 12px;
+      overflow: hidden; position: relative; cursor: pointer; border: 1px solid var(--border);
+    }
+    .gif-item:hover { border-color: var(--accent); }
+    .gif-item::after {
+      content: 'GIF'; position: absolute; bottom: 4px; right: 4px;
+      font-family: var(--font-mono); font-size: 9px; color: var(--fg);
+      background: color-mix(in oklch,#000 50%,transparent); padding: 2px 5px; border-radius: 3px;
+    }
+    .gif-placeholder {
+      width: 100%; height: 100%; display: grid; place-items: center;
+      color: var(--muted); font-family: var(--font-mono); font-size: 10px;
+    }
+
+    /* trending badges */
+    .gif-trending .gif-item::before {
+      content: '🔥'; position: absolute; top: 6px; left: 6px; font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="screen" data-od-id="screen-gif">
+    <div class="status-space"></div>
+
+    <header class="gif-header" data-od-id="gif-header">
+      <button class="icon-btn" aria-label="Fermer">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+      <div class="search" style="margin:0">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input type="search" placeholder="Rechercher un GIF…" aria-label="Recherche GIF" />
+      </div>
+      <button class="icon-btn" aria-label="Favoris">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 3 2 12l4 2v8l4-2 4 2v-8l4-2z"/></svg>
+      </button>
+    </header>
+
+    <nav class="gif-tabs" data-od-id="gif-tabs" aria-label="Catégories GIF">
+      <span class="gif-tab" data-gif-tab="recent">Récents</span>
+      <span class="gif-tab active" data-gif-tab="trending">Tendances</span>
+      <span class="gif-tab" data-gif-tab="search">Recherche</span>
+      <span class="gif-tab" data-gif-tab="favorites">Favoris</span>
+    </nav>
+
+    <main class="gif-grid" data-od-id="gif-grid">
+      <div class="gif-page active gif-trending" data-gif-tab="trending">
+        <div class="gif-item"><div class="gif-placeholder">😂</div></div>
+        <div class="gif-item"><div class="gif-placeholder">🎉</div></div>
+        <div class="gif-item"><div class="gif-placeholder">🔥</div></div>
+        <div class="gif-item"><div class="gif-placeholder">🤔</div></div>
+        <div class="gif-item"><div class="gif-placeholder">😭</div></div>
+        <div class="gif-item"><div class="gif-placeholder">👍</div></div>
+        <div class="gif-item"><div class="gif-placeholder">💯</div></div>
+        <div class="gif-item"><div class="gif-placeholder">🥲</div></div>
+        <div class="gif-item"><div class="gif-placeholder">🙏</div></div>
+        <div class="gif-item"><div class="gif-placeholder">✨</div></div>
+      </div>
+      <div class="gif-page" data-gif-tab="recent">
+        <div class="gif-item"><div class="gif-placeholder">👋</div></div>
+        <div class="gif-item"><div class="gif-placeholder">🎯</div></div>
+        <div class="gif-item"><div class="gif-placeholder">🦉</div></div>
+        <div class="gif-item"><div class="gif-placeholder">🐱</div></div>
+      </div>
+      <div class="gif-page" data-gif-tab="favorites">
+        <div class="gif-item"><div class="gif-placeholder">❤️</div></div>
+        <div class="gif-item"><div class="gif-placeholder">😎</div></div>
+      </div>
+      <div class="gif-page" data-gif-tab="search">
+        <div class="gif-placeholder" style="grid-column:1/-1;padding:40px">Aucun résultat. Essayez une autre recherche.</div>
+      </div>
+    </main>
+  </div>
+  <script>
+    const saved = localStorage.getItem('kite-theme');
+    if (saved) document.documentElement.setAttribute('data-theme', saved);
+
+    // Onglets → pages
+    document.querySelectorAll('.gif-tab').forEach(t => {
+      t.addEventListener('click', () => {
+        document.querySelectorAll('.gif-tab').forEach(x => x.classList.remove('active'));
+        t.classList.add('active');
+        const tab = t.dataset.gifTab;
+        document.querySelectorAll('.gif-page').forEach(p => {
+          p.classList.toggle('active', p.dataset.gifTab === tab);
+        });
+      });
+    });
+
+    // Recherche : filtre les GIFs de toutes les pages selon les mots-clés mock
+    const KEYWORDS = {
+      '😂': 'rire mort de rire mdrr drôle fun',
+      '🎉': 'fête celebration anniversaire party bravo',
+      '🔥': 'feu hot fire mode wow',
+      '🤔': 'réflexion pense hmm doute question',
+      '😭': 'pleure triste sad cry émotion',
+      '👍': 'pouce ok daccord bien valide top',
+      '💯': 'cent parfait parfait vrai celebrity',
+      '🥲': ' sourire triste entre deux larmes',
+      '🙏': 'merci prière merci beaucoup please',
+      '✨': 'magie étoiles brillant wow esthétique',
+      '👋': 'salut bonjour coucou bye hello',
+      '🎯': 'cible précis objectif atteint bravo',
+      '🦉': 'chouette hibou oiseau nuit',
+      '🐱': 'chat chaton miaou animal mignon',
+      '❤️': 'coeur amour love like adore',
+      '😎': 'cool lunettes style boss confiant'
+    };
+    const searchInput = document.querySelector('.gif-header input[type="search"]');
+    const searchPage = document.querySelector('.gif-page[data-gif-tab="search"]');
+    const noResult = searchPage.querySelector('.gif-placeholder');
+    searchInput.addEventListener('input', () => {
+      const q = searchInput.value.trim().toLowerCase();
+      if (!q) { noResult.textContent = 'Aucun résultat. Essayez une autre recherche.'; return; }
+      searchPage.querySelectorAll('.gif-item').forEach(el => el.remove());
+      const matches = Object.entries(KEYWORDS).filter(([, kw]) => kw.includes(q)).map(([emo]) => emo);
+      matches.forEach(emo => {
+        const item = document.createElement('div');
+        item.className = 'gif-item';
+        item.innerHTML = '<div class="gif-placeholder">' + emo + '</div>';
+        searchPage.appendChild(item);
+      });
+      noResult.style.display = matches.length ? 'none' : '';
+      // Active l'onglet Recherche pendant la saisie
+      const tab = document.querySelector('.gif-tab[data-gif-tab="search"]');
+      if (tab && !tab.classList.contains('active')) tab.click();
+    });
+  </script>
+  <script src="../theme-sync.js"></script>
+</body>
+</html>

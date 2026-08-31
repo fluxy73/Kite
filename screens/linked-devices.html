@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="fr" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <title>Appareils liés — Kite</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="../app.css" />
+  <style>
+    /* === Linked Devices === */
+    .linked-grid { flex: 1; overflow-y: auto; }
+
+    .device-row {
+      display: grid; grid-template-columns: 48px 1fr auto; gap: 12px;
+      align-items: center; padding: 14px 16px; border-bottom: 1px solid var(--border);
+    }
+    .device-row:hover { background: var(--fg-soft); }
+    .device-icon {
+      width: 40px; height: 40px; border-radius: 10px; background: var(--surface-2);
+      display: grid; place-items: center; color: var(--accent);
+    }
+    .device-icon svg { width: 19px; height: 19px; }
+    .device-info .label { font-weight: 600; font-size: 14px; }
+    .device-info .desc { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+    .device-info .time { font-family: var(--font-mono); font-size: 11px; color: var(--muted); margin-top: 4px; }
+    .device-actions .btn {
+      font-family: var(--font-mono); font-size: 11px; font-weight: 700;
+      color: var(--accent); padding: 6px 12px; border-radius: 999px;
+    }
+    .device-actions .btn:hover { background: var(--accent-soft); }
+
+    .linked-footer {
+      flex: 0 0 auto; padding: 12px 16px; border-top: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .linked-footer .info { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+    .linked-footer .link-btn {
+      width: 100%; padding: 12px; border-radius: 12px; border: 1px dashed var(--border);
+      background: transparent; color: var(--fg); font-size: 13px; cursor: pointer;
+    }
+    .linked-footer .link-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    .qr-code {
+      width: 160px; height: 160px; margin: 16px auto;
+      background: var(--surface);
+      display: grid; place-items: center; border-radius: 8px;
+      image-rendering: pixelated;
+    }
+    .qr-code::before { content: 'QR'; font-family: var(--font-mono); color: var(--muted); }
+  </style>
+</head>
+<body>
+  <div class="screen" data-od-id="screen-linked-devices">
+    <div class="status-space"></div>
+
+    <header class="app-header" data-od-id="linked-devices-header" style="border-bottom:1px solid var(--border)">
+      <button class="icon-btn" aria-label="Retour" onclick="location.href='settings.html'">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m15 18-6-6 6-6"/></svg>
+      </button>
+      <h1 class="title">Appareils liés</h1>
+      <span style="font-family:var(--font-mono);font-size:11px;color:var(--muted)">3 appareils</span>
+    </header>
+
+    <main class="linked-grid" data-od-id="linked-devices-list">
+      <div class="device-row" data-od-id="device-1">
+        <div class="device-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 2h12v4H6zM6 18h12v4H6z"/></svg>
+        </div>
+        <div class="device-info">
+          <div class="label">MacBook Pro</div>
+          <div class="desc">Kite Web · Paris, France</div>
+          <div class="time">Actif maintenant</div>
+        </div>
+        <div class="device-actions">
+          <button class="btn" aria-label="Déconnecter">Déconnecter</button>
+        </div>
+      </div>
+
+      <div class="device-row" data-od-id="device-2">
+        <div class="device-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>
+        </div>
+        <div class="device-info">
+          <div class="label">iPad Pro</div>
+          <div class="desc">Kite iOS · Dernière connexion aujourd'hui 14:30</div>
+          <div class="time">Hier, 18:42</div>
+        </div>
+        <div class="device-actions">
+          <button class="btn" aria-label="Déconnecter">Déconnecter</button>
+        </div>
+      </div>
+
+      <div class="device-row" data-od-id="device-3">
+        <div class="device-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="10"/><path d="M12 7v5l3 3"/></svg>
+        </div>
+        <div class="device-info">
+          <div class="label">Google Pixel 8</div>
+          <div class="desc">Kite Android · Dernière connexion 23 juin</div>
+          <div class="time">23 juin, 11:20</div>
+        </div>
+        <div class="device-actions">
+          <button class="btn" aria-label="Déconnecter">Déconnecter</button>
+        </div>
+      </div>
+    </main>
+
+    <div class="linked-footer" data-od-id="linked-footer">
+      <div class="qr-code" data-od-id="qr-code"></div>
+      <p class="info" style="text-align:center">Scannez le code QR pour lier un nouvel appareil</p>
+      <button class="link-btn" data-od-id="link-device-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" style="width:16px;height:16px;margin-right:8px"><circle cx="12" cy="12" r="10"/><path d="M12 7v5l3 3"/></svg>
+        Signaler un appareil non reconnu ?
+      </button>
+    </div>
+  </div>
+  <script>
+    const saved = localStorage.getItem('kite-theme');
+    if (saved) document.documentElement.setAttribute('data-theme', saved);
+  </script>
+  <script src="../theme-sync.js"></script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+# Normalise les fins de ligne pour un diff GitHub propre.
+# Le dépôt est géré en LF ; Git convertit en CRLF dans l'arbre local sous Windows.
+* text=auto eol=lf
+
+# Binaires / artefacts de build ne sont pas normalisés.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary

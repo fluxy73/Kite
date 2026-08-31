@@ -1,0 +1,12 @@
+analyzer:
+  exclude:
+    - build/**
+    - android/**
+    - ios/**
+    - windows/**
+    - linux/**
+include: package:flutter_lints/flutter.yaml
+
+linter:
+  rules:
+    prefer_single_quotes: true

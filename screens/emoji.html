@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="fr" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <title>Emojis — Kite</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="../app.css" />
+  <style>
+    /* === Emoji Picker === */
+    .emoji-header {
+      flex: 0 0 auto; padding: 10px 16px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 10px;
+    }
+    .emoji-header .search { flex: 1; }
+    .emoji-categories {
+      display: flex; align-items: center; gap: 4px;
+      padding: 8px 12px; border-bottom: 1px solid var(--border);
+      overflow-x: auto; scrollbar-width: none; flex: 0 0 auto;
+    }
+    .emoji-categories::-webkit-scrollbar { display: none; }
+    .emoji-cat {
+      flex: 0 0 auto; padding: 8px 12px; border-radius: 12px;
+      background: transparent; color: var(--muted); font-size: 12px; font-weight: 500;
+      cursor: pointer; border: 1px solid transparent;
+    }
+    .emoji-cat:hover { color: var(--fg); }
+    .emoji-cat.active { color: var(--accent); border-color: color-mix(in oklch, var(--accent) 45%, transparent); background: var(--accent-soft); }
+
+    .emoji-grid {
+      flex: 1; overflow-y: auto; padding: 4px 4px 60px;
+    }
+    .emoji-page { display: none; }
+    .emoji-page.active { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+    .emoji-cell {
+      aspect-ratio: 1; display: grid; place-items: center;
+      font-size: 22px; cursor: pointer; border-radius: 8px;
+    }
+    .emoji-cell:hover { background: var(--fg-soft); }
+
+    /* sticker grid for sticker tab */
+    .sticker-grid { grid-template-columns: repeat(4, 1fr); }
+    .sticker-cell {
+      aspect-ratio: 1; background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; display: grid; place-items: center; font-size: 24px;
+    }
+
+    .emoji-footer {
+      flex: 0 0 auto; padding: 8px; border-top: 1px solid var(--border);
+      display: flex; justify-content: space-around; background: var(--surface);
+    }
+    .emoji-footer .ef-item {
+      display: flex; flex-direction: column; align-items: center; gap: 2px;
+      padding: 6px 10px; border-radius: 10px; color: var(--muted); font-size: 9px;
+    }
+    .emoji-footer .ef-item.active { color: var(--accent); background: var(--accent-soft); }
+  </style>
+</head>
+<body>
+  <div class="screen" data-od-id="screen-emoji">
+    <div class="status-space"></div>
+
+    <header class="emoji-header" data-od-id="emoji-header">
+      <button class="icon-btn" aria-label="Fermer">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+      <div class="search" style="margin:0">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input type="search" placeholder="Rechercher un emoji…" aria-label="Recherche emoji" />
+      </div>
+      <button class="icon-btn" aria-label="Favoris">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 3 2 12l4 2v8l4-2 4 2v-8l4-2z"/></svg>
+      </button>
+    </header>
+
+    <nav class="emoji-categories" data-od-id="emoji-categories" aria-label="Catégories d'emojis">
+      <span class="emoji-cat active" data-emoji-tab="recent">Récents</span>
+      <span class="emoji-cat" data-emoji-tab="smileys">Smileys</span>
+      <span class="emoji-cat" data-emoji-tab="people">Personnes</span>
+      <span class="emoji-cat" data-emoji-tab="animals">Animaux</span>
+      <span class="emoji-cat" data-emoji-tab="food">Nourriture</span>
+      <span class="emoji-cat" data-emoji-tab="activities">Activités</span>
+      <span class="emoji-cat" data-emoji-tab="travel">Voyage</span>
+      <span class="emoji-cat" data-emoji-tab="objects">Objets</span>
+      <span class="emoji-cat" data-emoji-tab="symbols">Symboles</span>
+      <span class="emoji-cat" data-emoji-tab="flags">Drapeaux</span>
+    </nav>
+
+    <main class="emoji-grid" data-od-id="emoji-grid">
+      <!-- Récents -->
+      <div class="emoji-page active" data-emoji-tab="recent">
+        <div class="emoji-cell">❤️</div><div class="emoji-cell">👍</div><div class="emoji-cell">😂</div>
+        <div class="emoji-cell">😮</div><div class="emoji-cell">😢</div><div class="emoji-cell">🙏</div>
+        <div class="emoji-cell">🎉</div><div class="emoji-cell">🤔</div><div class="emoji-cell">👀</div>
+        <div class="emoji-cell">🔥</div><div class="emoji-cell">💯</div><div class="emoji-cell">✨</div>
+        <div class="emoji-cell">😎</div><div class="emoji-cell">🙃</div><div class="emoji-cell">🤗</div>
+      </div>
+      <!-- Smileys -->
+      <div class="emoji-page" data-emoji-tab="smileys">
+        <div class="emoji-cell">😀</div><div class="emoji-cell">😃</div><div class="emoji-cell">😄</div>
+        <div class="emoji-cell">😁</div><div class="emoji-cell">😆</div><div class="emoji-cell">😅</div>
+        <div class="emoji-cell">🤣</div><div class="emoji-cell">🥲</div><div class="emoji-cell">😊</div>
+        <div class="emoji-cell">😇</div><div class="emoji-cell">🙂</div><div class="emoji-cell">🙃</div>
+        <div class="emoji-cell">😉</div><div class="emoji-cell">😌</div><div class="emoji-cell">😍</div>
+        <div class="emoji-cell">🥰</div><div class="emoji-cell">😘</div><div class="emoji-cell">😗</div>
+        <div class="emoji-cell">😙</div><div class="emoji-cell">😚</div><div class="emoji-cell">😋</div>
+        <div class="emoji-cell">😛</div><div class="emoji-cell">😝</div><div class="emoji-cell">😜</div>
+        <div class="emoji-cell">🤪</div><div class="emoji-cell">🤨</div><div class="emoji-cell">🧐</div>
+        <div class="emoji-cell">🤓</div><div class="emoji-cell">😏</div><div class="emoji-cell">😒</div>
+        <div class="emoji-cell">😞</div><div class="emoji-cell">😔</div><div class="emoji-cell">🙁</div>
+        <div class="emoji-cell">😣</div><div class="emoji-cell">😖</div><div class="emoji-cell">🙈</div>
+      </div>
+      <!-- People -->
+      <div class="emoji-page" data-emoji-tab="people">
+        <div class="emoji-cell">👋</div><div class="emoji-cell">🤝</div><div class="emoji-cell">👏</div>
+        <div class="emoji-cell">🙏</div><div class="emoji-cell">👍</div><div class="emoji-cell">👎</div>
+        <div class="emoji-cell">✌️</div><div class="emoji-cell">🫡</div><div class="emoji-cell">🫶</div>
+        <div class="emoji-cell">🫱</div><div class="emoji-cell">🫲</div><div class="emoji-cell">🙌</div>
+        <div class="emoji-cell">👐</div><div class="emoji-cell">👐</div><div class="emoji-cell">🙎</div>
+        <div class="emoji-cell">🙅</div><div class="emoji-cell">🙆</div><div class="emoji-cell">🫠</div>
+        <div class="emoji-cell">🧍</div><div class="emoji-cell">🧎</div><div class="emoji-cell">🧑</div>
+        <div class="emoji-cell">👨</div><div class="emoji-cell">👩</div><div class="emoji-cell">👶</div>
+      </div>
+      <!-- Animals -->
+      <div class="emoji-page" data-emoji-tab="animals">
+        <div class="emoji-cell">🐶</div><div class="emoji-cell">🐱</div><div class="emoji-cell">🐭</div>
+        <div class="emoji-cell">🐹</div><div class="emoji-cell">🐰</div><div class="emoji-cell">🦊</div>
+        <div class="emoji-cell">🐻</div><div class="emoji-cell">🐼</div><div class="emoji-cell">🐨</div>
+        <div class="emoji-cell">🐯</div><div class="emoji-cell">🦁</div><div class="emoji-cell">🐮</div>
+        <div class="emoji-cell">🐷</div><div class="emoji-cell">🐸</div><div class="emoji-cell">🐵</div>
+        <div class="emoji-cell">🐔</div><div class="emoji-cell">🐧</div><div class="emoji-cell">🐦</div>
+        <div class="emoji-cell">🦅</div><div class="emoji-cell">🦉</div><div class="emoji-cell">🦇</div>
+        <div class="emoji-cell">🐺</div><div class="emoji-cell">🐻</div><div class="emoji-cell">🐗</div>
+      </div>
+      <!-- Food -->
+      <div class="emoji-page" data-emoji-tab="food">
+        <div class="emoji-cell">🍎</div><div class="emoji-cell">🍕</div><div class="emoji-cell">🍔</div>
+        <div class="emoji-cell">🍟</div><div class="emoji-cell">🌭</div><div class="emoji-cell">🍿</div>
+        <div class="emoji-cell">🍰</div><div class="emoji-cell">🥐</div><div class="emoji-cell">☕</div>
+        <div class="emoji-cell">🍵</div><div class="emoji-cell">🍷</div><div class="emoji-cell">🍾</div>
+        <div class="emoji-cell">🍜</div><div class="emoji-cell">🍣</div><div class="emoji-cell">🍤</div>
+      </div>
+    </main>
+
+    <footer class="emoji-footer" data-od-id="emoji-footer">
+      <div class="ef-item active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg><span>Emoji</span></div>
+      <div class="ef-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M7 7a5 5 0 0 1 10 0 5 5 0 0 1 4 4v7a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V11a5 5 0 0 1 5-4z"/></svg><span>Stickers</span></div>
+      <div class="ef-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg><span>GIF</span></div>
+      </footer>
+  </div>
+  <script>
+    const saved = localStorage.getItem('kite-theme');
+    if (saved) document.documentElement.setAttribute('data-theme', saved);
+    // Tab switching
+    document.querySelectorAll('.emoji-cat').forEach(cat => {
+      cat.addEventListener('click', () => {
+        document.querySelectorAll('.emoji-cat').forEach(c => c.classList.remove('active'));
+        cat.classList.add('active');
+        const tab = cat.dataset.emojiTab;
+        document.querySelectorAll('.emoji-page').forEach(p => {
+          p.classList.toggle('active', p.dataset.emojiTab === tab);
+        });
+      });
+    });
+  </script>
+  <script src="../theme-sync.js"></script>
+</body>
+</html>

@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="fr" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <title>Frame — MacBook Pro 14&quot; + Safari</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    /* Cadre 1240×780 : barre Safari + zone écran. Taille naturelle, mise à l'échelle par le launcher. */
+    html, body { margin: 0; padding: 0; background: #0b0b0d; }
+    .mac {
+      width: 1240px; height: 780px;
+      display: flex; flex-direction: column;
+      background: #16161a;
+      border-radius: 14px;
+      overflow: hidden;
+      position: relative;
+      box-shadow: inset 0 0 0 1px #2b2b31;
+    }
+    /* Encoche */
+    .notch {
+      position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+      width: 180px; height: 22px; background: #0b0b0d;
+      border-radius: 0 0 11px 11px; z-index: 5;
+    }
+    /* Barre Safari */
+    .chrome {
+      flex: 0 0 46px;
+      display: flex; align-items: center; gap: 14px;
+      padding: 0 18px;
+      background: #1d1d22;
+      border-bottom: 1px solid #2b2b31;
+    }
+    .dots { display: flex; gap: 8px; }
+    .dot { width: 12px; height: 12px; border-radius: 50%; }
+    .dot.r { background: #ff5f57; }
+    .dot.y { background: #febc2e; }
+    .dot.g { background: #28c840; }
+    .nav-arrows { display: flex; gap: 10px; color: #85858c; }
+    .nav-arrows svg { width: 16px; height: 16px; }
+    .urlbar {
+      flex: 1; max-width: 560px; margin: 0 auto;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      height: 30px; background: #2a2a30; border-radius: 8px;
+      font: 12px/1 ui-monospace, 'SF Mono', Menlo, monospace;
+      color: #b9b9c0; letter-spacing: .02em;
+    }
+    .urlbar svg { width: 11px; height: 11px; color: #28c840; }
+    /* Écran */
+    .screen { flex: 1; overflow: hidden; background: var(--bg, #0a0a0c); }
+    .screen iframe { display: block; width: 100%; height: 100%; border: none; background: transparent; }
+  </style>
+</head>
+<body>
+  <div class="mac" data-od-id="frame-macbook-shell">
+    <div class="notch"></div>
+    <div class="chrome">
+      <div class="dots"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></div>
+      <div class="nav-arrows">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+      </div>
+      <div class="urlbar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+        kite.chat
+      </div>
+      <div style="width: 92px;"></div>
+    </div>
+    <div class="screen"><iframe id="f" title="Kite — vue desktop"></iframe></div>
+  </div>
+  <script>
+    const sp = new URLSearchParams(location.search);
+    const s = sp.get('screen');
+    if (s) document.getElementById('f').src = '../' + s;
+    const syncTheme = () => {
+      try {
+        const t = localStorage.getItem('kite-theme') || 'dark';
+        const dark = t === 'dark' || (t === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+      } catch (e) {}
+    };
+    syncTheme();
+    window.addEventListener('storage', syncTheme);
+  </script>
+</body>
+</html>
