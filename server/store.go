@@ -48,7 +48,7 @@ type CallRecord struct {
 	CallerID   string `json:"callerId"`
 	CallerName string `json:"callerName"`
 	Kind       string `json:"kind"`   // audio | video
-	Status     string `json:"status"` // ringing | accepted | declined | ended
+	Status     string `json:"status"` // ringing | accepted | declined | missed | ended
 	CreatedAt  int64  `json:"createdAt"`
 	UpdatedAt  int64  `json:"updatedAt"`
 }

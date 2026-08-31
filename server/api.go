@@ -370,8 +370,8 @@ func (a *api) handleCallRespond(w http.ResponseWriter, r *http.Request) {
 		httpError(w, 400, "corps invalide: "+err.Error())
 		return
 	}
-	if body.Status != "accepted" && body.Status != "declined" {
-		httpError(w, 400, "status doit être accepted ou declined")
+	if body.Status != "accepted" && body.Status != "declined" && body.Status != "missed" {
+		httpError(w, 400, "status doit être accepted, declined ou missed")
 		return
 	}
 	updated, ok := a.store.respondCall(body.CallID, body.Status)
