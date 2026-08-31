@@ -28,6 +28,9 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
     with SingleTickerProviderStateMixin {
   late final AnimationController _ring;
   Timer? _vibration;
+  Timer? _countdown;
+  int _remaining = 30;
+  bool _ending = false;
 
   @override
   void initState() {
@@ -38,16 +41,23 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
     _vibration = Timer.periodic(const Duration(milliseconds: 550), (_) {
       if (mounted) setState(() {});
     });
+    _countdown = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (_ending) return;
+      setState(() => _remaining -= 1);
+      if (_remaining <= 0) _timeout();
+    });
   }
 
   @override
   void dispose() {
     _ring.dispose();
     _vibration?.cancel();
+    _countdown?.cancel();
     super.dispose();
   }
 
   Future<void> _accept() async {
+    _countdown?.cancel();
     final call = widget.call;
     await widget.api.respondCall(call.id, 'accepted').catchError((_) => null);
     CallCenter.instance.dismiss();
@@ -65,9 +75,27 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
   }
 
   Future<void> _decline() async {
+    _countdown?.cancel();
     await widget.api.respondCall(widget.call.id, 'declined').catchError((_) => null);
     CallCenter.instance.dismiss();
     if (mounted) Navigator.of(context).pop();
+  }
+
+  /// Expire la sonnerie après 30 s : marque l'appel manqué côté serveur.
+  Future<void> _timeout() async {
+    if (_ending) return;
+    _ending = true;
+    _ring.stop();
+    _countdown?.cancel();
+    _vibration?.cancel();
+    final call = widget.call;
+    await widget.api.respondCall(call.id, 'missed').catchError((_) => null);
+    CallCenter.instance.dismiss();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Appel manqué — sans réponse')),
+    );
+    Navigator.of(context).pop();
   }
 
   @override
@@ -118,7 +146,28 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
                 ),
               ),
             ),
-            const SizedBox(height: 26),
+            const SizedBox(height: 22),
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                SizedBox(
+                  width: 64,
+                  height: 64,
+                  child: CircularProgressIndicator(
+                    value: _remaining / 30,
+                    strokeWidth: 4,
+                    color: KiteColors.tint2,
+                    backgroundColor: KiteColors.surface2,
+                  ),
+                ),
+                Text('$_remaining',
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(_remaining <= 1 ? 'Sonnerie...' : 'Sans réponse dans $_remaining s',
+                style: const TextStyle(color: KiteColors.muted, fontSize: 13)),
+            const SizedBox(height: 4),
             Text(call.callerName,
                 style: const TextStyle(
                   fontSize: 24,
