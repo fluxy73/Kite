@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="fr" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <title>Recherche — Kite</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="../app.css" />
+      <!-- Contacts -->
+      <div class="result-section" data-od-id="results-contacts">
+        <div class="sec-title">Contacts</div>
+        <div class="result-row" tabindex="0">
+          <div class="avatar av-1">LU</div>
+          <div><div class="name">Lucas Martin</div><div class="desc">Projet Nova · en ligne</div></div>
+          <span class="time">Message</span>
+        </div>
+        <div class="result-row" tabindex="0">
+          <div class="avatar av-3">EM</div>
+          <div><div class="name">Emma Rossi</div><div class="desc">Vu il y a 2 h</div></div>
+          <span class="time">Message</span>
+        </div>
+        <div class="result-row" tabindex="0">
+          <div class="avatar av-2">TH</div>
+          <div><div class="name">Thomas Dubois</div><div class="desc">Projet Nova</div></div>
+          <span class="time">Message</span>
+        </div>
+      </div>
+
+      <!-- Messages -->
+      <div class="result-section" data-od-id="results-messages">
+        <div class="sec-title">Messages</div>
+        <div class="result-row" tabindex="0">
+          <div class="avatar av-1">LU</div>
+          <div>
+            <div class="name">Lucas</div>
+            <div class="desc">"Tu viens ce soir ? On se retrouve à 20h"</div>
+          </div>
+          <span class="time">14:42</span>
+        </div>
+        <div class="result-row" tabindex="0">
+          <div class="avatar group av-2">PR</div>
+          <div>
+            <div class="name">Projet Nova</div>
+            <div class="desc"><b>Thomas :</b> sondage · On joue à quoi ce soir ?</div>
+          </div>
+          <span class="time">13:08</span>
+        </div>
+        <div class="result-row" tabindex="0">
+          <div class="avatar av-3">CA</div>
+          <div>
+            <div class="name">Camille</div>
+            <div class="desc">"Tu as vu le document que j'ai envoyé ?"</div>
+          </div>
+          <span class="time">hier</span>
+        </div>
+      </div>
+
+      <!-- Photos -->
+      <div class="result-section" data-od-id="results-photos">
+        <div class="sec-title">Photos</div>
+        <div class="media-result" tabindex="0">
+          <div class="media-thumb">IMG_2047</div>
+          <div>
+            <div class="name">Photo de Lucas</div>
+            <div class="desc">Dans Projet Nova · Aujourd'hui</div>
+          </div>
+          <span class="time">14:42</span>
+        </div>
+        <div class="media-result" tabindex="0">
+          <div class="media-thumb">IMG_2046</div>
+          <div>
+            <div class="name">Photo de Sophie</div>
+            <div class="desc">Dans Discussions · Hier</div>
+          </div>
+          <span class="time">hier</span>
+        </div>
+      </div>
+
+      <!-- Liens -->
+      <div class="result-section" data-od-id="results-links">
+        <div class="sec-title">Liens</div>
+        <div class="result-row" tabindex="0">
+          <div class="avatar av-2" style="border-radius:8px">🌐</div>
+          <div>
+            <div class="name">Notion — Roadmaps Q3</div>
+            <div class="desc">notion.so/.../roadmaps-q3-2025</div>
+          </div>
+          <span class="time">12:15</span>
+        </div>
+      </div>
+
+      <!-- Documents -->
+      <div class="result-section" data-od-id="results-documents">
+        <div class="sec-title">Documents</div>
+        <div class="media-result" tabindex="0">
+          <div class="media-thumb">📄</div>
+          <div>
+            <div class="name">projet-nova.pdf</div>
+            <div class="desc">Dans Projet Nova · 8,4 Mo</div>
+          </div>
+        </div>
+        <div class="media-result" tabindex="0">
+          <div class="media-thumb">📊</div>
+          <div>
+            <div class="name">budget-2025.xlsx</div>
+            <div class="desc">Dans Famille · 2,1 Mo</div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script>
+    const saved = localStorage.getItem('kite-theme');
+    if (saved) document.documentElement.setAttribute('data-theme', saved);
+    // Toggle filter pills
+    document.querySelectorAll('.filter-pill').forEach(p => {
+      p.addEventListener('click', () => {
+        document.querySelectorAll('.filter-pill').forEach(x => x.classList.remove('active'));
+        p.classList.add('active');
+      });
+    });
+  </script>
+  <script src="../theme-sync.js"></script>
+</body>
+</html>

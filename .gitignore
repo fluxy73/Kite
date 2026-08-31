@@ -1,0 +1,28 @@
+# SDK locaux téléchargés pour cette session (réinstallables)
+tools/
+
+# Dossiers internes de l'outil / historiques (pas du code projet)
+.freebuff/
+.od-skills/
+.file-versions/
+*.artifact.json
+
+# Serveur — binaires & données
+server/kite-server.exe
+server/kite-server-linux
+server/kite-server
+server/data/
+server/*.log
+
+# Flutter — générés par le build
+app/build/
+app/.dart_tool/
+app/.flutter-plugins
+app/.flutter-plugins-dependencies
+app/.metadata
+app/android/.gradle/
+app/android/local.properties
+app/ios/Pods/
+app/ios/.symlinks/
+app/windows/flutter/ephemeral/
+app/linux/flutter/ephemeral/

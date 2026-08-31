@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="fr" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <title>Nouvel événement — Kite</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="../app.css" />
+  <style>
+    .event-screen { display: flex; flex-direction: column; height: 100dvh; overflow: hidden; }
+    .event-form { flex: 1; overflow-y: auto; padding: 16px; }
+    .form-field { margin-bottom: 16px; }
+    .form-field label {
+      font-family: var(--font-mono); font-size: 10px; letter-spacing: .08em;
+      text-transform: uppercase; color: var(--muted); margin-bottom: 6px; display: block;
+    }
+    .form-field input, .form-field textarea {
+      width: 100%; padding: 12px 16px; border-radius: var(--radius-field);
+      background: var(--surface); border: 1px solid var(--border); color: var(--fg);
+      font: inherit; font-size: 15px; outline: none; resize: none;
+    }
+    .form-field input:focus, .form-field textarea:focus { border-color: color-mix(in oklch, var(--accent) 50%, var(--border)); }
+    .form-field input::placeholder, .form-field textarea::placeholder { color: var(--muted); }
+
+    .event-date {
+      display: flex; gap: 10px; align-items: center; padding: 12px 16px;
+      background: var(--surface); border-radius: 12px; border: 1px solid var(--border);
+    }
+    .event-date .ed-col { flex: 1; }
+    .event-date .ed-col label { font-size: 10px; color: var(--muted); text-transform: uppercase; font-family: var(--font-mono); }
+    .event-date input { padding: 8px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; color: var(--fg); font-family: var(--font-mono); font-size: 13px; }
+    .form-switch {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 16px; border-radius: 12px; cursor: pointer;
+      border: 1px solid var(--border); background: var(--surface);
+    }
+    .form-switch .left { display: flex; align-items: center; gap: 10px; }
+    .form-switch .left svg { width: 17px; height: 17px; color: var(--accent); }
+    .form-switch .label { font-size: 13.5px; font-weight: 500; }
+
+    .event-footer {
+      flex: 0 0 auto; padding: 12px 16px; border-top: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .event-footer .create-btn {
+      width: 100%; padding: 14px; border-radius: 999px; border: none;
+      background: var(--accent); color: var(--accent-ink); font-weight: 600; font-size: 15px;
+    }
+  </style>
+</head>
+<body>
+  <div class="event-screen" data-od-id="screen-event-create">
+    <div class="status-space"></div>
+
+    <header class="app-header" data-od-id="event-header" style="border-bottom:1px solid var(--border)">
+      <button class="icon-btn" aria-label="Retour">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m15 18-6-6 6-6"/></svg>
+      </button>
+      <h1 class="title">Nouvel événement</h1>
+      <button class="icon-btn" aria-label="Envoyer" id="event-send" style="opacity:.35">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </button>
+    </header>
+
+    <main class="event-form" data-od-id="event-form">
+      <div class="form-field">
+        <label>Nom</label>
+        <input type="text" placeholder="Soirée jeu de société" id="event-name" aria-label="Nom de l'événement" />
+      </div>
+
+      <div class="form-field">
+        <label>Description (facultatif)</label>
+        <textarea rows="3" placeholder="Décrivez votre événement..."></textarea>
+      </div>
+
+      <div class="form-field">
+        <label>Date et heure</label>
+        <div class="event-date">
+          <div class="ed-col">
+            <label>Date</label>
+            <input type="date" />
+          </div>
+          <div class="ed-col">
+            <label>Heure</label>
+            <input type="time" />
+          </div>
+        </div>
+      </div>
+
+      <div class="form-field">
+        <label>Lieu (facultatif)</label>
+        <input type="text" placeholder="Café de Flore, Paris" />
+      </div>
+
+      <div class="form-field">
+        <label>Catégorie</label>
+        <div class="event-date">
+          <div class="ed-col">
+            <select style="padding:8px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;color:var(--fg);font:inherit;font-size:13px;width:100%">
+              <option>🎉 Fête</option>
+              <option>🎮 Jeux</option>
+              <option selected>🍽️ Repas</option>
+              <option>🏃 Sport</option>
+              <option>💼 Travail</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-field">
+        <div class="form-switch">
+          <div class="left">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+            <span class="label">Lien d'appel</span>
+          </div>
+          <input type="text" placeholder="https://meet.kite.chat/xxxx" style="flex:1;margin-left:10px;padding:6px 10px;border-radius:8px;background:var(--surface-2);border:1px solid var(--border);color:var(--fg);font:inherit;font-size:13px" />
+        </div>
+      </div>
+
+      <div class="form-field">
+        <div class="form-switch">
+          <div class="left">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 19V5M5 12l7 7 7-7"/></svg>
+            <span class="label">Rappeler aux participants</span>
+          </div>
+          <span class="right" style="color:var(--muted)">15 min avant</span>
+        </div>
+      </div>
+    </main>
+
+    <div class="event-footer">
+      <button class="create-btn" data-od-id="create-event-btn">Créer l'événement</button>
+    </div>
+  </div>
+  <script>
+    const saved = localStorage.getItem('kite-theme');
+    if (saved) document.documentElement.setAttribute('data-theme', saved);
+    const name = document.getElementById('event-name');
+    const send = document.getElementById('event-send');
+    name.addEventListener('input', () => {
+      send.style.opacity = name.value.trim() ? '1' : '.35';
+    });
+  </script>
+  <script src="../theme-sync.js"></script>
+</body>
+</html>

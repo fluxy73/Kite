@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="fr" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <title>Archivées — Kite</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="../app.css" />
+  <style>
+    .archive-screen { display: flex; flex-direction: column; height: 100dvh; overflow: hidden; }
+
+    .archive-summary {
+      flex: 0 0 auto; padding: 16px; background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+    .archive-summary h2 { font-family: var(--font-display); font-size: 22px; margin: 0 0 4px; }
+    .archive-summary .count { font-size: 13px; color: var(--muted); }
+
+    /* Re-use chat-row style */
+    .chat-row {
+      display: grid; grid-template-columns: 48px 1fr auto; gap: 12px;
+      align-items: center; padding: 11px 16px; transition: background .12s ease;
+    }
+    .chat-row:hover { background: var(--fg-soft); }
+    .chat-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 12px; }
+    .avatar.lg { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; font-size: 17px; font-weight: 600; }
+    .name-line { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+    .name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .time { font-family: var(--font-mono); font-size: 11px; color: var(--muted); flex: 0 0 auto; }
+    .preview { color: var(--muted); font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .preview b { color: var(--fg); font-weight: 500; }
+
+    .unread {
+      min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px;
+      background: var(--accent); color: var(--accent-ink);
+      font-family: var(--font-mono); font-size: 11px; font-weight: 700;
+      display: grid; place-items: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="archive-screen" data-od-id="screen-archive">
+    <div class="status-space"></div>
+
+    <header class="app-header" data-od-id="archive-header" style="border-bottom:1px solid var(--border)">
+      <button class="icon-btn" aria-label="Retour" onclick="location.href='chat-list.html'">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m15 18-6-6 6-6"/></svg>
+      </button>
+      <h1 class="title">Archivées</h1>
+    </header>
+
+    <div class="archive-summary" data-od-id="archive-summary">
+      <h2>Discussions archivées</h2>
+      <span class="count">12 conversations</span>
+    </div>
+
+    <main class="list" data-od-id="archive-list">
+      <div class="chat-row" tabindex="0">
+        <div class="avatar lg av-3">LU</div>
+        <div style="min-width:0">
+          <div class="name-line"><span class="name">Lucas</span><span class="time">14:42</span></div>
+          <div class="preview">Tu viens ce soir ?</div>
+        </div>
+        <div><span class="unread">2</span></div>
+      </div>
+      <div class="chat-row" tabindex="0">
+        <div class="avatar lg group av-2">AN</div>
+        <div style="min-width:0">
+          <div class="name-line"><span class="name">Ancien groupe</span><span class="time">13:08</span></div>
+          <div class="preview"><b>Thomas :</b> revue du sprint</div>
+        </div>
+      </div>
+      <div class="chat-row" tabindex="0">
+        <div class="avatar lg av-1">PR</div>
+        <div style="min-width:0">
+          <div class="name-line"><span class="name">Projet 2025</span><span class="time">hier</span></div>
+          <div class="preview">📄 projet-nova.pdf · 8,4 Mo</div>
+        </div>
+      </div>
+      <div class="chat-row" tabindex="0">
+        <div class="avatar lg av-3">SO</div>
+        <div style="min-width:0">
+          <div class="name-line"><span class="name">Sophie</span><span class="time">lun.</span></div>
+          <div class="preview">Merci pour l'info !</div>
+        </div>
+      </div>
+      <div class="chat-row" tabindex="0">
+        <div class="avatar lg group av-1">FA</div>
+        <div style="min-width:0">
+          <div class="name-line"><span class="name">Famille</span><span class="time">dim.</span></div>
+          <div class="preview"><b>Maman :</b> On se retrouve à quelle heure dimanche ?</div>
+        </div>
+      </div>
+      <div class="chat-row" tabindex="0">
+        <div class="avatar lg av-2">CA</div>
+        <div style="min-width:0">
+          <div class="name-line"><span class="name">Camille</span><span class="time">sam.</span></div>
+          <div class="preview">Ça marche</div>
+        </div>
+      </div>
+      <div class="chat-row" tabindex="0">
+        <div class="avatar lg av-3">TH</div>
+        <div style="min-width:0">
+          <div class="name-line"><span class="name">Thomas</span><span class="time">sam.</span></div>
+          <div class="preview">Brouillon : j'ai relu le dossier</div>
+        </div>
+      </div>
+      <div class="chat-row" tabindex="0">
+        <div class="avatar lg group av-2">CO</div>
+        <div style="min-width:0">
+          <div class="name-line"><span class="name">Copains Gaming</span><span class="time">ven.</span></div>
+          <div class="preview"><b>Hugo :</b> sondage · On joue à quoi ce soir ?</div>
+        </div>
+      </div>
+      <div class="chat-row" tabindex="0">
+        <div class="avatar lg av-1">LE</div>
+        <div style="min-width:0">
+          <div class="name-line"><span class="name">Léa</span><span class="time">ven.</span></div>
+          <div class="preview">🎥 Note vidéo · 0:12</div>
+        </div>
+      </div>
+      <div class="chat-row" tabindex="0">
+        <div class="avatar lg av-2">MA</div>
+        <div style="min-width:0">
+          <div class="name-line"><span class="name">Marc</span><span class="time">jeu.</span></div>
+          <div class="preview">Merci pour l'info !</div>
+        </div>
+      </div>
+      <div class="chat-row" tabindex="0">
+        <div class="avatar lg group av-3">LO</div>
+        <div style="min-width:0">
+          <div class="name-line"><span class="name">Location 2025</span><span class="time">jeu.</span></div>
+          <div class="preview"><b>Léa :</b> 📄 bail-2025.pdf · 2,1 Mo</div>
+        </div>
+      </div>
+      <div class="chat-row" tabindex="0">
+        <div class="avatar lg av-1">HU</div>
+        <div style="min-width:0">
+          <div class="name-line"><span class="name">Hugo</span><span class="time">mer.</span></div>
+          <div class="preview">Tu as vu le document ?</div>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script>
+    const saved = localStorage.getItem('kite-theme');
+    if (saved) document.documentElement.setAttribute('data-theme', saved);
+  </script>
+  <script src="../theme-sync.js"></script>
+</body>
+</html>

@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="fr" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <title>Paramètres — Kite</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="../app.css" />
+      <!-- Profil -->
+      <div class="profile-bar" data-od-id="profile-bar">
+        <div class="avatar av-1">JD</div>
+        <div>
+          <div class="name">Julien Dumont</div>
+          <div class="handle">@julien</div>
+        </div>
+        <span class="edit">Modifier le profil →</span>
+      </div>
+
+      <!-- Compte -->
+      <div class="card" data-od-id="card-account">
+        <div class="card-title">Compte</div>
+        <div class="setting-row">
+          <div class="left">
+            <div class="sr-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg></div>
+            <div class="info"><div class="label">Profil</div><div class="desc">Photo, nom, description</div></div>
+          </div>
+        </div>
+        <div class="setting-row">
+          <div class="left">
+            <div class="sr-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></div>
+            <div class="info"><div class="label">Confidentialité</div><div class="desc">Messages éphémères, blocage…</div></div>
+          </div>
+        </div>
+        <div class="setting-row">
+          <div class="left">
+            <div class="sr-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg></div>
+            <div class="info"><div class="label">Appareils liés</div><div class="desc">3 appareils synchronisés</div></div>
+          </div>
+          <span class="right">3</span>
+        </div>
+        <div class="setting-row">
+          <div class="left">
+            <div class="sr-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 12m8-8v8a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V4a4 4 0 0 1 4-4z"/></svg></div>
+            <div class="info"><div class="label">Sauvegarde</div><div class="desc">Cloud — activée</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Thème & personnalisation -->
+      <div class="card" data-od-id="card-theme">
+        <div class="card-title">Thème & personnalisation</div>
+        <div class="setting-row">
+          <div class="left">
+            <div class="sr-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></div>
+            <div class="info"><div class="label">Apparence</div><div class="desc">Sombre · Premium</div></div>
+          </div>
+          <div class="theme-preview">
+            <button class="theme-swatch active" data-theme-swatch="dark" aria-label="Sombre">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+            </button>
+            <button class="theme-swatch" data-theme-swatch="light" aria-label="Clair">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+            </button>
+            <button class="theme-swatch" data-theme-swatch="auto" aria-label="Système">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <div class="left">
+            <div class="sr-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 5v14M5 12h14"/></svg></div>
+            <div class="info"><div class="label">Accent de couleur</div><div class="desc">Ambre / Cuivre</div>
+          </div>
+          <span class="right" style="color:var(--accent)">●</span>
+        </div>
+
+        <div class="setting-row">
+          <div class="left">
+            <div class="sr-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 12h2M12 3l-9 9v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6l-9-9z"/></svg></div>
+            <div class="info"><div class="label">Navigation</div><div class="desc">Barre basse</div>
+          </div>
+        </div>
+        <div class="nav-grid" data-od-id="nav-selector">
+          <div class="nav-opt active" data-nav="bottom">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="17" width="18" height="6"/><path d="M6 11l6-7 6 7"/></svg>
+            <span class="lbl">Basse</span>
+          </div>
+          <div class="nav-opt" data-nav="floating">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="8" y="14" width="8" height="6" rx="1.5"/><path d="M9 14V8a3 3 0 1 1 6 0v6"/></svg>
+            <span class="lbl">Flottante</span>
+          </div>
+          <div class="nav-opt" data-nav="top">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="6" width="18" height="6"/><line x1="3" y1="12" x2="21" y2="12"/></svg>
+            <span class="lbl">Haute</span>
+          </div>
+          <div class="nav-opt" data-nav="sidebar">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="2" y="4" width="20" height="16" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+            <span class="lbl">Sidebar</span>
+          </div>
+          <div class="nav-opt" data-nav="compact">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M12 4v16"/></svg>
+            <span class="lbl">Compacte</span>
+          </div>
+          <div class="nav-opt" data-nav="icons">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="10"/><path d="M12 7v5l3 3"/></svg>
+            <span class="lbl">Icônes</span>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <div class="left">
+            <div class="sr-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="7" r="5"/><path d="M2 19.5c0-3.6 2.8-6.6 6.5-7.3.5.3.9.7 1.5 1.2.6-.2 1.2-.3 1.9-.3 1.9 0 3.6.7 4.9 1.9.3-.2.6-.5 1-1 .4-.5.9-1 1.4-1.4C18.8 14.2 22 17 22 21H2z"/></svg></div>
+            <div class="info"><div class="label">Photo de profil</div><div class="desc">Dégradé personnalisé</div></div>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <div class="left">
+            <div class="sr-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M14.7 6.7 9.1 12.3l-1.4-1.3-4 4.1 3 2.9 7.3-6.9z"/><path d="M19 4.5 11 12.7l-1.4-1.3"/></svg></div>
+            <div class="info"><div class="label">Animations</div><div class="desc">Activées</div></div>
+          </div>
+          <label class="toggle-wrap">
+            <span class="switch on"></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Navigation & affichage -->
+      <div class="card" data-od-id="card-nav">
+        <div class="card-title">Navigation & affichage</div>
+        <div class="setting-row">
+          <div class="left">
+            <div class="sr-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M21 12a9 9 0 1 1-9-9 9 9 0 0 0 9 9z"/></svg></div>
+            <div class="info"><div class="label">Afficher les badges</div></div>
+          </div>
+          <label class="toggle-wrap">
+            <span class="switch on"></span>
+          </label>
+        </div>
+        <div class="setting-row">
+          <div class="left">
+            <div class="sr-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M1 12s8-7 13-7 13 7 13 7-8 7-13 7-13-7-13-7z"/></svg></div>
+            <div class="info"><div class="label">Prévisualisation des messages</div><div class="desc">Toujours</div></div>
+          </div>
+        </div>
+        <div class="setting-row">
+          <div class="left">
+            <div class="sr-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.5 7c.6.9 1 1.9 1 3s-.4 2.1-1 3M18 10l3 2-3 2"/></svg></div>
+            <div class="info"><div class="label">Notifications</div><div class="desc">Toutes activées</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Centre de données -->
+      <div class="card" data-od-id="card-storage">
+        <div class="card-title">Stockage</div>
+        <div class="setting-row">
+          <div class="left">
+            <div class="sr-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/></svg></div>
+            <div class="info"><div class="label">Taille totale</div><div class="desc">2,4 Go sur 5 Go</div></div>
+          </div>
+        </div>
+        <div class="setting-row">
+          <div class="left">
+            <div class="sr-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 2v20M5 12h14"/></svg></div>
+            <div class="info"><div class="label">Nettoyer le stockage</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- À propos -->
+      <div class="card" data-od-id="card-about">
+        <div class="card-title">À propos</div>
+        <div class="setting-row">
+          <div class="left">
+            <div class="sr-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="10"/><path d="M12 7v5l2 2"/></svg></div>
+            <div class="info"><div class="label">Version</div><div class="desc">Kite 3.1.0</div></div>
+          </div>
+        </div>
+        <div class="setting-row">
+          <div class="left">
+            <div class="sr-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg></div>
+            <div class="info"><div class="label">Conditions d'utilisation</div></div>
+          </div>
+        </div>
+        <div class="setting-row">
+          <div class="left">
+            <div class="sr-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg></div>
+            <div class="info"><div class="label">Politique de confidentialité</div></div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <nav class="tabbar" data-od-id="tabbar">
+      <button class="tab" onclick="location.href='chat-list.html'">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M21 12a8 8 0 0 1-8 8H5l-2 2V12a8 8 0 0 1 8-8h2a8 8 0 0 1 8 8Z"/></svg>
+        Discussions
+      </button>
+      <button class="tab">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/></svg>
+        Communautés
+      </button>
+      <button class="tab">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 4h4l2 5-2.5 1.5a12 12 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2Z"/></svg>
+        Appels
+      </button>
+    </nav>
+  </div>
+  <script>
+    // Theme toggle within screen
+    document.querySelectorAll('[data-theme-swatch]').forEach(w => {
+      w.addEventListener('click', () => {
+        const t = w.dataset.themeSwatch;
+        document.documentElement.setAttribute('data-theme', t);
+        localStorage.setItem('kite-theme', t);
+        document.querySelectorAll('[data-theme-swatch]').forEach(x => x.classList.remove('active'));
+        w.classList.add('active');
+      });
+    });
+    // Nav style selector
+    document.querySelectorAll('[data-nav]').forEach(n => {
+      n.addEventListener('click', () => {
+        document.querySelectorAll('[data-nav]').forEach(x => x.classList.remove('active'));
+        n.classList.add('active');
+        localStorage.setItem('kite-nav', n.dataset.nav);
+      });
+    });
+    // Sync theme on load
+    const saved = localStorage.getItem('kite-theme');
+    if (saved) document.documentElement.setAttribute('data-theme', saved);
+  </script>
+  <script src="../theme-sync.js"></script>
+</body>
+</html>

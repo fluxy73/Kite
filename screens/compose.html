@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="fr" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <title>Conversation — Lucas — Kite</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="../app.css" />
+  <style>
+    /* === Rich Composer + Bottom Sheet === */
+    .chat-header {
+      flex: 0 0 auto; display: flex; align-items: center; gap: 10px;
+      padding: 8px 10px 10px 12px; border-bottom: 1px solid var(--border);
+      background: color-mix(in oklch, var(--bg) 90%, transparent); backdrop-filter: blur(10px);
+    }
+    .chat-header .icon-btn { width: 36px; height: 36px; }
+    .peer { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; }
+    .peer .avatar { width: 36px; height: 36px; font-size: 13px; }
+    .peer .avatar .presence {
+      position: absolute; right: -1px; bottom: -1px; width: 10px; height: 10px;
+      border-radius: 50%; background: var(--tint-2); border: 2px solid var(--bg);
+    }
+    .peer-name { font-weight: 600; font-size: 15px; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .peer-status { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 5px; }
+    .peer-status svg { width: 12px; height: 12px; color: var(--accent); }
+
+    /* messages list */
+    .msgs {
+      flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain;
+      padding: 14px 12px 10px; display: flex; flex-direction: column; gap: 3px;
+      background: radial-gradient(120% 60% at 50% 0%, color-mix(in oklch, var(--surface) 55%, transparent), transparent 70%), var(--bg);
+    }
+    .day-sep { align-self: center; margin: 10px 0 12px; font-family: var(--font-mono); font-size: 11px; color: var(--muted); background: var(--surface-2); border-radius: 999px; padding: 4px 12px; }
+
+    .msg { display: flex; flex-direction: column; max-width: 82%; }
+    .msg.in  { align-self: flex-start; align-items: flex-start; }
+    .msg.out { align-self: flex-end; align-items: flex-end; }
+    .bubble {
+      position: relative; padding: 8px 12px; border-radius: 18px;
+      font-size: 15px; line-height: 1.4; overflow-wrap: break-word; min-width: 0;
+    }
+    .msg.in  .bubble { background: var(--surface); border: 1px solid var(--border); border-bottom-left-radius: 6px; }
+    .msg.out .bubble { background: color-mix(in oklch, var(--accent) 13%, var(--surface-2)); border: 1px solid color-mix(in oklch, var(--accent) 30%, var(--border)); border-bottom-right-radius: 6px; }
+    .msg.out .bubble b { color: var(--accent-ink); }
+
+    /* text formats */
+    .bubble b { font-weight: 700; }
+    .bubble i { font-style: italic; opacity: .85; }
+    .bubble del { text-decoration: line-through; opacity: .7; }
+    .bubble code {
+      font-family: var(--font-mono); font-size: 13.5px;
+      background: var(--surface-2); padding: 2px 6px; border-radius: 6px;
+    }
+    .quote {
+      border-left: 2.5px solid var(--accent); background: color-mix(in oklch, var(--fg) 5%, transparent);
+      border-radius: 8px; padding: 5px 9px; margin-bottom: 6px; font-size: 12.5px; cursor: pointer; max-width: 240px;
+    }
+    .quote .q-name { color: var(--accent); font-weight: 600; display: block; }
+    .quote .q-txt { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+
+    .meta-line {
+      display: flex; align-items: center; gap: 4px; justify-content: flex-end;
+      margin-top: 3px; font-family: var(--font-mono); font-size: 10px; color: var(--muted);
+    }
+    .ticks { display: inline-flex; color: var(--muted); }
+    .ticks.read { color: var(--accent); }
+    .ticks svg { width: 14px; height: 14px; }
+
+    /* voice note */
+    .voice { display: flex; align-items: center; gap: 10px; min-width: 220px; padding: 10px 12px; }
+    .voice-play { width: 34px; height: 34px; border-radius: 50%; border: none; flex: 0 0 auto; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; }
+    .voice-play svg { width: 15px; height: 15px; }
+    .wave { display: flex; align-items: center; gap: 2.5px; flex: 1; height: 26px; }
+    .wave i { flex: 1; min-width: 2.5px; border-radius: 2px; background: color-mix(in oklch, var(--accent) 55%, var(--surface-2)); }
+    .wave i.dim { background: var(--surface-2); }
+    .voice-time { font-family: var(--font-mono); font-size: 11px; color: var(--muted); flex: 0 0 auto; }
+    .voice-speed { font-family: var(--font-mono); font-size: 10.5px; color: var(--muted); border: 1px solid var(--border); border-radius: 6px; padding: 2px 5px; flex: 0 0 auto; }
+
+    /* composer */
+    .composer-zone { flex: 0 0 auto; border-top: 1px solid var(--border); background: var(--bg); padding: 8px 10px calc(10px); }
+    .composer { display: flex; align-items: flex-end; gap: 8px; }
+    .comp-input {
+      flex: 1; display: flex; align-items: center; gap: 8px;
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-field); padding: 9px 12px; min-width: 0;
+    }
+    .comp-input:focus-within { border-color: color-mix(in oklch, var(--accent) 50%, var(--border)); }
+    .comp-input input {
+      flex: 1; min-width: 0; border: 0; background: transparent; color: var(--fg);
+      font: inherit; font-size: 15px; outline: none; resize: none;
+    }
+    .comp-input input::placeholder { color: var(--muted); }
+    .comp-input .mini-emoji { width: 20px; height: 20px; color: var(--muted); flex: 0 0 auto; }
+
+    .comp-btn {
+      width: 40px; height: 40px; border-radius: 50%; border: none;
+      background: transparent; color: var(--muted);
+      display: grid; place-items: center; flex: 0 0 auto; padding: 0;
+    }
+    .comp-btn:hover { color: var(--fg); background: var(--fg-soft); }
+    .comp-btn svg { width: 21px; height: 21px; }
+    .comp-send {
+      width: 40px; height: 40px; border-radius: 50%; border: none;
+      background: var(--accent); color: var(--accent-ink);
+      display: grid; place-items: center; flex: 0 0 auto;
+    }
+    .comp-send:hover { background: color-mix(in oklch, var(--accent) 88%, black); }
+    .comp-send:disabled { opacity: .4; cursor: not-allowed; }
+
+    .eph-status {
+      display: flex; align-items: center; gap: 6px; justify-content: center;
+      font-size: 11px; color: var(--muted); padding-bottom: 6px;
+    }
+    .eph-status svg { width: 12px; height: 12px; color: var(--accent); }
+
+    /* Bottom sheet for attachments */
+    .sheet-backdrop {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: color-mix(in oklch, #000 60%, transparent);
+      display: flex; flex-direction: column; justify-content: flex-end;
+      opacity: 0; visibility: hidden; pointer-events: none;
+      transition: opacity .2s ease; z-index: 200;
+    }
+    .sheet-backdrop.show { opacity: 1; visibility: visible; pointer-events: auto; }
+    .sheet {
+      background: var(--surface); border-top-left-radius: 26px; border-top-right-radius: 26px;
+      border-top: 1px solid var(--border); padding: 12px 16px 30px;
+      max-height: 80%; overflow-y: auto;
+      transform: translateY(100%); transition: transform .25s cubic-bezier(.4,0,.2,1);
+    }
+    .sheet-backdrop.show .sheet { transform: translateY(0); }
+    .sheet-handle { width: 32px; height: 4px; background: var(--border); border-radius: 2px; margin: 0 auto 16px; }
+
+    .sheet-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 10px; }
+    .sheet-item { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+    .sheet-item .si-icon {
+      width: 52px; height: 52px; border-radius: 50%;
+      background: var(--surface-2); color: var(--accent);
+      display: grid; place-items: center;
+    }
+    .sheet-item .si-icon svg { width: 22px; height: 22px; }
+    .sheet-item .si-label { font-size: 10.5px; color: var(--muted); font-weight: 500; }
+    .sheet-item .si-badge {
+      position: absolute; top: 8px; right: -6px; min-width: 16px; height: 16px;
+      border-radius: 999px; background: var(--accent); color: var(--accent-ink);
+      font-family: var(--font-mono); font-size: 9px; font-weight: 700;
+      display: grid; place-items: center; padding: 0 4px;
+    }
+
+    /* text format toolbar (shown when text selected) */
+    .fmt-toolbar {
+      position: absolute; z-index: 100; background: var(--surface-2);
+      border: 1px solid var(--border); border-radius: 12px;
+      padding: 4px; display: flex; gap: 2px; box-shadow: 0 10px 30px -10px color-mix(in oklch,#000 55%,transparent);
+    }
+    .fmt-btn { width: 30px; height: 30px; border-radius: 8px; background: transparent; color: var(--muted); display: grid; place-items: center; }
+    .fmt-btn:hover { color: var(--fg); background: var(--fg-soft); }
+    .fmt-btn svg { width: 16px; height: 16px; }
+  </style>
+</head>
+<body>
+  <div class="screen" data-od-id="screen-compose">
+    <div class="status-space"></div>
+
+    <header class="chat-header" data-od-id="chat-header">
+      <button class="icon-btn" aria-label="Retour">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m15 18-6-6 6-6"/></svg>
+      </button>
+      <div class="peer" tabindex="0">
+        <div class="avatar av-1">LU<span class="presence"></span></div>
+        <div>
+          <div class="peer-name">Lucas</div>
+          <div class="peer-status">en ligne</div>
+        </div>
+      </div>
+      <button class="icon-btn" aria-label="Appel vidéo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="2" y="6" width="14" height="12" rx="3"/><path d="m16 10 6-3v10l-6-3"/></svg>
+      </button>
+      <button class="icon-btn" aria-label="Appel vocal">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 4h4l2 5-2.5 1.5a12 12 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2Z"/></svg>
+      </button>
+      <button class="icon-btn" aria-label="Plus d'options">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="5" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="12" cy="19" r="1.4"/></svg>
+      </button>
+    </header>
+
+    <main class="msgs" data-od-id="messages">
+      <span class="day-sep">Aujourd'hui</span>
+
+      <div class="msg in" data-od-id="msg-in-1">
+        <div class="bubble">Salut ! Tu viens ce soir ? On se retrouve à 20h devant le cinéma</div>
+        <span class="meta-line">14:38</span>
+      </div>
+
+      <div class="msg out" data-od-id="msg-out-reply">
+        <div class="bubble">
+          <div class="quote">
+            <span class="q-name">Lucas</span>
+            <span class="q-txt">Salut ! Tu viens ce soir ? On se retrouve…</span>
+          </div>
+          <b>Oui</b> ! Je réserve les places
+        </div>
+        <span class="meta-line">14:40
+          <span class="ticks read"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m2 13 4 4 8-9"/><path d="m10 13 4 4 8-9"/></svg></span>
+        </span>
+      </div>
+      <div class="reactions">
+        <span class="rx mine">❤️ <span class="n">2</span></span>
+      </div>
+
+      <div class="msg in" data-od-id="msg-in-voice">
+        <div class="bubble">
+          <div class="voice">
+            <button class="voice-play" aria-label="Lire le message vocal">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7L8 5Z"/></svg>
+            </button>
+            <div class="wave" aria-hidden="true">
+              <i style="height:8px"></i><i style="height:14px"></i><i style="height:20px"></i><i style="height:12px"></i><i style="height:22px"></i><i class="dim" style="height:16px"></i><i class="dim" style="height:24px"></i><i class="dim" style="height:10px"></i><i class="dim" style="height:18px"></i><i class="dim" style="height:22px"></i><i class="dim" style="height:12px"></i><i class="dim" style="height:16px"></i>
+            </div>
+            <span class="voice-time">0:34</span>
+            <span class="voice-speed">1×</span>
+          </div>
+        </div>
+        <span class="meta-line">14:41</span>
+      </div>
+
+      <div class="msg out" data-od-id="msg-out-text-formats">
+        <div class="bubble">
+          <p><b>Gras important</b></p>
+          <p><i>Italique subtil</i></p>
+          <p><del>Barré </del>Correction</p>
+          <p>Code <code>inline</code> intégré</p>
+        </div>
+        <span class="meta-line">14:42
+          <span class="ticks read"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m2 13 4 4 8-9"/><path d="m10 13 4 4 8-9"/></svg></span>
+        </span>
+      </div>
+    </main>
+
+    <footer class="composer-zone" data-od-id="composer">
+      <div class="eph-status">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+        Messages éphémères activés · 24 heures
+      </div>
+      <div class="composer">
+        <button class="comp-btn" aria-label="Joindre" id="attach-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+        <div class="comp-input">
+          <input type="text" placeholder="Message" aria-label="Message" id="msg-input" />
+          <svg class="mini-emoji" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M8.5 14a4.5 4.5 0 0 0 7 0"/><circle cx="9" cy="9.5" r="0.8" fill="currentColor" stroke="none"/><circle cx="15" cy="9.5" r="0.8" fill="currentColor" stroke="none"/></svg>
+        </div>
+        <button class="comp-btn" aria-label="Enregistrer un vocal" id="voice-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+        </button>
+        <button class="comp-send" aria-label="Envoyer" id="send-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M4 12 20 4l-4 16-4-6-8-2Z"/><path d="m12 14 8-10"/></svg>
+        </button>
+      </div>
+    </footer>
+
+    <!-- Bottom sheet: Pièces jointes -->
+    <div class="sheet-backdrop" id="sheet-backdrop" data-od-id="attachment-sheet">
+      <div class="sheet">
+        <div class="sheet-handle"></div>
+        <div class="sheet-grid">
+          <div class="sheet-item"><div class="si-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M2 12l9-9v5a7 7 0 0 1 14 5v1a5 5 0 0 1-5 5H7a5 5 0 0 1-5-5v-1a7 7 0 0 1 9-6.6v2l3-3-3-3V6.4A7 7 0 0 0 9 8z"/></svg></div><span class="si-label">Document</span></div>
+          <div class="sheet-item"><div class="si-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="7" r="5"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg></div><span class="si-label">Caméra</span></div>
+          <div class="sheet-item"><div class="si-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 4V2h8v2M4 16V9h16v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/></svg></div><span class="si-label">Galerie</span></div>
+          <div class="sheet-item"><div class="si-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></div><span class="si-label">Audio</span></div>
+          <div class="sheet-item"><div class="si-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></div><span class="si-label">Localisation</span></div>
+          <div class="sheet-item"><div class="si-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg></div><span class="si-label">Contact</span></div>
+          <div class="sheet-item"><div class="si-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M9 7h6v2H9zM9 11h6v2H9z"/><rect x="4" y="4" width="16" height="16" rx="2"/></svg></div><span class="si-label">Sondage</span></div>
+          <div class="sheet-item"><div class="si-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg></div><span class="si-label">Événement</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    const saved = localStorage.getItem('kite-theme');
+    if (saved) document.documentElement.setAttribute('data-theme', saved);
+
+    // Attachment sheet toggle
+    const sheet = document.getElementById('sheet-backdrop');
+    const attachBtn = document.getElementById('attach-btn');
+    attachBtn.addEventListener('click', () => sheet.classList.add('show'));
+    sheet.addEventListener('click', (e) => {
+      if (e.target === sheet || e.target === sheet.querySelector('.sheet')) {
+        sheet.classList.remove('show');
+      }
+    });
+
+    // Send button
+    const sendBtn = document.getElementById('send-btn');
+    const msgInput = document.getElementById('msg-input');
+    sendBtn.addEventListener('click', () => {
+      if (msgInput.value.trim()) sendBtn.disabled = false;
+      else sendBtn.disabled = true;
+    });
+    msgInput.addEventListener('input', () => {
+      sendBtn.disabled = !msgInput.value.trim();
+    });
+  </script>
+  <script src="../theme-sync.js"></script>
+</body>
+</html>

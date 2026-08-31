@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="fr" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <title>Photo — Kite</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="../app.css" />
+  <style>
+    /* === Media Viewer (photo / video / editor) === */
+    .viewer-screen { display: flex; flex-direction: column; height: 100dvh; overflow: hidden; }
+    .viewer-header {
+      flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 16px; border-bottom: 1px solid var(--border);
+    }
+
+    .media-canvas { flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; }
+    .media-canvas img, .media-canvas video { max-width: 100%; max-height: 100%; object-fit: contain; }
+
+    /* photo editor overlays */
+    .editor-actions {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      display: flex; overflow-x: auto; gap: 10px; padding: 10px 16px;
+      background: color-mix(in oklch, var(--bg) 85%, transparent);
+      border-top: 1px solid var(--border); backdrop-filter: blur(10px);
+      scrollbar-width: none; flex: 0 0 auto;
+    }
+    .editor-actions::-webkit-scrollbar { display: none; }
+    .editor-tool {
+      flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 4px;
+      width: 56px; color: var(--muted); font-size: 10px; cursor: pointer;
+    }
+    .editor-tool:hover { color: var(--fg); }
+    .editor-tool.active { color: var(--accent); }
+    .editor-tool .et-icon { width: 40px; height: 40px; border-radius: 12px; background: var(--surface); display: grid; place-items: center; }
+    .editor-tool .et-icon svg { width: 19px; height: 19px; }
+
+    .caption-bar {
+      flex: 0 0 auto; padding: 8px 16px; border-top: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .caption-bar input {
+      flex: 1; width: 100%; border: 0; background: transparent; color: var(--fg);
+      font: inherit; font-size: 14px; outline: none; resize: none;
+    }
+    .caption-bar input::placeholder { color: var(--muted); }
+
+    .media-actions {
+      position: absolute; top: 12px; right: 12px; display: flex; gap: 8px; z-index: 10;
+    }
+    .media-actions .icon-btn { width: 34px; height: 34px; border-radius: 50%; background: color-mix(in oklch,#000 45%,transparent); }
+    .media-actions .icon-btn svg { width: 17px; height: 17px; }
+
+    /* single view indicators */
+    .view-once-tag {
+      position: absolute; top: 12px; left: 12px; z-index: 10;
+      display: flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 999px;
+      background: color-mix(in oklch, var(--bg) 80%, transparent); font-size: 10.5px; color: var(--fg);
+    }
+    .view-once-tag svg { width: 11px; height: 11px; color: var(--accent); }
+
+    /* video player controls */
+    .video-controls {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 16px; background: color-mix(in oklch, var(--bg) 85%, transparent);
+      border-top: 1px solid var(--border); backdrop-filter: blur(10px);
+    }
+    .vc-play { width: 34px; height: 34px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; }
+    .vc-play svg { width: 16px; height: 16px; }
+    .vc-progress { flex: 1; height: 4px; border-radius: 2px; background: var(--border); cursor: pointer; }
+    .vc-time { font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+    .vc-speed { font-family: var(--font-mono); font-size: 10.5px; color: var(--muted); border: 1px solid var(--border); border-radius: 6px; padding: 2px 6px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <div class="viewer-screen" data-od-id="screen-media-viewer">
+    <header class="viewer-header" data-od-id="viewer-header">
+      <button class="icon-btn" aria-label="Fermer">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+      <span style="font-family:var(--font-mono);font-size:11px;color:var(--muted)">IMG_2047.jpg</span>
+      <button class="icon-btn" aria-label="Télécharger">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M20 20a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8H4a2 2 0 0 1 2-2h1V5a3 3 0 0 1 3-3h8a3 3 0 0 1 3 3v1h1a2 2 0 0 1 2 2z"/><path d="M12 12l-5 5h3v6h4v-6h3z"/></svg>
+      </button>
+    </header>
+
+    <div class="media-canvas" data-od-id="media-canvas">
+      <div class="view-once-tag">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+        Vue unique · Ouvert
+      </div>
+      <img src="/ph-img" alt="Photo de groupe" />
+      <div class="media-actions">
+        <button class="icon-btn" aria-label="Favoris">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 3 2 12l4 2v8l4-2 4 2v-8l4-2z"/></svg>
+        </button>
+        <button class="icon-btn" aria-label="Partager">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="5" r="3"/><path d="M12 5v10m7-5-3-3m3 3-3 3"/></svg>
+        </button>
+        <button class="icon-btn" aria-label="Plus d'options">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="5" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="12" cy="19" r="1.4"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="caption-bar" data-od-id="caption-bar">
+      <input type="text" placeholder="Ajouter une légende…" aria-label="Légende" />
+    </div>
+
+    <div class="editor-actions" data-od-id="editor-actions">
+      <div class="editor-tool active" data-od-id="tool-crop"><div class="et-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 7V5a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H9l-2-2H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h3z"/><circle cx="9" cy="9" r="2"/></svg></div><span>Crop</span></div>
+      <div class="editor-tool" data-od-id="tool-rotate"><div class="et-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 12a9 9 0 0 1 9-9 9 9 0 0 1 9 9 9 9 0 0 1-9 9 9 9 0 0 1-9-9z"/><path d="M12 7v5l3 3"/></svg></div><span>Rotation</span></div>
+      <div class="editor-tool" data-od-id="tool-text"><div class="et-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 6h18M3 12h18M3 18h18"/></svg></div><span>Texte</span></div>
+      <div class="editor-tool" data-od-id="tool-draw"><div class="et-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M2 17l6.5-6.5a2 2 0 0 1 2.8 0l2.7 2.7a2 2 0 0 0 2.8 0l4-4a2 2 0 0 1 4 0v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2z"/><path d="M15 13l3-3 4 4v3a2 2 0 0 1-2 2h-2"/></svg></div><span>Dessin</span></div>
+      <div class="editor-tool" data-od-id="tool-emoji"><div class="et-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M8.5 14a4.5 4.5 0 0 0 7 0"/><circle cx="9" cy="9.5" r="0.8" fill="currentColor" stroke="none"/><circle cx="15" cy="9.5" r="0.8" fill="currentColor" stroke="none"/></svg></div><span>Emoji</span></div>
+      <div class="editor-tool" data-od-id="tool-sticker"><div class="et-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 2l2 6h6l-5 3 2 6-5-4-5 4 2-6-5-3h6z"/></svg></div><span>Sticker</span></div>
+      <div class="editor-tool" data-od-id="tool-filter"><div class="et-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="10"/><path d="M12 7v5l3 3"/></svg></div><span>Filtres</span></div>
+    </div>
+  </div>
+  <script>
+    const saved = localStorage.getItem('kite-theme');
+    if (saved) document.documentElement.setAttribute('data-theme', saved);
+    // Toggle editor tools
+    document.querySelectorAll('.editor-tool').forEach(t => {
+      t.addEventListener('click', () => {
+        document.querySelectorAll('.editor-tool').forEach(x => x.classList.remove('active'));
+        t.classList.add('active');
+      });
+    });
+  </script>
+  <script src="../theme-sync.js"></script>
+</body>
+</html>

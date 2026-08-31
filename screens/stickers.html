@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="fr" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <title>Stickers — Kite</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="../app.css" />
+  <style>
+    /* === Sticker Picker === */
+    .sticker-header {
+      flex: 0 0 auto; padding: 10px 16px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .pack-row { display: flex; align-items: center; gap: 10px; }
+    .pack-avatar {
+      width: 32px; height: 32px; border-radius: 10px;
+      background: var(--surface-2); display: grid; place-items: center;
+    }
+    .pack-name { font-weight: 600; font-size: 14px; }
+    .pack-count { font-size: 12px; color: var(--muted); }
+
+    .pack-list {
+      display: flex; gap: 10px; padding: 10px 16px; overflow-x: auto;
+      scrollbar-width: none; border-bottom: 1px solid var(--border); flex: 0 0 auto;
+    }
+    .pack-list::-webkit-scrollbar { display: none; }
+    .pack {
+      flex: 0 0 auto; text-align: center; cursor: pointer;
+    }
+    .pack .pack-cover {
+      width: 52px; height: 52px; border-radius: 14px;
+      background: var(--surface-2); border: 1px solid var(--border);
+      display: grid; place-items: center; font-size: 24px; margin-bottom: 4px;
+    }
+    .pack.active .pack-cover { border-color: var(--accent); background: var(--accent-soft); }
+    .pack .pack-label { font-size: 10px; color: var(--muted); }
+    .pack.active .pack-label { color: var(--accent); font-weight: 700; }
+
+    .sticker-scroll { flex: 1; overflow-y: auto; padding: 12px; }
+    .sticker-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+    }
+    .sticker-item {
+      aspect-ratio: 1; background: var(--surface-2);
+      border-radius: 4px; display: grid; place-items: center; font-size: 28px;
+      cursor: pointer; transition: transform .15s ease;
+    }
+    .sticker-item:hover { transform: scale(1.08); background: var(--surface); }
+
+    .sticker-create {
+      display: flex; flex-direction: column; align-items: center; gap: 6px;
+      padding: 12px; border-top: 1px solid var(--border); background: var(--surface);
+    }
+    .sticker-create .sc-btn {
+      width: 48px; height: 48px; border-radius: 16px;
+      background: var(--accent); color: var(--accent-ink);
+      display: grid; place-items: center; cursor: pointer;
+    }
+    .sticker-create .sc-btn svg { width: 22px; height: 22px; }
+    .sticker-create .sc-label { font-size: 11px; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <div class="screen" data-od-id="screen-stickers">
+    <div class="status-space"></div>
+
+    <header class="sticker-header" data-od-id="sticker-header">
+      <div class="pack-row">
+        <div class="pack-avatar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="10"/><path d="M12 7v5l3 3"/></svg>
+        </div>
+        <div>
+          <div class="pack-name">Sagesse perdue</div>
+          <div class="pack-count">8 stickers</div>
+        </div>
+      </div>
+      <button class="icon-btn" aria-label="Favoris">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 3 2 12l4 2v8l4-2 4 2v-8l4-2z"/></svg>
+      </button>
+    </header>
+
+    <nav class="pack-list" data-od-id="pack-list" aria-label="Packs de stickers">
+      <div class="pack active">
+        <div class="pack-cover">🦉</div>
+        <div class="pack-label">Sagesse perdue</div>
+      </div>
+      <div class="pack">
+        <div class="pack-cover">🐱</div>
+        <div class="pack-label">Minet fou</div>
+      </div>
+      <div class="pack">
+        <div class="pack-cover">🎮</div>
+        <div class="pack-label">Pixel art</div>
+      </div>
+      <div class="pack">
+        <div class="pack-cover">🎨</div>
+        <div class="pack-label">Couleurs</div>
+      </div>
+      <div class="pack">
+        <div class="pack-cover">☕</div>
+        <div class="pack-label">Café du matin</div>
+      </div>
+    </nav>
+
+    <main class="sticker-scroll" data-od-id="sticker-grid">
+      <div class="sticker-grid">
+        <div class="sticker-item">🦉</div>
+        <div class="sticker-item">📚</div>
+        <div class="sticker-item">🎓</div>
+        <div class="sticker-item">💡</div>
+        <div class="sticker-item">⏰</div>
+        <div class="sticker-item">🌙</div>
+        <div class="sticker-item">✨</div>
+        <div class="sticker-item">☕</div>
+        <div class="sticker-item">🍵</div>
+        <div class="sticker-item">🧠</div>
+        <div class="sticker-item">🎯</div>
+        <div class="sticker-item">💤</div>
+      </div>
+    </main>
+
+    <div class="sticker-create" data-od-id="sticker-create">
+      <div class="sc-btn" aria-label="Créer un sticker">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg>
+      </div>
+      <div class="sc-label">Créer un sticker</div>
+    </div>
+  </div>
+  <script>
+    const saved = localStorage.getItem('kite-theme');
+    if (saved) document.documentElement.setAttribute('data-theme', saved);
+    document.querySelectorAll('.pack').forEach(p => {
+      p.addEventListener('click', () => {
+        document.querySelectorAll('.pack').forEach(x => x.classList.remove('active'));
+        p.classList.add('active');
+      });
+    });
+  </script>
+  <script src="../theme-sync.js"></script>
+</body>
+</html>
