@@ -15,7 +15,7 @@ void main() {
   });
 
   testWidgets(
-      'Kite charge le shell à onglets (Discussions/Communautés/Appels) '
+      'Kite charge le shell à onglets (Discussions/Appels) '
       'et affiche l\'état d\'erreur hors-ligne avec Réessayer',
       (tester) async {
     // flutter_test bloque le réseau : la requête du shell échoue

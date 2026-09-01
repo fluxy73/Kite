@@ -21,11 +21,10 @@ fonctionnelle.
 
 | Écran | Fichier | Contenu |
 |---|---|---|
-| Shell 3 onglets (Discussions / Communautés / Appels) | `home_shell.dart` | navigation + chargement de `/api/shell` |
+| Shell 2 onglets (Discussions / Appels), vue 2 panneaux sur écrans larges | `home_shell.dart` | navigation adaptative (LayoutBuilder) + chargement de `/api/shell` |
 | Discussions | `chat_list_screen.dart` | liste des conversations, groupes, badges non-lus |
 | Conversation | `conversation_screen.dart` | messages (texte, image, vidéo, document, audio, sondage…), réactions, réponse, édition, suppression, transfert, infos, épinglés |
-| Communautés | `communities_screen.dart` | liste, détail, création, ajout de groupes |
-| Appels | `calls_screen.dart` | favoris, récents (badge « Manqué »), **appels planifiés** (création, rappel, suppression), lien d'appel |
+| Appels | `calls_screen.dart` | favoris, récents (badge « Manqué »), **appels planifiés** (création, rappel, suppression), lien d'appel, **import des contacts de l'appareil** (matching via serveur) |
 | Appel en cours | `calls_screen.dart` | **groupe** : grille responsive, partage d'écran, réactions · **1:1 vidéo** : flou d'arrière-plan, mode portrait |
 | Appel entrant | `incoming_call_screen.dart` | sonnerie avec compte à rebours 30 s, accepter / refuser (manqué si timeout) |
 | Rappel d'appel planifié | `reminder_center.dart` + `main.dart` | popup quand un appel avec rappel arrive à moins d'1 h |
@@ -41,8 +40,8 @@ Authentification mockée : paramètre `?userId=` sur chaque requête.
 | GET/POST | `/api/chats` | conversations / création (DM, groupe) |
 | GET/POST | `/api/chats/{id}/messages` | messages (marque lu) / envoi |
 | POST | `/api/messages/{id}/{react\|edit\|delete\|vote}` | réaction, édition, suppression, vote de sondage |
-| GET | `/api/shell` | agrégat `{users, chats, communities, calls, scheduledCalls}` |
-| GET/POST | `/api/communities` | liste / crée une communauté (avec groupes) |
+| GET | `/api/shell` | agrégat `{users, chats, calls, scheduledCalls}` |
+| POST | `/api/contacts/match` | matche les contacts de l'appareil (nom + téléphones) contre les utilisateurs enregistrés |
 | POST | `/api/calls/log` | journalise un appel (message `call`) |
 | POST | `/api/calls/initiate` | initie un appel → broadcast `call` (sonnerie) |
 | POST | `/api/calls/respond` | `accepted` \| `declined` \| `missed` → broadcast `call_respond` |
