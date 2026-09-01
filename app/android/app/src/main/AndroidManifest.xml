@@ -1,4 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- flutter_contacts: read device contacts for in-app call matching -->
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
     <application
         android:label="kite"
         android:name="${applicationName}"

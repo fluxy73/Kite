@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../api.dart';
 import '../models.dart';
 import '../theme.dart';
+import 'package:flutter_contacts/flutter_contacts.dart';
 
 /// Onglet Appels : favoris, récents, lien d'appel et appel en cours (timer réel).
 class CallsScreen extends StatelessWidget {
@@ -35,6 +36,7 @@ class CallsScreen extends StatelessWidget {
             _Header(
               onDemoCall: () => _simulateIncoming(context),
               onSchedule: () => _planCall(context),
+              onImportContacts: () => _importDeviceContacts(context),
             ),
             const _SectionTitle('Favoris'),
             _favoritesRow(context, favorites),
@@ -376,6 +378,103 @@ class CallsScreen extends StatelessWidget {
     }
   }
 
+
+  /// Lit les contacts de l'appareil, les matche contre les utilisateurs Kite
+  /// via POST /api/contacts/match, et affiche ceux qui correspondent.
+  /// Les appels restent in-app : le téléphone ne sert qu'à trouver les gens.
+  Future<void> _importDeviceContacts(BuildContext context) async {
+    if (!await FlutterContacts.requestPermission()) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Permission contacts refusée')),
+        );
+      }
+      return;
+    }
+    try {
+      final deviceContacts = await FlutterContacts.getContacts(withProperties: true);
+      final payload = <Map<String, dynamic>>[];
+      for (final c in deviceContacts) {
+        if (c.phones.isEmpty) continue;
+        payload.add({
+          'name': c.displayName,
+          'phones': c.phones.map((p) => p.number).toList(),
+        });
+      }
+      if (payload.isEmpty) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context)
+              .showSnackBar(const SnackBar(content: Text('Aucun contact avec numéro de téléphone')));
+        }
+        return;
+      }
+      final rawMatches = await api.matchContacts(payload);
+      final matches = rawMatches.map(ContactMatch.fromJson).where((m) => m.matched).toList();
+      if (!context.mounted) return;
+      showModalBottomSheet<void>(
+        context: context,
+        backgroundColor: KiteColors.surface,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        builder: (sheetCtx) => SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(20, 16, 20, 8),
+                child: Text('Contacts sur Kite',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: KiteColors.fg)),
+              ),
+              if (matches.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.all(20),
+                  child: Text('Aucun de vos contacts n’est sur Kite',
+                      style: TextStyle(color: KiteColors.muted)),
+                ),
+              for (final m in matches)
+                ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: KiteColors.surface2,
+                    child: Text(_initials(m.userName),
+                        style: const TextStyle(fontSize: 12)),
+                  ),
+                  title: Text(m.userName, style: const TextStyle(color: KiteColors.fg)),
+                  subtitle: Text('via ${m.via} · ${m.name}',
+                      style: const TextStyle(color: KiteColors.muted, fontSize: 12)),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.call_outlined, color: KiteColors.tint2),
+                        onPressed: () {
+                          Navigator.pop(sheetCtx);
+                          _contactCall(context, m.userId, name: m.userName);
+                        },
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.videocam_outlined, color: KiteColors.tint1),
+                        onPressed: () {
+                          Navigator.pop(sheetCtx);
+                          _contactCall(context, m.userId, name: m.userName, video: true);
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      );
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Serveur injoignable')));
+      }
+    }
+  }
+
   /// Démarre un appel (mock) et journalise l'appel dans la conversation (branché serveur).
   void _contactCall(BuildContext context, String id,
       {required String name, bool group = false, bool video = false}) {
@@ -421,13 +520,16 @@ class CallsScreen extends StatelessWidget {
 }
 
 class _Header extends StatelessWidget {
-  const _Header({this.onDemoCall, this.onSchedule});
+  const _Header({this.onDemoCall, this.onSchedule, this.onImportContacts});
 
   /// Déclenche un appel entrant simulé (démo du flux temps réel).
   final VoidCallback? onDemoCall;
 
   /// Ouvre le formulaire de planification d'un appel.
   final VoidCallback? onSchedule;
+
+  /// Importe les contacts de l'appareil et les matche contre Kite.
+  final VoidCallback? onImportContacts;
 
   @override
   Widget build(BuildContext context) {
@@ -454,6 +556,11 @@ class _Header extends StatelessWidget {
             icon: const Icon(Icons.event_outlined),
             tooltip: 'Planifier un appel',
             onPressed: onSchedule,
+          ),
+          IconButton(
+            icon: const Icon(Icons.import_contacts_outlined),
+            tooltip: 'Importer les contacts de l’appareil',
+            onPressed: onImportContacts,
           ),
           IconButton(
             icon: const Icon(Icons.phone_in_talk_outlined),
