@@ -8,7 +8,9 @@ import 'calls_screen.dart';
 import 'chat_list_screen.dart';
 import 'conversation_screen.dart';
 
-/// Enveloppe à onglets (Discussions / Communautés / Appels) branchée sur le\n///payload agrégé GET /api/shell du serveur Go.
+/// Enveloppe à onglets (Discussions / Appels) branchée sur le payload agrégé
+/// GET /api/shell du serveur Go. Sur écrans larges, l'onglet Discussions passe
+/// en vue 2 panneaux (liste + conversation côte à côte).
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key, required this.api});
   final KiteApi api;
