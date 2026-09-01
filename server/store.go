@@ -15,17 +15,9 @@ import (
 // ---------- Models ----------
 
 type User struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-}
-
-// Community is a container that groups several chats (groups).
-type Community struct {
-	ID          string   `json:"id"`
-	Name        string   `json:"name"`
-	Description string   `json:"description"`
-	GroupIDs    []string `json:"groupIds"`
-	CreatedAt   int64    `json:"createdAt"`
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Phone string `json:"phone,omitempty"` // E.164-ish, für Kontakt-Matching
 }
 
 // CallLog is a single call entry in the Calls tab.
@@ -102,7 +94,6 @@ type State struct {
 	Chats          []Chat          `json:"chats"`
 	Messages       []Message       `json:"messages"`
 	Pending        []Pending       `json:"pending"`
-	Communities    []Community     `json:"communities"`
 	Calls          []CallLog       `json:"calls"`
 	CallRecords    []CallRecord    `json:"callRecords"`
 	ScheduledCalls []ScheduledCall `json:"scheduledCalls"`
@@ -111,7 +102,7 @@ type State struct {
 
 // seedVersion is bumped whenever the shape of seedState() changes, so an
 // existing data file is regenerated on the next start.
-const seedVersion = 5
+const seedVersion = 6
 
 // ---------- Store ----------
 
@@ -308,13 +299,6 @@ func (s *Store) addUser(name string) User {
 	s.mu.Unlock()
 	_ = s.save()
 	return u
-}
-
-func (s *Store) addCommunity(cm Community) {
-	s.mu.Lock()
-	s.state.Communities = append(s.state.Communities, cm)
-	s.mu.Unlock()
-	_ = s.save()
 }
 
 func (s *Store) createCall(chatID, callerID, callerName, kind string) CallRecord {
@@ -600,11 +584,11 @@ func seedState() State {
 	min := func(n int64) int64 { return now.Add(time.Duration(-n) * time.Minute).UnixMilli() }
 
 	users := []User{
-		{ID: "u-julien", Name: "Julien Dumont"},
-		{ID: "u-lucas", Name: "Lucas Martin"},
-		{ID: "u-emma", Name: "Emma Bernard"},
-		{ID: "u-thomas", Name: "Thomas Petit"},
-		{ID: "u-sarah", Name: "Sarah Kacem"},
+		{ID: "u-julien", Name: "Julien Dumont", Phone: "+33612345678"},
+		{ID: "u-lucas", Name: "Lucas Martin", Phone: "+33698765432"},
+		{ID: "u-emma", Name: "Emma Bernard", Phone: "+33655544433"},
+		{ID: "u-thomas", Name: "Thomas Petit", Phone: "+33622233344"},
+		{ID: "u-sarah", Name: "Sarah Kacem", Phone: "+33677788899"},
 	}
 
 	chats := []Chat{
@@ -645,17 +629,7 @@ func seedState() State {
 		{UserID: "u-julien", Message: msgs[len(msgs)-1]},
 	}
 
-	// --- Communautés (sous-ensembles de groupes) ---
-	communities := []Community{
-		{ID: "cm-robot", Name: "Club Robotique", Description: "Bricolage, impression 3D et projets électroniques.", GroupIDs: []string{}, CreatedAt: min(8000)},
-		{ID: "cm-ecole", Name: "École", Description: "Groupe de la promo et de l'atelier design.", GroupIDs: []string{}, CreatedAt: min(7000)},
-		{ID: "cm-famille", Name: "Famille", Description: "Le grand groupe familial.", GroupIDs: []string{}, CreatedAt: min(6000)},
-	}
-	// Affectation des groupes existants aux communautés. c-nova est membre de
-	// la communauté « Club Robotique ».
-	communities[0].GroupIDs = []string{"c-nova", "g-print3d", "g-electro"}
-	// Les groupes rattachés doivent exister en tant que chats pour que l'UI
-	// puisse ouvrir une conversation. On ajoute deux groupes filles à la communauté.
+	// --- Zusätzliche Gruppen (ehem. Community-Kinder, jetzt normale Gruppen) ---
 	groups := []Chat{
 		{ID: "g-print3d", Type: "group", Name: "Impression 3D", MemberIDs: []string{"u-julien", "u-thomas", "u-sarah"}, AdminIDs: []string{"u-julien"}, CreatedAt: min(700)},
 		{ID: "g-electro", Type: "group", Name: "Électronique", MemberIDs: []string{"u-julien", "u-lucas", "u-thomas"}, AdminIDs: []string{"u-lucas"}, CreatedAt: min(680)},
@@ -685,7 +659,6 @@ func seedState() State {
 		Chats:          chats,
 		Messages:       msgs,
 		Pending:        pending,
-		Communities:    communities,
 		Calls:          calls,
 		SeedVersion:    seedVersion,
 		ScheduledCalls: scheduled,

@@ -1,43 +1,44 @@
 import 'dart:convert';
 /// Modèles miroirs de l'API du serveur Go (server/).
 class User {
-  const User({required this.id, required this.name});
+  const User({required this.id, required this.name, this.phone = ''});
 
   final String id;
   final String name;
+  final String phone; // numéro enregistré, utilisé pour le matching de contacts
 
-  factory User.fromJson(Map<String, dynamic> json) =>
-      User(id: json['id'] as String, name: json['name'] as String);
+  factory User.fromJson(Map<String, dynamic> json) => User(
+        id: json['id'] as String,
+        name: json['name'] as String,
+        phone: json['phone'] as String? ?? '',
+      );
 }
 
-/// Communauté : un conteneur de plusieurs groupes.
-class Community {
-  const Community({
-    required this.id,
+/// Un contact de l'appareil avec le résultat de matching serveur.
+class ContactMatch {
+  const ContactMatch({
     required this.name,
-    this.description = '',
-    this.groupIds = const [],
-    this.groups = const [],
+    this.phones = const [],
+    this.userId = '',
+    this.userName = '',
+    this.via = '',
   });
 
-  final String id;
   final String name;
-  final String description;
-  final List<String> groupIds;
-  final List<Chat> groups; // groupes dont l'utilisateur est membre (joins)
+  final List<String> phones;
+  final String userId; // non vide si matché à un utilisateur Kite
+  final String userName;
+  final String via; // phone | name
 
-  factory Community.fromJson(Map<String, dynamic> json) {
-    final groups = (json['groups'] as List? ?? [])
-        .map((e) => Chat.fromJson(e as Map<String, dynamic>))
-        .toList();
-    return Community(
-      id: json['id'] as String,
-      name: json['name'] as String,
-      description: json['description'] as String? ?? '',
-      groupIds: (json['groupIds'] as List? ?? []).cast<String>(),
-      groups: groups,
-    );
-  }
+  bool get matched => userId.isNotEmpty;
+
+  factory ContactMatch.fromJson(Map<String, dynamic> json) => ContactMatch(
+        name: json['name'] as String? ?? '',
+        phones: (json['phones'] as List? ?? []).cast<String>(),
+        userId: json['userId'] as String? ?? '',
+        userName: json['userName'] as String? ?? '',
+        via: json['via'] as String? ?? '',
+      );
 }
 
 /// Un appel dans l'onglet Appels.
@@ -116,14 +117,12 @@ class AppShell {
   const AppShell({
     this.users = const [],
     this.chats = const [],
-    this.communities = const [],
     this.calls = const [],
     this.scheduledCalls = const [],
   });
 
   final List<User> users;
   final List<Chat> chats;
-  final List<Community> communities;
   final List<CallLog> calls;
   final List<ScheduledCall> scheduledCalls;
 
@@ -133,9 +132,6 @@ class AppShell {
             .toList(),
         chats: (json['chats'] as List? ?? [])
             .map((e) => Chat.fromJson(e as Map<String, dynamic>))
-            .toList(),
-        communities: (json['communities'] as List? ?? [])
-            .map((e) => Community.fromJson(e as Map<String, dynamic>))
             .toList(),
         calls: (json['calls'] as List? ?? [])
             .map((e) => CallLog.fromJson(e as Map<String, dynamic>))

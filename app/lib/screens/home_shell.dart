@@ -6,7 +6,6 @@ import '../models.dart';
 import '../theme.dart';
 import 'calls_screen.dart';
 import 'chat_list_screen.dart';
-import 'communities_screen.dart';
 
 /// Enveloppe à onglets (Discussions / Communautés / Appels) branchée sur le\n///payload agrégé GET /api/shell du serveur Go.
 class HomeShell extends StatefulWidget {
@@ -94,7 +93,6 @@ class _HomeShellState extends State<HomeShell> {
     final shell = _shell ?? const AppShell();
     final screens = [
       ChatListScreen(api: widget.api, shell: shell, onRefresh: _load),
-      CommunitiesScreen(api: widget.api, shell: shell, onRefresh: _load),
       CallsScreen(api: widget.api, shell: shell, onRefresh: _load),
     ];
 
@@ -115,8 +113,7 @@ class _HomeShellState extends State<HomeShell> {
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
             _tabItem(0, Icons.chat_bubble_outline, 'Discussions'),
-            _tabItem(1, Icons.grid_view_outlined, 'Communautés'),
-            _tabItem(2, Icons.call_outlined, 'Appels'),
+            _tabItem(1, Icons.call_outlined, 'Appels'),
           ],
         ),
       ),

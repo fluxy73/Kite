@@ -48,24 +48,19 @@ class KiteApi {
     return (raw as List).map((e) => Chat.fromJson(e as Map<String, dynamic>)).toList();
   }
 
-  /// Agrégat de l'écran principal : discussions + communautés + appels.
+  /// Agrégat de l'écran principal : discussions + appels.
   Future<AppShell> fetchAppShell() async {
     final raw = await _send('GET', '/api/shell', query: {'userId': meId});
     return AppShell.fromJson(raw as Map<String, dynamic>);
   }
 
-  /// Crée une communauté (avec éventuellement des groupes rattachés).
-  Future<Community> createCommunity({
-    required String name,
-    String description = '',
-    List<String> groupIds = const [],
-  }) async {
-    final raw = await _send('POST', '/api/communities', query: {'userId': meId}, body: {
-      'name': name,
-      'description': description,
-      'groupIds': groupIds,
-    });
-    return Community.fromJson(raw as Map<String, dynamic>);
+  /// Résultat de matching d'un contact de l'appareil contre les utilisateurs.
+  Future<List<Map<String, dynamic>>> matchContacts(
+      List<Map<String, dynamic>> contacts) async {
+    final raw = await _send('POST', '/api/contacts/match',
+        query: {'userId': meId}, body: {'contacts': contacts});
+    return ((raw as Map)['matches'] as List? ?? [])
+        .cast<Map<String, dynamic>>();
   }
 
   /// Journalise un appel (message de type "call") dans une conversation.

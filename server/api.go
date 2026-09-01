@@ -199,30 +199,9 @@ func (a *api) handleMessages(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// ---------- App shell (Discussions + Communautés + Appels) ----------
+// ---------- App shell (Discussions + Appels) ----------
 
-// communityView joins a community with its member group chats.
-type communityView struct {
-	Community
-	Groups []Chat `json:"groups"`
-}
-
-func (a *api) communitiesFor(userID string, withGroups bool) []communityView {
-	out := []communityView{}
-	for _, cm := range a.store.state.Communities {
-		groups := []Chat{}
-		if withGroups {
-			for _, gid := range cm.GroupIDs {
-				if c, ok := a.store.chatByID(gid); ok && inSlice(c.MemberIDs, userID) {
-					groups = append(groups, *c)
-				}
-			}
-		}
-		out = append(out, communityView{Community: cm, Groups: groups})
-	}
-	return out
-}
-
+// handleShell aggregates everything the app needs on load.
 func (a *api) handleShell(w http.ResponseWriter, r *http.Request) {
 	uid, ok := a.userOrError(w, r)
 	if !ok {
@@ -231,47 +210,77 @@ func (a *api) handleShell(w http.ResponseWriter, r *http.Request) {
 	wJSON(w, 200, map[string]any{
 		"users":          a.store.state.Users,
 		"chats":          a.store.chatsFor(uid),
-		"communities":    a.communitiesFor(uid, true),
 		"calls":          a.store.state.Calls,
 		"scheduledCalls": a.store.scheduledCallsFor(uid),
 	})
 }
 
-// handleCommunities lists communities and lets me create a new one.
-func (a *api) handleCommunities(w http.ResponseWriter, r *http.Request) {
+// handleContactMatch matcht Geräte-Kontakte (Namen + Telefonnummern) gegen
+// registrierte Nutzer. Das Telefon hilft beim Finden — angerufen wird in-app.
+func (a *api) handleContactMatch(w http.ResponseWriter, r *http.Request) {
 	uid, ok := a.userOrError(w, r)
 	if !ok {
 		return
 	}
-	switch r.Method {
-	case http.MethodGet:
-		wJSON(w, 200, a.communitiesFor(uid, true))
-	case http.MethodPost:
-		var body struct {
-			Name        string   `json:"name"`
-			Description string   `json:"description"`
-			GroupIDs    []string `json:"groupIds"`
-		}
-		if err := readJSON(r, &body); err != nil {
-			httpError(w, 400, "corps invalide: "+err.Error())
-			return
-		}
-		if strings.TrimSpace(body.Name) == "" {
-			httpError(w, 400, "name requis")
-			return
-		}
-		cm := Community{
-			ID:          newID("cm"),
-			Name:        strings.TrimSpace(body.Name),
-			Description: body.Description,
-			GroupIDs:    body.GroupIDs,
-			CreatedAt:   time.Now().UnixMilli(),
-		}
-		a.store.addCommunity(cm)
-		wJSON(w, 201, cm)
-	default:
-		httpError(w, 405, "méthode non supportée")
+	var body struct {
+		Contacts []struct {
+			Name  string   `json:"name"`
+			Phones []string `json:"phones"`
+		} `json:"contacts"`
 	}
+	if err := readJSON(r, &body); err != nil {
+		httpError(w, 400, "corps invalide: "+err.Error())
+		return
+	}
+
+	normalize := func(p string) string {
+		digits := strings.Map(func(r rune) rune {
+			if r >= '0' && r <= '9' {
+				return r
+			}
+			return -1
+		}, p)
+		if len(digits) > 9 {
+			digits = digits[len(digits)-9:] // letzte 9 Ziffern = nationale Nummer
+		}
+		return digits
+	}
+
+	byPhone := map[string]*User{}
+	byName := map[string]*User{}
+	for i := range a.store.state.Users {
+		u := &a.store.state.Users[i]
+		if u.Phone != "" {
+			byPhone[normalize(u.Phone)] = u
+		}
+		byName[strings.ToLower(u.Name)] = u
+	}
+
+	type match struct {
+		Name     string   `json:"name"`
+		Phones   []string `json:"phones,omitempty"`
+		UserID   string   `json:"userId,omitempty"`
+		UserName string   `json:"userName,omitempty"`
+		Via      string   `json:"via,omitempty"` // phone | name
+	}
+	out := []match{}
+	for _, c := range body.Contacts {
+		m := match{Name: c.Name, Phones: c.Phones}
+		for _, p := range c.Phones {
+			if u, ok := byPhone[normalize(p)]; ok {
+				m.UserID, m.UserName, m.Via = u.ID, u.Name, "phone"
+				break
+			}
+		}
+		if m.UserID == "" {
+			if u, ok := byName[strings.ToLower(strings.TrimSpace(c.Name))]; ok {
+				m.UserID, m.UserName, m.Via = u.ID, u.Name, "name"
+			}
+		}
+		out = append(out, m)
+	}
+	_ = uid
+	wJSON(w, 200, map[string]any{"matches": out})
 }
 
 // handleCallLog logs a completed (or missed/running) call in a chat.
