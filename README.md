@@ -100,21 +100,8 @@ Le serveur Go tourne en service **systemd** et est exposé via un **tunnel
 Cloudflare** (HTTPS inclus, aucune porte ouverte sur le pare-feu) :
 
 ```bash
-# Service systemd pour le serveur Go — config complète dans DEPLOY.md
-sudo tee /etc/systemd/system/kite.service >/dev/null <<'UNIT'
-[Unit]
-Description=Kite server (Go)
-After=network-online.target
-[Service]
-WorkingDirectory=/opt/kite/server
-ExecStart=/opt/kite/server/kite-server
-Environment=KITE_ADDR=:8080
-Environment=KITE_DATA=/opt/kite/server/data/kite.json
-Restart=always
-RestartSec=3
-[Install]
-WantedBy=multi-user.target
-UNIT
+# Unité systemd versionnée dans le repo — config complète dans DEPLOY.md
+sudo cp deploy/kite.service /etc/systemd/system/kite.service
 sudo systemctl daemon-reload && sudo systemctl enable --now kite
 
 # Tunnel Cloudflare nommé → http://localhost:8080

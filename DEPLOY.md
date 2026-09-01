@@ -41,9 +41,10 @@ sudo chown -R kite:kite /opt/kite
 
 ## 2. Service systemd pour le serveur Go
 
-Créez `/etc/systemd/system/kite.service` :
+L'unité `kite.service` est versionnée dans le repo (`deploy/kite.service`) :
 
 ```ini
+# deploy/kite.service — contenu complet ci-dessous pour référence
 [Unit]
 Description=Kite server (Go)
 After=network-online.target
@@ -63,7 +64,14 @@ RestartSec=3
 WantedBy=multi-user.target
 ```
 
-Activez-le et démarrez-le :
+Installez-la depuis le repo (une copie simple, pas un lien symbolique :
+`systemctl daemon-reload` ignore les symlinks hors de `/etc/systemd/system`) :
+
+```bash
+sudo cp deploy/kite.service /etc/systemd/system/kite.service
+```
+
+Activez-la et démarrez-la :
 
 ```bash
 sudo systemctl daemon-reload

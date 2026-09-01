@@ -1,0 +1,24 @@
+# Kite server (Go) — unité systemd
+# Installation :
+#   sudo cp deploy/kite.service /etc/systemd/system/kite.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now kite
+# Voir DEPLOY.md pour le guide complet (build, tunnel Cloudflare, mise à jour).
+
+[Unit]
+Description=Kite server (Go)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=kite
+WorkingDirectory=/opt/kite/server
+ExecStart=/opt/kite/server/kite-server
+Environment=KITE_ADDR=:8080
+Environment=KITE_DATA=/opt/kite/server/data/kite.json
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
