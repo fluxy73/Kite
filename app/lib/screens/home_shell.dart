@@ -4,6 +4,7 @@ import '../api.dart';
 import '../call_center.dart';
 import '../models.dart';
 import '../theme.dart';
+import '../ui/skeleton.dart';
 import 'calls_screen.dart';
 import 'chat_list_screen.dart';
 import 'communities_screen.dart';
@@ -62,8 +63,30 @@ class _HomeShellState extends State<HomeShell> {
   @override
   Widget build(BuildContext context) {
     if (_loading && _shell == null) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+      // Skeleton instead of a full-screen spinner: the layout is visible
+      // immediately and fills in when the shell arrives (perceived speed).
+      return Scaffold(
+        body: SafeArea(
+          child: Column(
+            children: [
+              const SizedBox(height: 24),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16),
+                child: KiteSkeleton(width: 180, height: 28, radius: 6),
+              ),
+              const SizedBox(height: 20),
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      for (int i = 0; i < 8; i++) const KiteSkeletonRow(),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       );
     }
     if (_error != null && _shell == null) {
