@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../api.dart';
 import '../models.dart';
 import '../theme.dart';
+import '../ui/primitives.dart';
+import '../ui/skeleton.dart';
 import 'conversation_screen.dart';
 
 /// Écran principal : liste des discussions (miroir de screens/chat-list.html).
@@ -181,7 +183,11 @@ class _ChatListScreenState extends State<ChatListScreen> {
       future: _future,
       builder: (context, snap) {
         if (snap.connectionState != ConnectionState.done) {
-          return const Center(child: CircularProgressIndicator());
+          // Skeleton instead of a spinner: the list structure is visible
+          // immediately and fills in when the chats arrive (perceived speed).
+          return const SingleChildScrollView(
+            child: KiteSkeletonList(itemCount: 8),
+          );
         }
         if (snap.hasError) {
           return _ErrorState(
@@ -370,7 +376,7 @@ class _ChatRow extends StatelessWidget {
         .join();
     final preview = chat.lastMessage?.preview() ?? 'Nouvelle discussion';
     final time = chat.lastMessage == null ? '' : _timeOf(chat.lastMessage!.createdAt);
-    return InkWell(
+    return KitePressable(
       onTap: onTap,
       onLongPress: onLongPress,
       child: Padding(

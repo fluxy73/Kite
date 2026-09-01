@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../api.dart';
 import '../models.dart';
 import '../theme.dart';
+import '../ui/haptics.dart';
 
 /// Conversation temps réel : tous les types de messages, réactions,
 /// réponse, édition, suppression, pièces jointes (workflows simulés).
@@ -176,29 +177,54 @@ class _ConversationScreenState extends State<ConversationScreen> {
     if (editing != null) {
       try {
         await widget.api.editMessage(editing.id, text);
+        if (!mounted) return;
         setState(() {
           _editing = null;
           _input.clear();
         });
+        KiteHaptics.success();
       } catch (e) {
         _toast('Échec de la modification : $e');
+        KiteHaptics.error();
       }
       return;
     }
+    // Optimistic UI : le message apparaît instantanément (pending),
+    // la confirmation serveur le remplace via l'événement temps réel.
+    final replyId = _replyTo?.id;
+    final optimistic = Message(
+      id: 'tmp-${DateTime.now().microsecondsSinceEpoch}',
+      chatId: widget.chat.id,
+      senderId: widget.api.meId,
+      type: 'text',
+      text: text,
+      createdAt: DateTime.now().millisecondsSinceEpoch,
+      replyTo: replyId,
+    );
+    setState(() {
+      _messages.add(optimistic);
+      _input.clear();
+      _replyTo = null;
+    });
+    KiteHaptics.light();
+    _jumpToEnd();
     try {
-      final replyId = _replyTo?.id;
       await widget.api.sendMessage(
         widget.chat.id,
         type: 'text',
         text: text,
         replyTo: replyId,
       );
-      setState(() {
-        _input.clear();
-        _replyTo = null;
-      });
+      if (mounted) KiteHaptics.success();
     } catch (e) {
+      // Rollback propre : on retire le message optimiste et on restaure le brouillon.
+      if (!mounted) return;
+      setState(() {
+        _messages.removeWhere((m) => m.id == optimistic.id);
+        _input.text = text;
+      });
       _toast('Message non envoyé — réessayer ?\n$e');
+      KiteHaptics.error();
     }
   }
 
