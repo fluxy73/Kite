@@ -6,6 +6,7 @@ import '../models.dart';
 import '../theme.dart';
 import 'calls_screen.dart';
 import 'chat_list_screen.dart';
+import 'conversation_screen.dart';
 
 /// Enveloppe à onglets (Discussions / Communautés / Appels) branchée sur le\n///payload agrégé GET /api/shell du serveur Go.
 class HomeShell extends StatefulWidget {
@@ -18,6 +19,7 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   int _tab = 0;
+  Chat? _selectedChat; // sélection pour la vue 2 panneaux (écrans larges)
   AppShell? _shell;
   bool _loading = true;
   String? _error;
@@ -96,26 +98,76 @@ class _HomeShellState extends State<HomeShell> {
       CallsScreen(api: widget.api, shell: shell, onRefresh: _load),
     ];
 
-    return Scaffold(
-      body: SafeArea(
-        child: IndexedStack(
-          index: _tab,
-          children: screens,
+    // Vue adaptative : sur écrans larges (>= 900 px logiques) l'onglet Discussions
+    // affiche la liste et la conversation côte à côte (2 panneaux).
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth >= 900;
+        if (isWide) {
+          return Scaffold(
+            body: SafeArea(
+              child: _tab == 0
+                  ? _twoPaneDiscussions(shell)
+                  : IndexedStack(index: _tab - 1, children: screens.skip(1).toList()),
+            ),
+            bottomNavigationBar: _tabBar(),
+          );
+        }
+        return Scaffold(
+          body: SafeArea(
+            child: IndexedStack(
+              index: _tab,
+              children: screens,
+            ),
+          ),
+          bottomNavigationBar: _tabBar(),
+        );
+      },
+    );
+  }
+
+  /// Vue 2 panneaux : liste des discussions à gauche, conversation à droite.
+  Widget _twoPaneDiscussions(AppShell shell) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SizedBox(
+          width: 380,
+          child: ChatListScreen(
+            api: widget.api,
+            shell: shell,
+            onRefresh: _load,
+            onChatSelected: (chat) => setState(() => _selectedChat = chat),
+          ),
         ),
+        const VerticalDivider(width: 1, color: KiteColors.border),
+        Expanded(
+          child: _selectedChat != null
+              ? ConversationScreen(api: widget.api, chat: _selectedChat!)
+              : const Center(
+                  child: Text(
+                    'Sélectionnez une discussion',
+                    style: TextStyle(color: KiteColors.muted),
+                  ),
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _tabBar() {
+    return Container(
+      decoration: const BoxDecoration(
+        color: KiteColors.bg,
+        border: Border(top: BorderSide(color: KiteColors.border)),
       ),
-      bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          color: KiteColors.bg,
-          border: Border(top: BorderSide(color: KiteColors.border)),
-        ),
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            _tabItem(0, Icons.chat_bubble_outline, 'Discussions'),
-            _tabItem(1, Icons.call_outlined, 'Appels'),
-          ],
-        ),
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _tabItem(0, Icons.chat_bubble_outline, 'Discussions'),
+          _tabItem(1, Icons.call_outlined, 'Appels'),
+        ],
       ),
     );
   }

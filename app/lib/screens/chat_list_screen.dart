@@ -12,6 +12,7 @@ class ChatListScreen extends StatefulWidget {
     required this.api,
     this.shell,
     this.onRefresh,
+    this.onChatSelected,
   });
 
   final KiteApi api;
@@ -19,6 +20,10 @@ class ChatListScreen extends StatefulWidget {
   /// Données injectées depuis le shell (si null, fetch indépendant).
   final AppShell? shell;
   final Future<void> Function()? onRefresh;
+
+  /// Callback pour la vue adaptative 2 panneaux : notifie le shell quand
+  /// une discussion est sélectionnée (au lieu de naviguer).
+  final void Function(Chat chat)? onChatSelected;
 
   @override
   State<ChatListScreen> createState() => _ChatListScreenState();
@@ -164,14 +169,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
               const Divider(height: 1, color: KiteColors.border),
           itemBuilder: (context, i) => _ChatRow(
             chat: chats[i],
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => ConversationScreen(
-                  api: widget.api,
-                  chat: chats[i],
-                ),
-              ),
-            ),
+            onTap: () => _openChat(context, chats[i]),
             onLongPress: () => _showChatMenu(context, chats[i]),
           ),
         ),
@@ -202,14 +200,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                 const Divider(height: 1, color: KiteColors.border),
             itemBuilder: (context, i) => _ChatRow(
               chat: chats[i],
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => ConversationScreen(
-                    api: widget.api,
-                    chat: chats[i],
-                  ),
-                ),
-              ),
+              onTap: () => _openChat(context, chats[i]),
               onLongPress: () => _showChatMenu(context, chats[i]),
             ),
           ),
@@ -285,6 +276,20 @@ class _ChatListScreenState extends State<ChatListScreen> {
     );
   }
 
+  void _openChat(BuildContext context, Chat chat) {
+    if (widget.onChatSelected != null) {
+      widget.onChatSelected!(chat);
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ConversationScreen(
+          api: widget.api,
+          chat: chat,
+        ),
+      ),
+    );
+  }
   void _showChatMenu(BuildContext context, Chat chat) {
     showModalBottomSheet<void>(
       context: context,
