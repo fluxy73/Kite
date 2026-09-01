@@ -80,6 +80,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
         ),
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'fab-chat-list',
         backgroundColor: KiteColors.accent,
         foregroundColor: KiteColors.accentInk,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),

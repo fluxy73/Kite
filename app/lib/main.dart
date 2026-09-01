@@ -2,22 +2,27 @@ import 'package:flutter/material.dart';
 
 import 'api.dart';
 import 'call_center.dart';
+import 'offline_api.dart';
 import 'reminder_center.dart';
 import 'screens/home_shell.dart';
 import 'screens/incoming_call_screen.dart';
 import 'theme.dart';
 
 void main() {
-  // URL du serveur : --dart-define=KITE_API=http://localhost:8080
+  // Mode hors-ligne par défaut : l'app fonctionne seule (données locales).
+  // Pour brancher un serveur : --dart-define=KITE_API=http://host:8080
   // (émulateur Android : http://10.0.2.2:8080)
-  const apiBase = String.fromEnvironment('KITE_API', defaultValue: 'http://localhost:8080');
-  runApp(KiteApp(api: KiteApi(apiBase)));
+  const apiBase = String.fromEnvironment('KITE_API');
+  final api = apiBase.isNotEmpty
+      ? KiteApi(apiBase)
+      : OfflineApi() as dynamic;
+  runApp(KiteApp(api: api));
 }
 
 class KiteApp extends StatefulWidget {
   const KiteApp({super.key, required this.api});
 
-  final KiteApi api;
+  final dynamic api;
 
   @override
   State<KiteApp> createState() => _KiteAppState();
@@ -30,7 +35,7 @@ class _KiteAppState extends State<KiteApp> {
   @override
   void initState() {
     super.initState();
-    // Écoute globale des appels entrants via WebSocket/SSE (temps réel).
+    // Écoute globale des appels entrants (WebSocket/SSE serveur ou flux local).
     CallCenter.instance.start(widget.api);
     CallCenter.instance.current.addListener(_onIncomingCall);
     ScheduledReminderCenter.instance.start(widget.api);

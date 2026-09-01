@@ -315,6 +315,8 @@ extension MessageCopyWith on Message {
     bool? deleted,
     List<String>? deletedFor,
     Map<String, List<String>>? reactions,
+    List<String>? readBy,
+    List<String>? deliveredTo,
   }) =>
       Message(
         id: id,
@@ -329,7 +331,7 @@ extension MessageCopyWith on Message {
         deletedFor: deletedFor ?? this.deletedFor,
         reactions: reactions ?? this.reactions,
         replyTo: replyTo,
-        readBy: readBy,
-        deliveredTo: deliveredTo,
+        readBy: readBy ?? this.readBy,
+        deliveredTo: deliveredTo ?? this.deliveredTo,
       );
 }

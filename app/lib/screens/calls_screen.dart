@@ -53,6 +53,7 @@ class CallsScreen extends StatelessWidget {
         ),
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'fab-calls',
         backgroundColor: KiteColors.accent,
         foregroundColor: KiteColors.accentInk,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),

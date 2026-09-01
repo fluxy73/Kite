@@ -6,7 +6,9 @@ import 'models.dart';
 
 /// Client du serveur Go (server/). Zéro dépendance externe (dart:io).
 class KiteApi {
-  KiteApi(this.baseUrl, {this.meId = 'u-julien'});
+  KiteApi(this.baseUrl, {this.meId = 'u-julien', HttpClient? httpClient})
+      : _http = httpClient ??
+            (HttpClient()..connectionTimeout = const Duration(seconds: 6));
 
   /// URL du serveur. Exemples :
   ///  - Desktop/Linux/Windows : http://localhost:8080
@@ -14,8 +16,7 @@ class KiteApi {
   final String baseUrl;
   final String meId;
 
-  final HttpClient _http = HttpClient()
-    ..connectionTimeout = const Duration(seconds: 6);
+  final HttpClient _http;
 
   Uri _uri(String path, [Map<String, String>? query]) =>
       Uri.parse('$baseUrl$path').replace(queryParameters: query);

@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import 'api.dart';
 import 'models.dart';
 
 /// Appel entrant en cours de sonnerie.
@@ -45,7 +44,7 @@ class CallCenter {
   StreamSubscription<ServerEvent>? _sub;
   final Set<String> _seen = {};
 
-  void start(KiteApi api) {
+  void start(dynamic api) {
     if (_sub != null) return;
     _sub = api.realtime().listen(_onEvent, onError: (_) {});
   }

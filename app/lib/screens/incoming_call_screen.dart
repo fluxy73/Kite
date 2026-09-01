@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../api.dart';
 import '../call_center.dart';
 import '../theme.dart';
 import 'calls_screen.dart';
@@ -16,7 +15,7 @@ class IncomingCallScreen extends StatefulWidget {
     this.onAccepted,
   });
 
-  final KiteApi api;
+  final dynamic api;
   final IncomingCall call;
   final VoidCallback? onAccepted;
 
