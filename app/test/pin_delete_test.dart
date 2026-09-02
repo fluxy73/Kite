@@ -5,9 +5,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:kite/local_store.dart';
 import 'package:kite/offline_api.dart';
 
-/// Comportement réel : épinglage persistant + suppression « pour moi »
-/// (renaissance à l'arrivée d'un nouveau message) — via la vraie pile
-/// hors-ligne (LocalStore + OfflineApi, fichier temporaire).
+/// Comportement réel : épinglage persistant, suppression « pour moi »
+/// (renaissance à l'arrivée d'un nouveau message) et sourdine avec
+/// expiration — via la vraie pile hors-ligne (LocalStore + OfflineApi,
+/// fichier temporaire).
 void main() {
   late Directory tmp;
   late String dataPath;
@@ -104,5 +105,58 @@ void main() {
     expect(
         after.firstWhere((c) => c.id == group.id).pinnedFor('u-julien'),
         isTrue); // toujours épinglée
+  });
+
+  test('Sourdine : active avec expiration, puis démutée', () async {
+    final chats = await api.fetchChats();
+    final dm = chats.firstWhere((c) => !c.isGroup);
+    expect(dm.mutedFor('u-julien'), isFalse);
+
+    await api.setChatMuted(dm.id, duration: '1w');
+    final muted = await api.fetchChats();
+    final m = muted.firstWhere((c) => c.id == dm.id);
+    expect(m.mutedFor('u-julien'), isTrue);
+    // L'expiration est bien dans ~7 jours (pas « toujours »).
+    final until = m.mutes['u-julien']!;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    expect(until, greaterThan(now + 6 * 24 * 3600 * 1000));
+    expect(until, lessThan(now + 8 * 24 * 3600 * 1000));
+
+    // Persisté sur disque.
+    expect(File(dataPath).readAsStringSync().contains('mutes'), isTrue);
+
+    // Démute.
+    await api.setChatMuted(dm.id);
+    final unmuted = await api.fetchChats();
+    expect(
+        unmuted.firstWhere((c) => c.id == dm.id).mutedFor('u-julien'),
+        isFalse);
+  });
+
+  test('Sourdine expirée : mutedFor repasse à false', () async {
+    final chats = await api.fetchChats();
+    final dm = chats.firstWhere((c) => !c.isGroup);
+
+    await api.setChatMuted(dm.id, duration: '8h');
+    final c = (await api.fetchChats()).firstWhere((e) => e.id == dm.id);
+    expect(c.mutedFor('u-julien'), isTrue);
+    // Expiration passée : plus muet (logique d'expiration de mutedFor).
+    expect(c.mutedFor('u-julien', DateTime.now().millisecondsSinceEpoch + 9 * 3600 * 1000),
+        isFalse);
+  });
+
+  test('Suppression nettoie la sourdine', () async {
+    final chats = await api.fetchChats();
+    final dm = chats.firstWhere((c) => !c.isGroup);
+    await api.setChatMuted(dm.id, duration: 'always');
+    await api.deleteChat(dm.id);
+
+    // Renaissance par un message de l'autre : la sourdine ne revient pas.
+    final otherApi = OfflineApi(meId: 'u-lucas');
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    await otherApi.sendMessage(dm.id, text: 're ?');
+
+    final revived = (await api.fetchChats()).firstWhere((c) => c.id == dm.id);
+    expect(revived.mutedFor('u-julien'), isFalse);
   });
 }

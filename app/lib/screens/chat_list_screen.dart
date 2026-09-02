@@ -217,6 +217,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
           itemBuilder: (context, i) => _ChatRow(
             chat: chats[i],
             pinned: chats[i].pinnedFor(widget.api.meId),
+            muted: chats[i].mutedFor(widget.api.meId),
             onTap: () => _openChat(context, chats[i]),
             onLongPress: () => _showChatMenu(context, chats[i]),
           ),
@@ -249,6 +250,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
             itemBuilder: (context, i) => _ChatRow(
               chat: chats[i],
               pinned: chats[i].pinnedFor(widget.api.meId),
+            muted: chats[i].mutedFor(widget.api.meId),
               onTap: () => _openChat(context, chats[i]),
               onLongPress: () => _showChatMenu(context, chats[i]),
             ),
@@ -332,6 +334,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
     final me = widget.api.meId;
     final archived = chat.archivedFor(me);
     final pinned = chat.pinnedFor(me);
+    final muted = chat.mutedFor(me);
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: KiteColors.surface,
@@ -368,6 +371,20 @@ class _ChatListScreenState extends State<ChatListScreen> {
               },
             ),
             ListTile(
+              leading: Icon(
+                muted ? Icons.notifications_active_outlined : Icons.notifications_off_outlined,
+                color: KiteColors.accent,
+              ),
+              title: Text(
+                muted ? 'Réactiver les notifications' : 'Mettre en sourdine',
+                style: const TextStyle(color: KiteColors.fg),
+              ),
+              onTap: () {
+                Navigator.pop(sheetCtx);
+                muted ? _unmute(context, chat) : _chooseMuteDuration(context, chat);
+              },
+            ),
+            ListTile(
               leading: const Icon(Icons.delete_outline, color: KiteColors.danger),
               title: const Text('Supprimer la discussion', style: TextStyle(color: KiteColors.danger)),
               onTap: () {
@@ -379,6 +396,58 @@ class _ChatListScreenState extends State<ChatListScreen> {
         ),
       ),
     );
+  }
+
+  /// Choix de la durée de sourdine (8 h / 1 semaine / toujours).
+  Future<void> _chooseMuteDuration(BuildContext context, Chat chat) async {
+    final duration = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: KiteColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetCtx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final (value, label) in [
+              ('8h', 'Pendant 8 heures'),
+              ('1w', 'Pendant 1 semaine'),
+              ('always', 'Toujours'),
+            ])
+              ListTile(
+                leading: const Icon(Icons.notifications_off_outlined, color: KiteColors.accent),
+                title: Text(label, style: const TextStyle(color: KiteColors.fg)),
+                onTap: () => Navigator.pop(sheetCtx, value),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (duration == null) return;
+    try {
+      await widget.api.setChatMuted(chat.id, duration: duration);
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Action indisponible')));
+      }
+      return;
+    }
+    _refresh();
+  }
+
+  Future<void> _unmute(BuildContext context, Chat chat) async {
+    try {
+      await widget.api.setChatMuted(chat.id);
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Action indisponible')));
+      }
+      return;
+    }
+    _refresh();
   }
 
   Future<void> _togglePin(BuildContext context, Chat chat) async {
@@ -505,12 +574,14 @@ class _ChatRow extends StatelessWidget {
     required this.onTap,
     required this.onLongPress,
     this.pinned = false,
+    this.muted = false,
   });
 
   final Chat chat;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
   final bool pinned;
+  final bool muted;
 
   @override
   Widget build(BuildContext context) {
@@ -562,17 +633,21 @@ class _ChatRow extends StatelessWidget {
                 ],
               ),
             ),
+            if (muted) ...[
+              const SizedBox(width: 6),
+              const Icon(Icons.notifications_off, size: 14, color: KiteColors.muted),
+            ],
             if (chat.unread > 0) ...[
               const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: const BoxDecoration(
-                  color: KiteColors.accent,
-                  borderRadius: BorderRadius.all(Radius.circular(999)),
+                decoration: BoxDecoration(
+                  color: muted ? KiteColors.muted : KiteColors.accent,
+                  borderRadius: const BorderRadius.all(Radius.circular(999)),
                 ),
                 child: Text(
                   '${chat.unread}',
-                  style: const TextStyle(color: KiteColors.accentInk, fontSize: 11, fontWeight: FontWeight.w700),
+                  style: TextStyle(color: muted ? KiteColors.bg : KiteColors.accentInk, fontSize: 11, fontWeight: FontWeight.w700),
                 ),
               ),
             ],

@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"sort"
 	"strconv"
@@ -727,8 +728,10 @@ func (a *api) handleChatAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		Archived bool `json:"archived"`
-		Pinned   bool `json:"pinned"`
+		Archived bool   `json:"archived"`
+		Pinned   bool   `json:"pinned"`
+		Until    int64  `json:"until"`    // mute : expiration (epoch ms)
+		Duration string `json:"duration"` // mute : 8h | 1w | always
 	}
 	// delete n'a pas de corps : tout ce qui compte est l'utilisateur.
 	if action != "delete" {
@@ -759,6 +762,31 @@ func (a *api) handleChatAction(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		wJSON(w, 200, map[string]any{"id": chatID, "deletedFor": uid})
+	case "mute":
+		// Sourdine personnelle avec expiration. Accepte soit une durée
+		// symbolique (8h | 1w | always), soit un epoch ms direct (`until`).
+		until := body.Until
+		if until == 0 {
+			switch body.Duration {
+			case "8h":
+				until = time.Now().Add(8 * time.Hour).UnixMilli()
+			case "1w":
+				until = time.Now().Add(7 * 24 * time.Hour).UnixMilli()
+			case "always":
+				until = math.MaxInt64
+			case "off":
+				// until reste 0 : SetMute supprime l'entrée (démute).
+			default:
+				httpError(w, 400, "duration requise (8h | 1w | always | off)")
+				return
+			}
+		}
+		if !a.store.SetMute(chatID, uid, until) {
+			httpError(w, 404, "conversation introuvable")
+			return
+		}
+		// Sourdine personnelle : pas de broadcast.
+		wJSON(w, 200, map[string]any{"id": chatID, "until": until})
 	default:
 		httpError(w, 404, "action inconnue")
 	}
