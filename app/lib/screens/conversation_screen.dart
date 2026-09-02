@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../api.dart';
 import '../drafts.dart';
+import '../message_notifier.dart';
 import '../models.dart';
 import '../theme.dart';
 
@@ -52,6 +53,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
 
     _load();
     _sse = widget.api.realtime().listen(_onEvent, onError: (_) {});
+    // Conversation ouverte : pas de popup de notification pour elle.
+    MessageNotifier.instance.openChat(widget.chat.id);
     _loadDraft();
   }
 
@@ -84,6 +87,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
   @override
   void dispose() {
     DraftStore.instance.flushIfNeeded(); // brouillon écrit sur disque
+    MessageNotifier.instance.closeChat(widget.chat.id);
     _sse?.cancel();
     _recTimer?.cancel();
     _typingClear?.cancel();

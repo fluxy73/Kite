@@ -22,12 +22,20 @@ class OfflineApi {
   Future<void> _init() async {
     final store = await LocalStore.instance();
     _store = store;
-    store.changes.listen((_) => shellRevision.value++);
+    store.changes.listen((_) {
+      shellRevision.value++;
+      _events.add(ServerEvent('shell', {'userId': meId}));
+    });
     shellRevision.value++;
   }
 
   /// Incrémenté à chaque mutation locale (équivalent de l'event "shell").
   final ValueNotifier<int> shellRevision = ValueNotifier<int>(0);
+
+  /// Flux d'événements locaux : mutations de la base (event "shell") et
+  /// échos simulés (event "message"). Même forme que les événements serveur.
+  final StreamController<ServerEvent> _events =
+      StreamController<ServerEvent>.broadcast();
 
   bool get ready => _store != null;
 
@@ -223,11 +231,9 @@ class OfflineApi {
 
   /// Flux d'événements locaux : réagit aux mutations de la base (et échos
   /// simulés). Même forme d'événements que le serveur ({type, data}).
-  Stream<ServerEvent> realtime({int lastEventId = 0}) async* {
-    await for (final _ in _s.changes) {
-      yield ServerEvent('shell', {'userId': meId});
-    }
-  }
+  /// Diffusé en broadcast : plusieurs abonnés possibles (CallCenter,
+  /// ConversationScreen, MessageNotifier), `lastEventId` sans effet local.
+  Stream<ServerEvent> realtime({int lastEventId = 0}) => _events.stream;
 
   // ---------- Écho simulé d'un correspondant ----------
 
@@ -252,15 +258,19 @@ class OfflineApi {
       final reply = _echoReplies[DateTime.now().second % _echoReplies.length];
       final m = _s.addMessage(chatId, other, 'text', reply);
       // Livré + lu immédiatement (simulation locale).
-      _s.upsertMessage(m.copyWith(
+      final stored = m.copyWith(
         deliveredTo: [meId],
         readBy: [meId],
-      ));
+      );
+      _s.upsertMessage(stored);
+      // Notifié comme un vrai message entrant (notifications, UI).
+      _events.add(ServerEvent('message', _s.messageToJson(stored)));
     });
   }
 
   void dispose() {
     _echoTimer?.cancel();
+    _events.close();
   }
 }
 
