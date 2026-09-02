@@ -63,7 +63,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
     if (_showArchived) {
       return chats.where((c) => c.archivedFor(me)).toList();
     }
-    // Vue normale : masque mes conversations archivées.
+    // Vue normale : masque mes conversations archivées (les discussions
+    // supprimées « pour moi » sont déjà filtrées par l'API/store).
     chats = chats.where((c) => !c.archivedFor(me)).toList();
     switch (_filter) {
       case 'Non lues':
@@ -71,7 +72,16 @@ class _ChatListScreenState extends State<ChatListScreen> {
       case 'Groupes':
         return chats.where((c) => c.isGroup).toList();
       default:
-        return chats;
+        // Épinglées d'abord, puis par dernier message (comportement WhatsApp).
+        return chats..sort((a, b) {
+          final pa = a.pinnedFor(me) ? 0 : 1;
+          final pb = b.pinnedFor(me) ? 0 : 1;
+          if (pa != pb) return pa - pb;
+          final ta = a.lastMessage?.createdAt ?? 0;
+          final tb = b.lastMessage?.createdAt ?? 0;
+          if (ta != tb) return tb - ta;
+          return a.name.compareTo(b.name);
+        });
     }
   }
 
@@ -206,6 +216,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
               const Divider(height: 1, color: KiteColors.border),
           itemBuilder: (context, i) => _ChatRow(
             chat: chats[i],
+            pinned: chats[i].pinnedFor(widget.api.meId),
             onTap: () => _openChat(context, chats[i]),
             onLongPress: () => _showChatMenu(context, chats[i]),
           ),
@@ -237,6 +248,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                 const Divider(height: 1, color: KiteColors.border),
             itemBuilder: (context, i) => _ChatRow(
               chat: chats[i],
+              pinned: chats[i].pinnedFor(widget.api.meId),
               onTap: () => _openChat(context, chats[i]),
               onLongPress: () => _showChatMenu(context, chats[i]),
             ),
@@ -317,7 +329,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
     );
   }
   void _showChatMenu(BuildContext context, Chat chat) {
-    final archived = chat.archivedFor(widget.api.meId);
+    final me = widget.api.meId;
+    final archived = chat.archivedFor(me);
+    final pinned = chat.pinnedFor(me);
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: KiteColors.surface,
@@ -329,12 +343,19 @@ class _ChatListScreenState extends State<ChatListScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.push_pin_outlined, color: KiteColors.accent),
-              title: Text(chat.isGroup ? 'Épingler le groupe' : 'Épingler la discussion'),
+              leading: Icon(
+                pinned ? Icons.push_pin : Icons.push_pin_outlined,
+                color: KiteColors.accent,
+              ),
+              title: Text(
+                pinned
+                    ? (chat.isGroup ? 'Détacher le groupe' : 'Détacher la discussion')
+                    : (chat.isGroup ? 'Épingler le groupe' : 'Épingler la discussion'),
+                style: const TextStyle(color: KiteColors.fg),
+              ),
               onTap: () {
                 Navigator.pop(sheetCtx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Discussion épinglée 📌')));
+                _togglePin(context, chat);
               },
             ),
             ListTile(
@@ -351,14 +372,66 @@ class _ChatListScreenState extends State<ChatListScreen> {
               title: const Text('Supprimer la discussion', style: TextStyle(color: KiteColors.danger)),
               onTap: () {
                 Navigator.pop(sheetCtx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Suppression bientôt disponible')));
+                _confirmDelete(context, chat);
               },
             ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _togglePin(BuildContext context, Chat chat) async {
+    final target = !chat.pinnedFor(widget.api.meId);
+    try {
+      await widget.api.setChatPinned(chat.id, pinned: target);
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Action indisponible')));
+      }
+      return;
+    }
+    _refresh();
+  }
+
+  /// Confirmation avant suppression (pour moi) — irréversible pour
+  /// l'utilisateur tant qu'aucun nouveau message n'arrive.
+  Future<void> _confirmDelete(BuildContext context, Chat chat) async {
+    final go = await showDialog<bool>(
+      context: context,
+      builder: (dlgCtx) => AlertDialog(
+        backgroundColor: KiteColors.surface,
+        title: const Text('Supprimer la discussion ?'),
+        content: Text(
+          chat.isGroup
+              ? 'Le groupe quittera votre liste. Un nouveau message le fera réapparaître.'
+              : 'La discussion quittera votre liste. Un nouveau message la fera réapparaître.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dlgCtx, false),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dlgCtx, true),
+            child: const Text('Supprimer',
+                style: TextStyle(color: KiteColors.danger)),
+          ),
+        ],
+      ),
+    );
+    if (go != true) return;
+    try {
+      await widget.api.deleteChat(chat.id);
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Suppression impossible')));
+      }
+      return;
+    }
+    _refresh();
   }
 
   /// Nouvelle discussion : choisit un contact et crée (ou réutilise) la DM.
@@ -427,11 +500,17 @@ class _ChatListScreenState extends State<ChatListScreen> {
 }
 
 class _ChatRow extends StatelessWidget {
-  const _ChatRow({required this.chat, required this.onTap, required this.onLongPress});
+  const _ChatRow({
+    required this.chat,
+    required this.onTap,
+    required this.onLongPress,
+    this.pinned = false,
+  });
 
   final Chat chat;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
+  final bool pinned;
 
   @override
   Widget build(BuildContext context) {
@@ -458,6 +537,10 @@ class _ChatRow extends StatelessWidget {
                 children: [
                   Row(
                     children: [
+                      if (pinned) ...[
+                        const Icon(Icons.push_pin, size: 13, color: KiteColors.muted),
+                        const SizedBox(width: 4),
+                      ],
                       Expanded(
                         child: Text(
                           chat.name,

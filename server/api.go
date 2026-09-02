@@ -224,7 +224,7 @@ func (a *api) handleContactMatch(w http.ResponseWriter, r *http.Request) {
 	}
 	var body struct {
 		Contacts []struct {
-			Name  string   `json:"name"`
+			Name   string   `json:"name"`
 			Phones []string `json:"phones"`
 		} `json:"contacts"`
 	}
@@ -489,7 +489,7 @@ func (a *api) handleCallRespond(w http.ResponseWriter, r *http.Request) {
 	}
 	a.hub.broadcastToUsers(chat.MemberIDs, Event{Type: "call_respond", ChatID: updated.ChatID, Data: mustJSON(updated)})
 	wJSON(w, 200, updated)
-}// handleCallSignal relaie la signalisation WebRTC (offer/answer/ICE) entre
+} // handleCallSignal relaie la signalisation WebRTC (offer/answer/ICE) entre
 // les participants d'un appel existant via le hub temps réel.
 func (a *api) handleCallSignal(w http.ResponseWriter, r *http.Request) {
 	uid, ok := a.userOrError(w, r)
@@ -526,9 +526,9 @@ func (a *api) handleCallSignal(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	a.hub.broadcastToUsers(targets, Event{Type: "call_signal", ChatID: c.ChatID, Data: mustJSON(map[string]any{
-		"callId": body.CallID,
-		"kind":   body.Kind,
-		"from":   uid,
+		"callId":  body.CallID,
+		"kind":    body.Kind,
+		"from":    uid,
 		"payload": body.Payload,
 	})})
 	wJSON(w, 200, map[string]bool{"relayed": true})
@@ -717,27 +717,51 @@ func (a *api) handleChatAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/chats/"), "/")
-	if len(parts) != 2 || parts[1] != "archive" {
+	if len(parts) != 2 {
 		httpError(w, 404, "action inconnue")
 		return
 	}
-	chatID := parts[0]
+	chatID, action := parts[0], parts[1]
 	if !a.store.memberOf(uid, chatID) {
 		httpError(w, 403, "pas membre de cette conversation")
 		return
 	}
 	var body struct {
 		Archived bool `json:"archived"`
+		Pinned   bool `json:"pinned"`
 	}
-	if err := readJSON(r, &body); err != nil {
-		httpError(w, 400, "corps invalide: "+err.Error())
-		return
+	// delete n'a pas de corps : tout ce qui compte est l'utilisateur.
+	if action != "delete" {
+		if err := readJSON(r, &body); err != nil {
+			httpError(w, 400, "corps invalide: "+err.Error())
+			return
+		}
 	}
-	if !a.store.setArchived(chatID, uid, body.Archived) {
-		httpError(w, 404, "conversation introuvable")
-		return
+	switch action {
+	case "archive":
+		if !a.store.setArchived(chatID, uid, body.Archived) {
+			httpError(w, 404, "conversation introuvable")
+			return
+		}
+		wJSON(w, 200, map[string]any{"id": chatID, "archived": body.Archived})
+	case "pin":
+		if !a.store.setPinned(chatID, uid, body.Pinned) {
+			httpError(w, 404, "conversation introuvable")
+			return
+		}
+		// Épinglage personnel : pas de broadcast.
+		wJSON(w, 200, map[string]any{"id": chatID, "pinned": body.Pinned})
+	case "delete":
+		// Suppression pour moi : la conversation disparaît de ma liste,
+		// l'historique et les autres membres sont conservés.
+		if !a.store.deleteChatFor(chatID, uid) {
+			httpError(w, 404, "conversation introuvable")
+			return
+		}
+		wJSON(w, 200, map[string]any{"id": chatID, "deletedFor": uid})
+	default:
+		httpError(w, 404, "action inconnue")
 	}
-	wJSON(w, 200, map[string]any{"id": chatID, "archived": body.Archived})
 }
 
 // handleTyping relaie l'indicateur de saisie (éphémère, sans log de replay).

@@ -34,8 +34,6 @@ class _ConversationScreenState extends State<ConversationScreen> {
   String? _remoteTyping;
   Timer? _typingClear;
   Timer? _typingThrottle;
-  // Brouillon local (persisté entre les sessions).
-  String _draft = '';
 
   // Enregistrement vocal simulé
   bool _recording = false;
@@ -58,10 +56,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
   Future<void> _loadDraft() async {
     final d = DraftStore.instance.load(widget.chat.id);
     if (d.isNotEmpty && mounted) {
-      setState(() {
-        _draft = d;
-        _input.text = d;
-      });
+      setState(() => _input.text = d);
     }
   }
 

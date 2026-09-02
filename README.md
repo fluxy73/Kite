@@ -52,6 +52,8 @@ Authentification mockée : paramètre `?userId=` sur chaque requête.
 | POST | `/api/calls/signal` | relaie la signalisation **WebRTC** (`offer` \| `answer` \| `ice`) aux participants d'un appel |
 | POST | `/api/messages/{id}/star` | marque/démarque le message en favori pour moi (persistance) |
 | POST | `/api/chats/{id}/archive` | archive/désarchive la conversation pour moi |
+| POST | `/api/chats/{id}/pin` | épingle/détache la conversation pour moi (persistance, tri en tête) |
+| POST | `/api/chats/{id}/delete` | supprime la discussion pour moi (les autres membres la conservent ; un nouveau message la fait renaître) |
 | POST | `/api/typing` | diffuse l'indicateur de saisie (éphémère, event `typing`) |
 | GET/POST/PATCH/DELETE | `/api/scheduled-calls` | liste / crée / bascule le rappel / supprime un appel planifié |
 | GET | `/api/events` | temps réel **SSE** (repli) |

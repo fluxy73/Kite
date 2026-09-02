@@ -59,13 +59,15 @@ type ScheduledCall struct {
 }
 
 type Chat struct {
-	ID        string   `json:"id"`
-	Type      string   `json:"type"` // dm | group | community
-	Name      string   `json:"name"`
-	MemberIDs []string `json:"memberIds"`
-	AdminIDs  []string `json:"adminIds"`
-	CreatedAt int64    `json:"createdAt"`
-	Archived  []string `json:"archived,omitempty"` // userIds ayant archivé cette conversation
+	ID         string   `json:"id"`
+	Type       string   `json:"type"` // dm | group | community
+	Name       string   `json:"name"`
+	MemberIDs  []string `json:"memberIds"`
+	AdminIDs   []string `json:"adminIds"`
+	CreatedAt  int64    `json:"createdAt"`
+	Archived   []string `json:"archived,omitempty"`   // userIds ayant archivé cette conversation
+	Pinned     []string `json:"pinned,omitempty"`     // userIds ayant épinglé cette conversation
+	DeletedFor []string `json:"deletedFor,omitempty"` // userIds ayant supprimé la discussion pour eux
 }
 
 type Message struct {
@@ -171,6 +173,16 @@ func inSlice(s []string, v string) bool {
 	return false
 }
 
+func removeFromSlice(s []string, v string) []string {
+	out := make([]string, 0, len(s))
+	for _, x := range s {
+		if x != v {
+			out = append(out, x)
+		}
+	}
+	return out
+}
+
 func removeFrom(s []string, v string) []string {
 	out := s[:0]
 	for _, x := range s {
@@ -243,11 +255,19 @@ func (s *Store) chatsFor(userID string) []Chat {
 	defer s.mu.RUnlock()
 	out := []Chat{}
 	for _, c := range s.state.Chats {
-		if inSlice(c.MemberIDs, userID) {
-			out = append(out, c)
+		// Masque la conversation pour ceux qui l'ont supprimée (pour eux).
+		if !inSlice(c.MemberIDs, userID) || inSlice(c.DeletedFor, userID) {
+			continue
 		}
+		out = append(out, c)
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].CreatedAt < out[j].CreatedAt })
+	sort.Slice(out, func(i, j int) bool {
+		pi, pj := inSlice(out[i].Pinned, userID), inSlice(out[j].Pinned, userID)
+		if pi != pj {
+			return pi // épinglées d'abord
+		}
+		return out[i].CreatedAt < out[j].CreatedAt
+	})
 	return out
 }
 
@@ -380,6 +400,50 @@ func (s *Store) toggleStar(messageID, userID string) ([]string, bool) {
 	return nil, false
 }
 
+// setPinned épingle ou détache une conversation pour un utilisateur.
+func (s *Store) setPinned(chatID, userID string, pinned bool) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i := range s.state.Chats {
+		c := &s.state.Chats[i]
+		if c.ID != chatID {
+			continue
+		}
+		found := inSlice(c.Pinned, userID)
+		if pinned && !found {
+			c.Pinned = append(c.Pinned, userID)
+		} else if !pinned && found {
+			c.Pinned = removeFromSlice(c.Pinned, userID)
+		}
+		_ = s.save()
+		return true
+	}
+	return false
+}
+
+// deleteChatFor supprime la conversation pour cet utilisateur uniquement :
+// elle disparaît de sa liste, l'historique et les autres membres sont
+// conservés. Un nouveau message la fait renaître (comportement WhatsApp).
+func (s *Store) deleteChatFor(chatID, userID string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i := range s.state.Chats {
+		c := &s.state.Chats[i]
+		if c.ID != chatID || !inSlice(c.MemberIDs, userID) {
+			continue
+		}
+		if !inSlice(c.DeletedFor, userID) {
+			c.DeletedFor = append(c.DeletedFor, userID)
+		}
+		// Épinglage et archivage personnels : nettoyés avec la suppression.
+		c.Pinned = removeFromSlice(c.Pinned, userID)
+		c.Archived = removeFromSlice(c.Archived, userID)
+		_ = s.save()
+		return true
+	}
+	return false
+}
+
 // setArchived archive ou désarchive une conversation pour un utilisateur.
 func (s *Store) setArchived(chatID, userID string, archived bool) bool {
 	s.mu.Lock()
@@ -498,6 +562,14 @@ func (s *Store) addMessage(chatID, senderID, typ, text string, media map[string]
 		ReplyTo:   replyTo,
 	}
 	s.mu.Lock()
+	// Un nouveau message fait renaître la conversation pour tous ceux qui
+	// l'avaient supprimée (comportement WhatsApp).
+	for i := range s.state.Chats {
+		if s.state.Chats[i].ID == chatID {
+			s.state.Chats[i].DeletedFor = nil
+			break
+		}
+	}
 	s.state.Messages = append(s.state.Messages, m)
 	s.mu.Unlock()
 	_ = s.save()

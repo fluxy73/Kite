@@ -153,6 +153,8 @@ class Chat {
     this.unread = 0,
     this.online = 0,
     this.archived = const [],
+    this.pinned = const [],
+    this.deletedFor = const [],
   });
 
   final String id;
@@ -164,11 +166,39 @@ class Chat {
   final int unread;
   final int online;
   final List<String> archived; // userIds ayant archivé cette conversation
+  final List<String> pinned; // userIds ayant épinglé cette conversation
+  final List<String> deletedFor; // userIds ayant supprimé la discussion pour eux
 
   bool get isGroup => type == 'group';
 
   /// true si [userId] a archivé cette conversation.
   bool archivedFor(String userId) => archived.contains(userId);
+
+  /// true si [userId] a épinglé cette conversation.
+  bool pinnedFor(String userId) => pinned.contains(userId);
+
+  /// true si [userId] a supprimé la discussion (pour lui).
+  bool deletedForUser(String userId) => deletedFor.contains(userId);
+
+  Chat copyWith({
+    String? name,
+    List<String>? archived,
+    List<String>? pinned,
+    List<String>? deletedFor,
+  }) =>
+      Chat(
+        id: id,
+        type: type,
+        name: name ?? this.name,
+        memberIds: memberIds,
+        adminIds: adminIds,
+        lastMessage: lastMessage,
+        unread: unread,
+        online: online,
+        archived: archived ?? this.archived,
+        pinned: pinned ?? this.pinned,
+        deletedFor: deletedFor ?? this.deletedFor,
+      );
 
   factory Chat.fromJson(Map<String, dynamic> json) => Chat(
         id: json['id'] as String,
@@ -177,6 +207,8 @@ class Chat {
         memberIds: (json['memberIds'] as List).cast<String>(),
         adminIds: (json['adminIds'] as List? ?? []).cast<String>(),
         archived: (json['archived'] as List? ?? []).cast<String>(),
+        pinned: (json['pinned'] as List? ?? []).cast<String>(),
+        deletedFor: (json['deletedFor'] as List? ?? []).cast<String>(),
         lastMessage: json['lastMessage'] == null
             ? null
             : Message.fromJson(json['lastMessage'] as Map<String, dynamic>),

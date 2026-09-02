@@ -182,6 +182,19 @@ class KiteApi {
     });
   }
 
+  /// Épingle ou détache une conversation pour moi.
+  Future<void> setChatPinned(String chatId, {required bool pinned}) async {
+    await _send('POST', '/api/chats/$chatId/pin', query: {'userId': meId}, body: {
+      'pinned': pinned,
+    });
+  }
+
+  /// Supprime la discussion pour moi (l'historique et les autres membres
+  /// sont conservés ; un nouveau message la fait renaître).
+  Future<void> deleteChat(String chatId) async {
+    await _send('POST', '/api/chats/$chatId/delete', query: {'userId': meId});
+  }
+
   /// Notifie les autres membres que je saisis dans cette conversation.
   Future<void> sendTyping(String chatId) async {
     await _send('POST', '/api/typing', query: {'userId': meId}, body: {

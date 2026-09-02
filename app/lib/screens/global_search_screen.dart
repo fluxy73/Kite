@@ -32,8 +32,7 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
 
   Future<void> _load() async {
     try {
-      final shell =
-          widget.shell ?? await widget.api.fetchAppShell() as AppShell;
+      final shell = widget.shell ?? await widget.api.fetchAppShell();
       final chats = shell.chats;
       final hits = <_MessageHit>[];
       final names = {for (final u in shell.users) u.id: u.name};
