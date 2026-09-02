@@ -44,7 +44,9 @@ class _ConversationScreenState extends State<ConversationScreen> {
   final Map<String, _VoicePlayer> _players = {};
   // RSVP d'événements (state local)
   final Set<String> _rsvpYes = {};
-  final Set<String> _rsvpMaybe = {};  @override
+  final Set<String> _rsvpMaybe = {};
+
+  @override
   void initState() {
     super.initState();
 

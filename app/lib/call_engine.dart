@@ -69,10 +69,17 @@ class CallEngine {
   }
 
   Future<void> _setup({required String media}) async {
-    final stream = await navigator.mediaDevices.getUserMedia({
-      'audio': true,
-      if (media == 'video') 'video': {'facingMode': 'user', 'width': 1280, 'height': 720},
-    });
+    MediaStream stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        'audio': true,
+        if (media == 'video') 'video': {'facingMode': 'user', 'width': 1280, 'height': 720},
+      });
+    } catch (_) {
+      // Micro/caméra refusés ou indisponibles : pas d'appel possible.
+      state.value = 'failed';
+      return;
+    }
     _localStream = stream;
     localStream.value = stream;
 
@@ -116,7 +123,9 @@ class CallEngine {
       }
       if (status == 'ended' || status == 'declined' || status == 'missed') {
         state.value = 'ended';
-        dispose();
+        // Libère média/connexions sans réinitialiser l'état : l'écran doit
+        // encore lire 'ended' pour afficher « Appel terminé » et sortir.
+        _disposeMediaOnly();
       }
     });
   }
@@ -248,5 +257,22 @@ class CallEngine {
     localStream.value = null;
     remoteStream.value = null;
     state.value = 'idle';
+  }
+
+  /// Libère les ressources média/connexions sans remettre l'état à zéro —
+  /// utilisé quand l'écran doit encore lire l'état final (ex. 'failed').
+  void _disposeMediaOnly() {
+    _connectTimeout?.cancel();
+    _sigSub?.cancel();
+    _sigSub = null;
+    _respSub?.cancel();
+    _respSub = null;
+    _pc?.close();
+    _pc = null;
+    _localStream?.getTracks().forEach((t) => t.stop());
+    _localStream = null;
+    _remoteStream = null;
+    localStream.value = null;
+    remoteStream.value = null;
   }
 }

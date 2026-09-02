@@ -1027,10 +1027,17 @@ class _InCallScreenState extends State<InCallScreen> {
     engine.state.addListener(_onEngineState);
     engine.localStream.addListener(_onStreamsChanged);
     engine.remoteStream.addListener(_onStreamsChanged);
-    if (widget.isCaller) {
-      await engine.startAsCaller(video: widget.video);
-    } else {
-      await engine.startAsCallee(video: widget.video);
+    try {
+      if (widget.isCaller) {
+        await engine.startAsCaller(video: widget.video);
+      } else {
+        await engine.startAsCallee(video: widget.video);
+      }
+    } catch (_) {
+      // Micro/caméra refusés ou indisponibles : feedback explicite au lieu
+      // d'un écran figé sur « Connexion… ».
+      engine.state.value = 'failed';
+      return;
     }
   }
 

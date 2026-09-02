@@ -74,7 +74,8 @@ class DraftStore {
     return _cache[chatId] ?? '';
   }
 
-  /// Sauvegarde (debounce 500 ms via [scheduleSave] pour la saisie fréquent).
+  /// Sauvegarde en mémoire ; l'écriture disque est différée à
+  /// [flushIfNeeded] (appelé à la sortie d'écran).
   void save(String chatId, String text) {
     _ensureLoaded();
     if (text.isEmpty) {

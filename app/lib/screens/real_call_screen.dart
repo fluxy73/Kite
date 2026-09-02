@@ -31,7 +31,6 @@ class RealCallScreen extends StatefulWidget {
 
 class _RealCallScreenState extends State<RealCallScreen> {
   Map<String, dynamic>? _call;
-  final String _status = 'Sonnerie…';
   Timer? _timeout;
   StreamSubscription<Map<String, dynamic>>? _respSub;
   bool _done = false;
@@ -134,7 +133,8 @@ class _RealCallScreenState extends State<RealCallScreen> {
               style: const TextStyle(color: KiteColors.muted, fontSize: 15),
             ),
             const SizedBox(height: 18),
-            Text(_status, style: const TextStyle(color: KiteColors.accent, fontSize: 14)),
+            const Text('Sonnerie…',
+                style: TextStyle(color: KiteColors.accent, fontSize: 14)),
             const Spacer(),
             InkWell(
               onTap: () {
