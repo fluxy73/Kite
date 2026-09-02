@@ -292,6 +292,16 @@ func (s *Store) lastMessage(chatID string) *Message {
 func (s *Store) unreadCount(chatID, userID string) int {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+	for i := range s.state.Chats {
+		if s.state.Chats[i].ID == chatID {
+			// Conversation muette : le compteur reste à 0 tant que la
+			// sourdine est active (les messages restent eux non lus).
+			if mutedUntil(s.state.Chats[i].Mutes, userID) > 0 {
+				return 0
+			}
+			break
+		}
+	}
 	n := 0
 	for i := range s.state.Messages {
 		m := &s.state.Messages[i]
@@ -481,6 +491,27 @@ func (s *Store) setArchived(chatID, userID string, archived bool) bool {
 		return true
 	}
 	return false
+}
+
+// mutedForUser indique si la sourdine de userID est active sur chatID.
+func (s *Store) mutedForUser(chatID, userID string) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for i := range s.state.Chats {
+		if s.state.Chats[i].ID == chatID {
+			return mutedUntil(s.state.Chats[i].Mutes, userID) > 0
+		}
+	}
+	return false
+}
+
+// mutedUntil retourne l'échéance de sourdine active de userID (> 0), 0 sinon.
+func mutedUntil(mutes map[string]int64, userID string) int64 {
+	u, ok := mutes[userID]
+	if !ok || u <= time.Now().UnixMilli() {
+		return 0
+	}
+	return u
 }
 
 // SetMute rend muet (until > now) ou démute (until <= 0) une conversation

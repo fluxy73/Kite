@@ -135,7 +135,9 @@ class _ConversationScreenState extends State<ConversationScreen> {
     final data = ev.data;
     switch (ev.type) {
       case 'typing':
-        if (data['chatId']?.toString() == widget.chat.id) {
+        // Sourdine active : aucun indicateur de saisie affiché.
+        if (!widget.chat.mutedFor(widget.api.meId) &&
+            data['chatId']?.toString() == widget.chat.id) {
           _showRemoteTyping(data['name']?.toString() ?? 'Quelqu\u2019un');
         }
       case 'message':

@@ -567,6 +567,10 @@ func (a *api) handleEvents(w http.ResponseWriter, r *http.Request) {
 		if !a.store.memberOf(uid, ev.ChatID) {
 			continue
 		}
+		// Sourdine active sur cette conversation : pas d'indicateur de saisie.
+		if ev.Type == "typing" && a.store.mutedForUser(ev.ChatID, uid) {
+			continue
+		}
 		writeEvent(ev)
 	}
 	// Livraison des messages en attente (reçus hors-ligne).
@@ -821,7 +825,10 @@ func (a *api) handleTyping(w http.ResponseWriter, r *http.Request) {
 	targets := []string{}
 	for _, m := range chat.MemberIDs {
 		if m != uid {
-			targets = append(targets, m)
+			// Sourdine active : pas d'indicateur de saisie.
+			if mutedUntil(chat.Mutes, m) == 0 {
+				targets = append(targets, m)
+			}
 		}
 	}
 	a.hub.broadcastToUsers(targets, Event{Type: "typing", ChatID: body.ChatID, Data: mustJSON(map[string]string{"chatId": body.ChatID, "userId": uid, "name": name})})
