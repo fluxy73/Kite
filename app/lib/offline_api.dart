@@ -154,6 +154,10 @@ class OfflineApi {
     _s.setMute(chatId, meId, duration);
   }
 
+  Future<void> setChatNotifs(String chatId, {NotifPrefs? prefs}) async {
+    _s.setNotifs(chatId, meId, prefs);
+  }
+
   Future<void> sendTyping(String chatId) async {}
   // Hors-ligne, il n'y a personne d'autre à qui signaler la saisie.
 

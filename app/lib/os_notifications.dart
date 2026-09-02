@@ -48,6 +48,23 @@ class OsNotifications {
 
   static const _channelId = 'kite_messages';
 
+  /// Un canal Android par priorité : la priorité par conversation se
+  /// traduit par le choix du canal (comportement Android idiomatique).
+  static const _channels = [
+    AndroidNotificationChannel('$_channelId-low', 'Messages (silencieux)',
+        description: 'Priorité basse', importance: Importance.low),
+    AndroidNotificationChannel('$_channelId-default', 'Messages',
+        description: 'Priorité normale', importance: Importance.defaultImportance),
+    AndroidNotificationChannel('$_channelId-high', 'Messages (urgents)',
+        description: 'Priorité haute', importance: Importance.high),
+  ];
+
+  static String _channelFor(NotifPriority p) => switch (p) {
+        NotifPriority.low => '$_channelId-low',
+        NotifPriority.high => '$_channelId-high',
+        NotifPriority.normal => '$_channelId-default',
+      };
+
   /// Flux des appuis sur une notification OS (payload = chatId).
   final StreamController<String> _taps = StreamController.broadcast();
   Stream<String> get taps => _taps.stream;
@@ -82,14 +99,9 @@ class OsNotifications {
         if (granted == false) {
           return; // permission refusée : snackbars seules
         }
-        await android?.createNotificationChannel(
-          const AndroidNotificationChannel(
-            _channelId,
-            'Messages',
-            description: 'Messages entrants Kite',
-            importance: Importance.high,
-          ),
-        );
+        for (final c in _channels) {
+          await android?.createNotificationChannel(c);
+        }
       }
       if (Platform.isIOS || Platform.isMacOS) {
         final grantedIOS = await _plugin
@@ -121,18 +133,28 @@ class OsNotifications {
         id: _idFor(n.chatId),
         title: n.senderName,
         body: body,
-        notificationDetails: const NotificationDetails(
+        notificationDetails: NotificationDetails(
+          // Priorité et son par conversation : canal dédié + playSound.
           android: AndroidNotificationDetails(
-            _channelId,
+            _channelFor(n.priority),
             'Messages',
             channelDescription: 'Messages entrants Kite',
-            importance: Importance.high,
-            priority: Priority.high,
+            importance: switch (n.priority) {
+              NotifPriority.low => Importance.low,
+              NotifPriority.high => Importance.high,
+              NotifPriority.normal => Importance.defaultImportance,
+            },
+            priority: switch (n.priority) {
+              NotifPriority.low => Priority.low,
+              NotifPriority.high => Priority.high,
+              NotifPriority.normal => Priority.defaultPriority,
+            },
+            playSound: n.soundOn,
           ),
-          iOS: DarwinNotificationDetails(),
-          macOS: DarwinNotificationDetails(),
-          linux: LinuxNotificationDetails(),
-          windows: WindowsNotificationDetails(),
+          iOS: DarwinNotificationDetails(presentSound: n.soundOn),
+          macOS: DarwinNotificationDetails(presentSound: n.soundOn),
+          linux: const LinuxNotificationDetails(),
+          windows: const WindowsNotificationDetails(),
         ),
         payload: n.chatId,
       );

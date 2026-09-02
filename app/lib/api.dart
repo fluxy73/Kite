@@ -202,6 +202,13 @@ class KiteApi {
         body: {'duration': duration ?? 'off'});
   }
 
+  /// Préférences de notification de cette conversation pour moi
+  /// (priorité, son, aperçu). [prefs] null = remise aux défauts.
+  Future<void> setChatNotifs(String chatId, {NotifPrefs? prefs}) async {
+    await _send('POST', '/api/chats/$chatId/notifs', query: {'userId': meId},
+        body: prefs?.toJson() ?? const {});
+  }
+
   /// Notifie les autres membres que je saisis dans cette conversation.
   Future<void> sendTyping(String chatId) async {
     await _send('POST', '/api/typing', query: {'userId': meId}, body: {

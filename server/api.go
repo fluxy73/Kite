@@ -732,10 +732,13 @@ func (a *api) handleChatAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		Archived bool   `json:"archived"`
-		Pinned   bool   `json:"pinned"`
-		Until    int64  `json:"until"`    // mute : expiration (epoch ms)
-		Duration string `json:"duration"` // mute : 8h | 1w | always
+		Archived      bool   `json:"archived"`
+		Pinned        bool   `json:"pinned"`
+		Until         int64  `json:"until"`    // mute : expiration (epoch ms)
+		Duration      string `json:"duration"` // mute : 8h | 1w | always
+		NotifPriority string `json:"priority"` // notifs : low | default | high
+		NotifSound    *bool  `json:"sound"`    // notifs : son on/off
+		NotifPreview  *bool  `json:"preview"`  // notifs : aperçu on/off
 	}
 	// delete n'a pas de corps : tout ce qui compte est l'utilisateur.
 	if action != "delete" {
@@ -791,6 +794,23 @@ func (a *api) handleChatAction(w http.ResponseWriter, r *http.Request) {
 		}
 		// Sourdine personnelle : pas de broadcast.
 		wJSON(w, 200, map[string]any{"id": chatID, "until": until})
+	case "notifs":
+		// Préférences de notification personnelles (priorité, son, aperçu).
+		// Corps vide / champs absents = remise aux défauts de l'app.
+		prefs := NotifPrefs{Priority: body.NotifPriority}
+		if body.NotifSound != nil {
+			s := *body.NotifSound
+			prefs.Sound = &s
+		}
+		if body.NotifPreview != nil {
+			p := *body.NotifPreview
+			prefs.Preview = &p
+		}
+		if !a.store.SetNotifs(chatID, uid, prefs) {
+			httpError(w, 404, "conversation introuvable")
+			return
+		}
+		wJSON(w, 200, map[string]any{"id": chatID, "notifs": prefs})
 	default:
 		httpError(w, 404, "action inconnue")
 	}

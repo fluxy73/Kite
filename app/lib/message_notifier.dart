@@ -5,6 +5,8 @@ import 'package:flutter/material.dart' show AppLifecycleState, WidgetsBinding;
 
 import 'models.dart';
 
+export 'models.dart' show NotifPriority, NotifPrefs;
+
 /// Notification locale de message entrant (in-app).
 class MessageNotification {
   const MessageNotification({
@@ -12,15 +14,24 @@ class MessageNotification {
     required this.message,
     required this.chatName,
     String? senderName,
-  }) : _senderName = senderName;
+    String? body,
+    this.priority = NotifPriority.normal,
+    this.soundOn = true,
+  })  : _senderName = senderName,
+        _body = body;
 
   final String chatId;
   final Message message;
   final String chatName;
   final String? _senderName;
 
+  /// Aperçu pré-résolu (vide = privé, préf. « aperçu » désactivé).
+  final String? _body;
+  final NotifPriority priority;
+  final bool soundOn;
+
   String get senderName => _senderName ?? message.senderId;
-  String get body => message.preview();
+  String get body => _body ?? message.preview();
 }
 
 /// Centre de notifications locales de messages entrants : écoute le flux
@@ -94,11 +105,17 @@ class MessageNotifier {
     if (chat == null) return;
     // Sourdine active : aucune notification (ni OS ni in-app).
     if (chat.mutedFor(_meId ?? '')) return;
+    // Préférences par conversation : priorité, son, aperçu.
+    final prefs = chat.notifsFor(_meId ?? '');
     final n = MessageNotification(
       chatId: chat.id,
       message: m,
       chatName: chat.name.isNotEmpty ? chat.name : _otherName(chat),
       senderName: _userNames[m.senderId] ?? m.senderId,
+      // Aperçu masqué (préférence) : corps vide, jamais le texte du message.
+      body: (prefs?.previewOn ?? true) ? null : '',
+      priority: prefs?.priorityOrNormal ?? NotifPriority.normal,
+      soundOn: prefs?.soundOn ?? true,
     );
     // Routage : app en arrière-plan + OS disponible → bannière système ;
     // app au premier plan (ou OS indisponible) → snackbar in-app.

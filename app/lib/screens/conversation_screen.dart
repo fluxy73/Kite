@@ -901,7 +901,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                       ? const Text('Admin', style: TextStyle(color: KiteColors.accent, fontSize: 11))
                       : null,
                 ),
-            for (final item in const ['Médias, liens et documents', 'Messages favoris', 'Notifications', 'Thème du chat', 'Verrouiller la discussion', 'Bloquer', 'Signaler'])
+            for (final item in const ['Médias, liens et documents', 'Messages favoris', 'Thème du chat', 'Verrouiller la discussion', 'Bloquer', 'Signaler'])
               ListTile(
                 leading: const Icon(Icons.chevron_right, color: KiteColors.muted),
                 title: Text(item, style: const TextStyle(fontSize: 14.5)),
@@ -910,10 +910,104 @@ class _ConversationScreenState extends State<ConversationScreen> {
                   _toast('$item — workflow simulé');
                 },
               ),
+            ListTile(
+              leading: const Icon(Icons.chevron_right, color: KiteColors.muted),
+              title: const Text('Notifications', style: TextStyle(fontSize: 14.5)),
+              onTap: () {
+                Navigator.pop(sheetCtx);
+                _showNotifSettings();
+              },
+            ),
           ],
         ),
       ),
     );
+  }
+
+  // ---------- Préférences de notification (priorité, son, aperçu) ----------
+
+  Future<void> _showNotifSettings() async {
+    final me = widget.api.meId;
+    NotifPrefs prefs =
+        widget.chat.notifsFor(me) ?? const NotifPrefs();
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (dialogCtx, setDialogState) => AlertDialog(
+          backgroundColor: KiteColors.surface,
+          title: const Text('Notifications'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Priorité', style: TextStyle(color: KiteColors.muted, fontSize: 12)),
+              RadioGroup<NotifPriority>(
+                groupValue: prefs.priority,
+                onChanged: (v) => setDialogState(() => prefs = prefs.copyWith(priority: v)),
+                child: const Column(
+                  children: [
+                    RadioListTile<NotifPriority>(
+                      dense: true,
+                      value: NotifPriority.low,
+                      title: Text('Basse (silencieuse)'),
+                    ),
+                    RadioListTile<NotifPriority>(
+                      dense: true,
+                      value: NotifPriority.normal,
+                      title: Text('Normale'),
+                    ),
+                    RadioListTile<NotifPriority>(
+                      dense: true,
+                      value: NotifPriority.high,
+                      title: Text('Haute (urgente)'),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(color: KiteColors.border),
+              SwitchListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Son'),
+                value: prefs.soundOn,
+                onChanged: (v) => setDialogState(() => prefs = prefs.copyWith(sound: v)),
+              ),
+              SwitchListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Aperçu du message'),
+                subtitle: const Text('Masque le texte dans la notification',
+                    style: TextStyle(fontSize: 12, color: KiteColors.muted)),
+                value: prefs.previewOn,
+                onChanged: (v) => setDialogState(() => prefs = prefs.copyWith(preview: v)),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogCtx, false),
+              child: const Text('Annuler'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogCtx, true),
+              child: const Text('Enregistrer'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (saved != true) return;
+    try {
+      await widget.api.setChatNotifs(
+        widget.chat.id,
+        prefs: prefs.isEmpty ? null : prefs,
+      );
+      _toast(prefs.isEmpty
+          ? 'Préférences réinitialisées'
+          : 'Préférences enregistrées');
+    } catch (_) {
+      _toast('Enregistrement impossible');
+    }
   }
 
   // ---------- Pièces jointes ----------
