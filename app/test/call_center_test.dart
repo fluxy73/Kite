@@ -21,7 +21,7 @@ void main() {
     addTearDown(respSub.cancel);
 
     // Signal pour un autre appel : ignoré par le filtre du moteur (callId).
-    center.handleEvent(ServerEvent('call_signal', {
+    center.handleEvent(const ServerEvent('call_signal', {
       'callId': 'other-call',
       'kind': 'offer',
       'from': 'u-emma',
@@ -29,7 +29,7 @@ void main() {
     }));
 
     // Signal du bon appel : routé + backlog.
-    center.handleEvent(ServerEvent('call_signal', {
+    center.handleEvent(const ServerEvent('call_signal', {
       'callId': 'call-1',
       'kind': 'answer',
       'from': 'u-lucas',
@@ -45,10 +45,10 @@ void main() {
     expect(center.signalBacklog('other-call'), hasLength(1));
 
     // Réponse accepted : diffusée, la sonnerie reste affichée.
-    center.handleEvent(ServerEvent('call_respond', {'id': 'call-1', 'status': 'accepted'}));
+    center.handleEvent(const ServerEvent('call_respond', {'id': 'call-1', 'status': 'accepted'}));
 
     // Un appel entrant sonne.
-    center.handleEvent(ServerEvent('call', {
+    center.handleEvent(const ServerEvent('call', {
       'id': 'call-1',
       'callerName': 'Lucas Martin',
       'chatId': 'c-lucas',
@@ -58,7 +58,7 @@ void main() {
     expect(center.current.value?.group, isFalse);
 
     // ended ferme la sonnerie du même appel.
-    center.handleEvent(ServerEvent('call_respond', {'id': 'call-1', 'status': 'ended'}));
+    center.handleEvent(const ServerEvent('call_respond', {'id': 'call-1', 'status': 'ended'}));
     expect(center.current.value, isNull);
 
     // Les streams broadcast délivrent en asynchrone : on laisse passer un tour.

@@ -954,11 +954,14 @@ class InCallScreen extends StatefulWidget {
   });
 
   /// Appel simulé (hors-ligne / démo) — même écran, sans moteur WebRTC.
-  InCallScreen.simulated({
-    Key? key,
-    required String name,
-    bool video = false,
-  }) : this(key: key, name: name, video: video);
+  const InCallScreen.simulated({
+    super.key,
+    required this.name,
+    this.video = false,
+  }) : group = false,
+       memberNames = const [],
+       engine = null,
+       isCaller = false;
 
   final String name;
   final bool group;
@@ -1684,7 +1687,11 @@ class _SelfVideoPip extends StatelessWidget {
         fit: StackFit.expand,
         children: [
           if (videoOn) video else const Center(child: Icon(Icons.videocam_off, size: 26, color: KiteColors.muted)),
-          Positioned(left: 6, bottom: 5, child: Text('Moi', style: TextStyle(fontSize: 11, color: KiteColors.fg))),
+          const Positioned(
+            left: 6,
+            bottom: 5,
+            child: Text('Moi', style: TextStyle(fontSize: 11, color: KiteColors.fg)),
+          ),
           if (muted)
             const Positioned(top: 6, right: 6, child: Icon(Icons.mic_off, size: 14, color: KiteColors.danger)),
         ],

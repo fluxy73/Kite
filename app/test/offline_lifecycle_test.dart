@@ -140,11 +140,9 @@ void main() {
     // separate process — covered by test/offline_restart_check.dart runner.)
     final candidates = <String>[
       if (Platform.isWindows)
-        (Platform.environment['APPDATA'] ?? '.') +
-            Platform.pathSeparator + 'kite' +
-            Platform.pathSeparator + 'kite-local.json'
+        '${(Platform.environment['APPDATA'] ?? '.')}${Platform.pathSeparator}kite${Platform.pathSeparator}kite-local.json'
       else
-        (Platform.environment['HOME'] ?? '.') + '/kite/kite-local.json',
+        '${(Platform.environment['HOME'] ?? '.')}/kite/kite-local.json',
       'kite-local.json',
     ];
     File? storeFile;
@@ -179,10 +177,8 @@ void main() {
 
     // Locate the persisted file.
     final f = File(Platform.isWindows
-        ? (Platform.environment['APPDATA'] ?? '.') +
-            Platform.pathSeparator + 'kite' +
-            Platform.pathSeparator + 'kite-local.json'
-        : (Platform.environment['HOME'] ?? '.') + '/kite/kite-local.json');
+        ? '${(Platform.environment['APPDATA'] ?? '.')}${Platform.pathSeparator}kite${Platform.pathSeparator}kite-local.json'
+        : '${(Platform.environment['HOME'] ?? '.')}/kite/kite-local.json');
     if (!f.existsSync()) {
       // Windows CI path: APPDATA fallback; if still missing, skip gracefully.
       final f2 = File('kite-local.json');
