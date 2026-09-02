@@ -137,7 +137,7 @@ class LocalStore {
                 })
             .toList(),
         'messages': _messagesByChat.map((k, v) => MapEntry(
-            k, v.map((m) => _messageToJson(m)).toList())),
+            k, v.map((m) => messageToJson(m)).toList())),
         'calls': calls
             .map((c) => {
                   'id': c.id,
@@ -165,7 +165,7 @@ class LocalStore {
             .toList(),
       };
 
-  Map<String, dynamic> _messageToJson(Message m) => {
+  Map<String, dynamic> messageToJson(Message m) => {
         'id': m.id,
         'chatId': m.chatId,
         'senderId': m.senderId,
@@ -492,7 +492,8 @@ class LocalStore {
   void setMute(String chatId, String userId, String? duration) {
     _mutateChat(chatId, (c) {
       final mutes = {...c.mutes};
-      if (duration == null) {
+      // 'off' démute (même sémantique que le serveur).
+      if (duration == null || duration == 'off') {
         mutes.remove(userId);
       } else {
         final now = DateTime.now().millisecondsSinceEpoch;

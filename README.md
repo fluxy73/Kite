@@ -77,7 +77,12 @@ Sans `KITE_API`, l'app est **autonome** — aucun serveur requis :
   réactions, édition, suppression, votes, journal d'appels, appels planifiés,
   matching de contacts (normalisation téléphone + repli par nom, même logique
   que le serveur). Un **écho simulé** d'un correspondant arrive ~3 s après
-  chaque envoi (marqué livré + lu) pour rendre la conversation vivante.
+  chaque envoi (marqué livré + lu) pour rendre la conversation vivante, et
+  déclenche une **notification locale** comme un vrai message entrant.
+- **Notifications locales** de messages entrants (snackbar avec expéditeur,
+  aperçu et bouton « Ouvrir ») : supprimées pour les conversations **muettes**
+  (`mutedFor`), les messages à soi-même et les conversations ouvertes à
+  l'écran — dans les deux modes (serveur et hors-ligne).
 - **Brouillons** par conversation (`drafts.dart`), persistés entre sessions
   (fichier `kite-drafts.json`, TTL 30 jours) ; effacés après l'envoi.
 - Les **appels 1:1 WebRTC** nécessitent la signalisation serveur : hors-ligne,

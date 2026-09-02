@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 
 import 'api.dart';
 import 'call_center.dart';
+import 'message_notifier.dart';
+import 'models.dart';
 import 'offline_api.dart';
 import 'reminder_center.dart';
 import 'server_status.dart';
 import 'screens/home_shell.dart';
 import 'screens/incoming_call_screen.dart';
+import 'screens/conversation_screen.dart';
 import 'theme.dart';
 
 void main() {
@@ -44,6 +47,9 @@ class _KiteAppState extends State<KiteApp> {
     CallCenter.instance.current.addListener(_onIncomingCall);
     ScheduledReminderCenter.instance.start(widget.api);
     ScheduledReminderCenter.instance.next.addListener(_onScheduledReminder);
+    // Notifications locales de messages entrants (ignorées si muettes).
+    MessageNotifier.instance.start(widget.api, meId: widget.api.meId);
+    MessageNotifier.instance.last.addListener(_onMessageNotification);
   }
 
   void _onIncomingCall() {
@@ -68,8 +74,62 @@ class _KiteAppState extends State<KiteApp> {
     ServerStatus.instance.stop();
     CallCenter.instance.current.removeListener(_onIncomingCall);
     ScheduledReminderCenter.instance.next.removeListener(_onScheduledReminder);
+    MessageNotifier.instance.last.removeListener(_onMessageNotification);
+    MessageNotifier.instance.stop();
     super.dispose();
   }
+
+  /// Popup (snackbar) quand un message entrant est notifiable
+  /// (non muet, conversation non ouverte).
+  void _onMessageNotification() {
+    final n = MessageNotifier.instance.last.value;
+    if (n == null) return;
+    MessageNotifier.instance.reset();
+    final ctx = _nav.currentState?.context;
+    if (ctx == null || !ctx.mounted) return;
+    ScaffoldMessenger.of(ctx).hideCurrentSnackBar();
+    ScaffoldMessenger.of(ctx).showSnackBar(
+      SnackBar(
+        duration: const Duration(seconds: 4),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: KiteColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(n.senderName, style: const TextStyle(fontWeight: FontWeight.w700, color: KiteColors.fg)),
+            if (n.chatName.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text(n.chatName, style: const TextStyle(color: KiteColors.muted, fontSize: 12)),
+            ],
+            const SizedBox(height: 4),
+            Text(n.body, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: KiteColors.fg)),
+          ],
+        ),
+        action: SnackBarAction(
+          label: 'Ouvrir',
+          onPressed: () {
+            _openChatById(n.chatId);
+          },
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openChatById(String chatId) async {
+    try {
+      final chats = await (widget.api as dynamic).fetchChats() as List<Chat>;
+      final chat = chats.where((c) => c.id == chatId).firstOrNull;
+      final ctx = _nav.currentState?.context;
+      if (chat == null || ctx == null || !ctx.mounted) return;
+      await Navigator.of(ctx, rootNavigator: true).push(
+        MaterialPageRoute(builder: (_) => ConversationScreen(api: widget.api, chat: chat)),
+      );
+    } catch (_) {
+      // Chat introuvable : notification expirée, on ignore.
+    }
+    }
 
   /// Popup quand un appel planifié arrive dans moins d'une heure (rappel activé).
   void _onScheduledReminder() {
