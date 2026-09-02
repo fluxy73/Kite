@@ -126,6 +126,10 @@ func (a *api) handleWSControl(ctx context.Context, c *wsConn, uid string, data [
 			if !a.store.memberOf(uid, ev.ChatID) {
 				continue
 			}
+			// Sourdine active sur cette conversation : pas d'indicateur de saisie.
+			if ev.Type == "typing" && a.store.mutedForUser(ev.ChatID, uid) {
+				continue
+			}
 			b, _ := json.Marshal(ev)
 			select {
 			case ch <- b:
