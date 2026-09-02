@@ -4,6 +4,7 @@ import 'api.dart';
 import 'call_center.dart';
 import 'offline_api.dart';
 import 'reminder_center.dart';
+import 'server_status.dart';
 import 'screens/home_shell.dart';
 import 'screens/incoming_call_screen.dart';
 import 'theme.dart';
@@ -35,6 +36,9 @@ class _KiteAppState extends State<KiteApp> {
   @override
   void initState() {
     super.initState();
+    // Sonde de connectivité : l'indicateur En ligne / Hors ligne (barre
+    // d'onglets) reflète l'état réel du serveur Go.
+    ServerStatus.instance.start(widget.api);
     // Écoute globale des appels entrants (WebSocket/SSE serveur ou flux local).
     CallCenter.instance.start(widget.api);
     CallCenter.instance.current.addListener(_onIncomingCall);
@@ -61,6 +65,7 @@ class _KiteAppState extends State<KiteApp> {
 
   @override
   void dispose() {
+    ServerStatus.instance.stop();
     CallCenter.instance.current.removeListener(_onIncomingCall);
     ScheduledReminderCenter.instance.next.removeListener(_onScheduledReminder);
     super.dispose();

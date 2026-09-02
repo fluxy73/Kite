@@ -24,15 +24,17 @@ func main() {
 	}))
 	mux.HandleFunc("/api/users", cors(a.handleUsers))
 	mux.HandleFunc("/api/chats", cors(a.handleChats))
-	mux.HandleFunc("/api/chats/", cors(a.handleMessages))
+	mux.HandleFunc("/api/chats/", cors(a.handleChatAction)) // {id}/archive ; /api/chats/{id}/messages routé en interne
 	mux.HandleFunc("/api/messages/", cors(a.handleMessageAction))
 	mux.HandleFunc("/api/events", cors(a.handleEvents))
 	mux.HandleFunc("/api/ws", cors(a.handleWS))
 	mux.HandleFunc("/api/shell", cors(a.handleShell))
 	mux.HandleFunc("/api/calls/log", cors(a.handleCallLog))
 	mux.HandleFunc("/api/calls/initiate", cors(a.handleCallInitiate))
+	mux.HandleFunc("/api/calls/signal", cors(a.handleCallSignal))
 	mux.HandleFunc("/api/contacts/match", cors(a.handleContactMatch))
 	mux.HandleFunc("/api/calls/respond", cors(a.handleCallRespond))
+	mux.HandleFunc("/api/typing", cors(a.handleTyping))
 	mux.HandleFunc("/api/scheduled-calls", cors(a.handleScheduledCalls))
 	mux.HandleFunc("/api/scheduled-calls/", cors(a.handleScheduledCalls))
 
@@ -44,7 +46,7 @@ func main() {
 
 	log.Printf("Kite server — écoute sur http://localhost%s", addr)
 	log.Printf("Données : %s (seed automatique au premier lancement)", dataPath)
-	log.Printf("Endpoints : /api/health · /api/users · /api/chats · /api/chats/{id}/messages · /api/messages/{id}/{react|edit|delete|vote} · /api/shell  · /api/calls/log  · /api/contacts/match · /api/events (SSE) · /api/ws (WebSocket)")
+	log.Printf("Endpoints : /api/health · /api/users · /api/chats · /api/chats/{id}/messages · /api/messages/{id}/{react|edit|delete|vote} · /api/shell  · /api/calls/log  · /api/calls/signal  · /api/contacts/match · /api/events (SSE) · /api/ws (WebSocket)")
 	if err := srv.ListenAndServe(); err != nil {
 		log.Fatalf("serveur: %v", err)
 	}

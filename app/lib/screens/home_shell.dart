@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../api.dart';
 import '../call_center.dart';
 import '../models.dart';
+import '../server_status.dart';
 import '../theme.dart';
 import 'calls_screen.dart';
 import 'chat_list_screen.dart';
@@ -95,6 +96,7 @@ class _HomeShellState extends State<HomeShell> {
     }
 
     final shell = _shell ?? const AppShell();
+    final unreadTotal = shell.chats.fold<int>(0, (sum, c) => sum + c.unread);
     final screens = [
       ChatListScreen(api: widget.api, shell: shell, onRefresh: _load),
       CallsScreen(api: widget.api, shell: shell, onRefresh: _load),
@@ -112,7 +114,7 @@ class _HomeShellState extends State<HomeShell> {
                   ? _twoPaneDiscussions(shell)
                   : IndexedStack(index: _tab - 1, children: screens.skip(1).toList()),
             ),
-            bottomNavigationBar: _tabBar(),
+            bottomNavigationBar: _tabBar(unreadTotal),
           );
         }
         return Scaffold(
@@ -122,7 +124,7 @@ class _HomeShellState extends State<HomeShell> {
               children: screens,
             ),
           ),
-          bottomNavigationBar: _tabBar(),
+          bottomNavigationBar: _tabBar(unreadTotal),
         );
       },
     );
@@ -157,24 +159,32 @@ class _HomeShellState extends State<HomeShell> {
     );
   }
 
-  Widget _tabBar() {
+  Widget _tabBar(int unreadTotal) {
     return Container(
       decoration: const BoxDecoration(
         color: KiteColors.bg,
         border: Border(top: BorderSide(color: KiteColors.border)),
       ),
       padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
+      // L'indicateur est posé en surimpression dans le coin : il ne comprime
+      // jamais les onglets, quelle que soit la largeur d'écran.
+      child: Stack(
         children: [
-          _tabItem(0, Icons.chat_bubble_outline, 'Discussions'),
-          _tabItem(1, Icons.call_outlined, 'Appels'),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _tabItem(0, Icons.chat_bubble_outline, 'Discussions',
+                  badge: unreadTotal > 0 ? '$unreadTotal' : null),
+              _tabItem(1, Icons.call_outlined, 'Appels'),
+            ],
+          ),
+          const Positioned(top: 0, right: 10, child: ConnectionBadge()),
         ],
       ),
     );
   }
 
-  Widget _tabItem(int index, IconData icon, String label) {
+  Widget _tabItem(int index, IconData icon, String label, {String? badge}) {
     final active = _tab == index;
     final color = active ? KiteColors.accent : KiteColors.muted;
     return InkWell(
@@ -184,7 +194,29 @@ class _HomeShellState extends State<HomeShell> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: color, size: 22),
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Icon(icon, color: color, size: 22),
+                if (badge != null)
+                  Positioned(
+                    top: -5,
+                    right: -9,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: KiteColors.danger,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      constraints: const BoxConstraints(minWidth: 16),
+                      child: Text(badge,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                              color: Colors.white, fontSize: 9, fontWeight: FontWeight.w700)),
+                    ),
+                  ),
+              ],
+            ),
             const SizedBox(height: 2),
             Text(label,
                 style: TextStyle(fontSize: 10, color: color, fontWeight: active ? FontWeight.w600 : FontWeight.w400)),

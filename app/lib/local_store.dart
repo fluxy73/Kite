@@ -14,11 +14,15 @@ class LocalStore {
   LocalStore._(this._path);
 
   static LocalStore? _instance;
+  static String? _overridePath; // tests
+
+  /// Chemin de fichier imposé (tests uniquement).
+  static void overridePathForTest(String path) => _overridePath = path;
 
   /// Singleton (le chemin est résolu une seule fois).
   static Future<LocalStore> instance() async {
     if (_instance != null) return _instance!;
-    final path = await _dataFilePath();
+    final path = _overridePath ?? await _dataFilePath();
     final store = LocalStore._(path);
     await store._load();
     _instance = store;
@@ -87,6 +91,15 @@ class LocalStore {
         chats = (decoded['chats'] as List? ?? [])
             .map((e) => Chat.fromJson(e as Map<String, dynamic>))
             .toList();
+        // Nettoyage défensif : une conversation supprimée doit rester
+        // cachée après un redémarrage (le champ est persisté, mais on
+        // garantit l'invariant ici aussi).
+        chats = [
+          for (final c in chats)
+            c.deletedFor.length >= c.memberIds.length
+                ? c.copyWith(deletedFor: const [])
+                : c
+        ];
         calls = (decoded['calls'] as List? ?? [])
             .map((e) => CallLog.fromJson(e as Map<String, dynamic>))
             .toList();
@@ -117,6 +130,9 @@ class LocalStore {
                   'name': c.name,
                   'memberIds': c.memberIds,
                   'adminIds': c.adminIds,
+                  if (c.archived.isNotEmpty) 'archived': c.archived,
+                  if (c.pinned.isNotEmpty) 'pinned': c.pinned,
+                  if (c.deletedFor.isNotEmpty) 'deletedFor': c.deletedFor,
                 })
             .toList(),
         'messages': _messagesByChat.map((k, v) => MapEntry(
@@ -163,6 +179,7 @@ class LocalStore {
         if (m.replyTo != null) 'replyTo': m.replyTo,
         'readBy': m.readBy,
         'deliveredTo': m.deliveredTo,
+        if (m.starredBy.isNotEmpty) 'starredBy': m.starredBy,
       };
 
   Future<void> _persist() async {
@@ -343,8 +360,12 @@ class LocalStore {
   // ---------- Lectures ----------
 
   AppShell shellFor(String meId) {
-    final myChats =
-        chats.where((c) => c.memberIds.contains(meId)).toList();
+    // Même sémantique que le serveur : masque les conversations que
+    // l'utilisateur a supprimées pour lui.
+    final myChats = chats
+        .where((c) =>
+            c.memberIds.contains(meId) && !c.deletedFor.contains(meId))
+        .toList();
     return AppShell(
       users: users,
       chats: myChats,
@@ -382,6 +403,10 @@ class LocalStore {
     );
     final list = _messagesByChat.putIfAbsent(chatId, () => []);
     list.add(m);
+    // Un nouveau message fait renaître la conversation pour ceux qui
+    // l'avaient supprimée (comportement WhatsApp).
+    _mutateChat(chatId, (c) =>
+        c.deletedFor.isEmpty ? c : c.copyWith(deletedFor: const []));
     _persist();
     _changes.add(null);
     return m;
@@ -407,6 +432,65 @@ class LocalStore {
       }
     }
     return null;
+  }
+
+  /// Marque/démarque un message en favori (retourne le nouvel état).
+  bool toggleStar(String messageId, String userId) {
+    final m = messageById(messageId);
+    if (m == null) return false;
+    final starred = !m.starredFor(userId);
+    upsertMessage(m.copyWith(
+      starredBy: starred
+          ? [...m.starredBy, userId]
+          : m.starredBy.where((u) => u != userId).toList(),
+    ));
+    return starred;
+  }
+
+  /// Archive/désarchive une conversation pour l'utilisateur donné.
+  void setArchived(String chatId, String userId, bool archived) {
+    _mutateChat(chatId, (c) {
+      final has = c.archived.contains(userId);
+      if (archived == has) return c;
+      return c.copyWith(
+          archived: archived
+              ? [...c.archived, userId]
+              : c.archived.where((u) => u != userId).toList());
+    });
+  }
+
+  /// Épingle/détache une conversation pour l'utilisateur donné.
+  void setPinned(String chatId, String userId, bool pinned) {
+    _mutateChat(chatId, (c) {
+      final has = c.pinned.contains(userId);
+      if (pinned == has) return c;
+      return c.copyWith(
+          pinned: pinned
+              ? [...c.pinned, userId]
+              : c.pinned.where((u) => u != userId).toList());
+    });
+  }
+
+  /// Supprime la discussion pour cet utilisateur : elle quitte sa liste,
+  /// l'historique et les autres membres sont conservés. Un nouveau message
+  /// la fait renaître (comportement WhatsApp).
+  void deleteChatFor(String chatId, String userId) {
+    _mutateChat(chatId, (c) {
+      if (c.deletedFor.contains(userId)) return c;
+      return c.copyWith(
+        deletedFor: [...c.deletedFor, userId],
+        pinned: c.pinned.where((u) => u != userId).toList(),
+        archived: c.archived.where((u) => u != userId).toList(),
+      );
+    });
+  }
+
+  void _mutateChat(String chatId, Chat Function(Chat) fn) {
+    final idx = chats.indexWhere((c) => c.id == chatId);
+    if (idx < 0) return;
+    chats[idx] = fn(chats[idx]);
+    _persist();
+    _changes.add(null);
   }
 
   bool toggleReaction(String messageId, String userId, String emoji) {
