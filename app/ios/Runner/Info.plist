@@ -4,6 +4,10 @@
 <dict>
 	<key>NSContactsUsageDescription</key>
 	<string>Kite reads your device contacts to find colleagues who use Kite for in-app calls.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Kite uses the camera for video calls.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Kite uses the microphone for calls.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>

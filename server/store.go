@@ -65,6 +65,7 @@ type Chat struct {
 	MemberIDs []string `json:"memberIds"`
 	AdminIDs  []string `json:"adminIds"`
 	CreatedAt int64    `json:"createdAt"`
+	Archived  []string `json:"archived,omitempty"` // userIds ayant archivé cette conversation
 }
 
 type Message struct {
@@ -82,6 +83,7 @@ type Message struct {
 	ReplyTo     string              `json:"replyTo,omitempty"`
 	ReadBy      []string            `json:"readBy,omitempty"`
 	DeliveredTo []string            `json:"deliveredTo,omitempty"`
+	StarredBy   []string            `json:"starredBy,omitempty"` // userIds ayant mis en favori
 }
 
 type Pending struct {
@@ -332,6 +334,83 @@ func (s *Store) respondCall(callID, status string) (*CallRecord, bool) {
 		}
 	}
 	return nil, false
+}
+
+func (s *Store) callByID(id string) (CallRecord, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, c := range s.state.CallRecords {
+		if c.ID == id {
+			return c, true
+		}
+	}
+	return CallRecord{}, false
+}
+
+// toggleStar marque/démarque un message en favori pour un utilisateur.
+func (s *Store) toggleStar(messageID, userID string) ([]string, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i := range s.state.Messages {
+		m := &s.state.Messages[i]
+		if m.ID != messageID {
+			continue
+		}
+		found := false
+		for _, u := range m.StarredBy {
+			if u == userID {
+				found = true
+				break
+			}
+		}
+		if found {
+			out := make([]string, 0, len(m.StarredBy))
+			for _, u := range m.StarredBy {
+				if u != userID {
+					out = append(out, u)
+				}
+			}
+			m.StarredBy = out
+		} else {
+			m.StarredBy = append(m.StarredBy, userID)
+		}
+		_ = s.save()
+		return m.StarredBy, true
+	}
+	return nil, false
+}
+
+// setArchived archive ou désarchive une conversation pour un utilisateur.
+func (s *Store) setArchived(chatID, userID string, archived bool) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i := range s.state.Chats {
+		c := &s.state.Chats[i]
+		if c.ID != chatID {
+			continue
+		}
+		found := false
+		for _, u := range c.Archived {
+			if u == userID {
+				found = true
+				break
+			}
+		}
+		if archived && !found {
+			c.Archived = append(c.Archived, userID)
+		} else if !archived && found {
+			out := make([]string, 0, len(c.Archived))
+			for _, u := range c.Archived {
+				if u != userID {
+					out = append(out, u)
+				}
+			}
+			c.Archived = out
+		}
+		_ = s.save()
+		return true
+	}
+	return false
 }
 
 func (s *Store) addCallLog(c CallLog) CallLog {

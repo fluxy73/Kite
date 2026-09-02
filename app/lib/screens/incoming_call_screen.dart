@@ -2,7 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../api.dart';
 import '../call_center.dart';
+import '../call_engine.dart';
 import '../theme.dart';
 import 'calls_screen.dart';
 
@@ -62,6 +64,23 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
     CallCenter.instance.dismiss();
     if (!mounted) return;
     widget.onAccepted?.call();
+    // Appel 1:1 temps réel (mode serveur) : moteur WebRTC côté appelé —
+    // il répondra à l'offer de l'appelant via la signalisation relayée.
+    if (widget.api is KiteApi && !call.group) {
+      final engine = CallEngine(api: widget.api, callId: call.id);
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          fullscreenDialog: true,
+          builder: (_) => InCallScreen(
+            name: call.callerName,
+            video: call.isVideo,
+            memberNames: const [],
+            engine: engine,
+          ),
+        ),
+      );
+      return;
+    }
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
         builder: (_) => InCallScreen(
@@ -69,6 +88,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
           video: call.isVideo,
           memberNames: const [],
         ),
+        fullscreenDialog: true,
       ),
     );
   }

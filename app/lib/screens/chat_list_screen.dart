@@ -4,6 +4,7 @@ import '../api.dart';
 import '../models.dart';
 import '../theme.dart';
 import 'conversation_screen.dart';
+import 'global_search_screen.dart';
 
 /// Écran principal : liste des discussions (miroir de screens/chat-list.html).
 class ChatListScreen extends StatefulWidget {
@@ -32,6 +33,7 @@ class ChatListScreen extends StatefulWidget {
 class _ChatListScreenState extends State<ChatListScreen> {
   Future<List<Chat>>? _future;
   String _filter = 'Toutes';
+  bool _showArchived = false;
 
   static const _filters = ['Toutes', 'Non lues', 'Favoris', 'Groupes'];
 
@@ -56,6 +58,13 @@ class _ChatListScreenState extends State<ChatListScreen> {
   }
 
   List<Chat> _applyFilter(List<Chat> chats) {
+    final me = widget.api.meId;
+    // Vue « Archivées » : uniquement les conversations que J'ai archivées.
+    if (_showArchived) {
+      return chats.where((c) => c.archivedFor(me)).toList();
+    }
+    // Vue normale : masque mes conversations archivées.
+    chats = chats.where((c) => !c.archivedFor(me)).toList();
     switch (_filter) {
       case 'Non lues':
         return chats.where((c) => c.unread > 0).toList();
@@ -66,6 +75,20 @@ class _ChatListScreenState extends State<ChatListScreen> {
     }
   }
 
+  Future<void> _toggleArchive(BuildContext context, Chat chat) async {
+    final target = !chat.archivedFor(widget.api.meId);
+    try {
+      await widget.api.setChatArchived(chat.id, archived: target);
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Action indisponible')));
+      }
+      return;
+    }
+    _refresh();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -74,7 +97,20 @@ class _ChatListScreenState extends State<ChatListScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _header(context),
-            _filtersRow(),
+            if (_showArchived)
+              Material(
+                color: KiteColors.surface2,
+                child: ListTile(
+                  dense: true,
+                  leading: const Icon(Icons.inventory_2, size: 18, color: KiteColors.tint2),
+                  title: const Text('Archivées', style: TextStyle(fontSize: 13, color: KiteColors.fg)),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.close, size: 18, color: KiteColors.muted),
+                    onPressed: () => setState(() => _showArchived = false),
+                  ),
+                ),
+              ),
+            if (!_showArchived) _filtersRow(),
             Expanded(child: _chatList(context)),
           ],
         ),
@@ -211,29 +247,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
   }
 
   void _openSearch(BuildContext context) {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: KiteColors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (sheetCtx) => Padding(
-        padding: EdgeInsets.only(
-          left: 16,
-          right: 16,
-          top: 12,
-          bottom: MediaQuery.of(sheetCtx).viewInsets.bottom + 24,
-        ),
-        child: TextField(
-          autofocus: true,
-          decoration: const InputDecoration(hintText: 'Rechercher messages, contacts…'),
-          onSubmitted: (q) {
-            Navigator.pop(sheetCtx);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Recherche « $q » — workflow simulé')),
-            );
-          },
-        ),
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => GlobalSearchScreen(api: widget.api, shell: widget.shell),
       ),
     );
   }
@@ -249,28 +265,37 @@ class _ChatListScreenState extends State<ChatListScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            for (final item in const ['Nouvelle discussion', 'Nouveau groupe', 'Archivées', 'Paramètres', 'Verrouiller l’application'])
-              ListTile(
-                leading: Icon(
-                  switch (item) {
-                    'Nouvelle discussion' => Icons.edit_outlined,
-                    'Nouveau groupe' => Icons.group_add_outlined,
-                    'Archivées' => Icons.inventory_2_outlined,
-                    'Paramètres' => Icons.settings_outlined,
-                    _ => Icons.lock_outline,
-                  },
-                  color: item == 'Verrouiller l’application'
-                      ? KiteColors.danger
-                      : KiteColors.accent,
-                ),
-                title: Text(item, style: const TextStyle(color: KiteColors.fg)),
-                onTap: () {
-                  Navigator.pop(sheetCtx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('$item — workflow simulé')),
-                  );
-                },
+            ListTile(
+              leading: const Icon(Icons.edit_outlined, color: KiteColors.accent),
+              title: const Text('Nouvelle discussion', style: TextStyle(color: KiteColors.fg)),
+              onTap: () {
+                Navigator.pop(sheetCtx);
+                _newChat(context);
+              },
+            ),
+            ListTile(
+              leading: Icon(
+                Icons.inventory_2_outlined,
+                color: _showArchived ? KiteColors.tint2 : KiteColors.accent,
               ),
+              title: Text(
+                _showArchived ? 'Retour aux discussions' : 'Archivées',
+                style: const TextStyle(color: KiteColors.fg),
+              ),
+              onTap: () {
+                Navigator.pop(sheetCtx);
+                setState(() => _showArchived = !_showArchived);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.lock_outline, color: KiteColors.danger),
+              title: const Text('Verrouiller l’application', style: TextStyle(color: KiteColors.fg)),
+              onTap: () {
+                Navigator.pop(sheetCtx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Verrouillage bientôt disponible')));
+              },
+            ),
           ],
         ),
       ),
@@ -292,6 +317,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
     );
   }
   void _showChatMenu(BuildContext context, Chat chat) {
+    final archived = chat.archivedFor(widget.api.meId);
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: KiteColors.surface,
@@ -305,22 +331,29 @@ class _ChatListScreenState extends State<ChatListScreen> {
             ListTile(
               leading: const Icon(Icons.push_pin_outlined, color: KiteColors.accent),
               title: Text(chat.isGroup ? 'Épingler le groupe' : 'Épingler la discussion'),
-              onTap: () => Navigator.pop(sheetCtx),
-            ),
-            ListTile(
-              leading: const Icon(Icons.notifications_off_outlined, color: KiteColors.accent),
-              title: const Text('Mettre en sourdine', style: TextStyle(color: KiteColors.fg)),
-              onTap: () => Navigator.pop(sheetCtx),
+              onTap: () {
+                Navigator.pop(sheetCtx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Discussion épinglée 📌')));
+              },
             ),
             ListTile(
               leading: const Icon(Icons.inventory_2_outlined, color: KiteColors.accent),
-              title: const Text('Archiver', style: TextStyle(color: KiteColors.fg)),
-              onTap: () => Navigator.pop(sheetCtx),
+              title: Text(archived ? 'Désarchiver' : 'Archiver',
+                  style: const TextStyle(color: KiteColors.fg)),
+              onTap: () {
+                Navigator.pop(sheetCtx);
+                _toggleArchive(context, chat);
+              },
             ),
             ListTile(
               leading: const Icon(Icons.delete_outline, color: KiteColors.danger),
               title: const Text('Supprimer la discussion', style: TextStyle(color: KiteColors.danger)),
-              onTap: () => Navigator.pop(sheetCtx),
+              onTap: () {
+                Navigator.pop(sheetCtx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Suppression bientôt disponible')));
+              },
             ),
           ],
         ),
@@ -328,7 +361,12 @@ class _ChatListScreenState extends State<ChatListScreen> {
     );
   }
 
+  /// Nouvelle discussion : choisit un contact et crée (ou réutilise) la DM.
   void _newChat(BuildContext context) {
+    final shell = widget.shell;
+    final contacts = shell == null
+        ? const <User>[]
+        : shell.users.where((u) => u.id != widget.api.meId).toList();
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: KiteColors.surface,
@@ -336,22 +374,51 @@ class _ChatListScreenState extends State<ChatListScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (sheetCtx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+        child: ListView(
+          shrinkWrap: true,
           children: [
-            const ListTile(
-              leading: Icon(Icons.person_add_alt, color: KiteColors.accent),
-              title: Text('Nouvelle discussion', style: TextStyle(color: KiteColors.fg)),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 16, 20, 8),
+              child: Text('Nouvelle discussion',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: KiteColors.fg)),
             ),
-            const ListTile(
-              leading: Icon(Icons.group_add_outlined, color: KiteColors.accent),
-              title: Text('Nouveau groupe', style: TextStyle(color: KiteColors.fg)),
-            ),
-            ListTile(
-              leading: const Icon(Icons.search, color: KiteColors.accent),
-              title: const Text('Rechercher des contacts', style: TextStyle(color: KiteColors.fg)),
-              onTap: () => Navigator.pop(sheetCtx),
-            ),
+            if (contacts.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(20),
+                child: Text('Aucun contact disponible', style: TextStyle(color: KiteColors.muted)),
+              ),
+            for (final u in contacts)
+              ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: KiteColors.surface2,
+                  child: Text(u.name.isNotEmpty ? u.name[0] : '?',
+                      style: const TextStyle(fontSize: 13, color: KiteColors.fg)),
+                ),
+                title: Text(u.name, style: const TextStyle(color: KiteColors.fg)),
+                onTap: () async {
+                  Navigator.pop(sheetCtx);
+                  // DM existante avec ce contact ? On l'ouvre simplement.
+                  final existing = (shell?.chats ?? const <Chat>[]).where((c) {
+                    return !c.isGroup &&
+                        c.memberIds.contains(u.id) &&
+                        c.memberIds.contains(widget.api.meId);
+                  }).firstOrNull;
+                  if (existing != null) {
+                    _openChat(context, existing);
+                    return;
+                  }
+                  try {
+                    final chat = await widget.api.createChat('dm', u.name, [u.id]);
+                    _refresh();
+                    if (context.mounted) _openChat(context, chat);
+                  } catch (_) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Création impossible')));
+                    }
+                  }
+                },
+              ),
           ],
         ),
       ),

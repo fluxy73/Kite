@@ -152,6 +152,7 @@ class Chat {
     this.lastMessage,
     this.unread = 0,
     this.online = 0,
+    this.archived = const [],
   });
 
   final String id;
@@ -162,8 +163,12 @@ class Chat {
   final Message? lastMessage;
   final int unread;
   final int online;
+  final List<String> archived; // userIds ayant archivé cette conversation
 
   bool get isGroup => type == 'group';
+
+  /// true si [userId] a archivé cette conversation.
+  bool archivedFor(String userId) => archived.contains(userId);
 
   factory Chat.fromJson(Map<String, dynamic> json) => Chat(
         id: json['id'] as String,
@@ -171,6 +176,7 @@ class Chat {
         name: json['name'] as String,
         memberIds: (json['memberIds'] as List).cast<String>(),
         adminIds: (json['adminIds'] as List? ?? []).cast<String>(),
+        archived: (json['archived'] as List? ?? []).cast<String>(),
         lastMessage: json['lastMessage'] == null
             ? null
             : Message.fromJson(json['lastMessage'] as Map<String, dynamic>),
@@ -195,6 +201,7 @@ class Message {
     this.replyTo,
     this.readBy = const [],
     this.deliveredTo = const [],
+    this.starredBy = const [],
   });
 
   final String id;
@@ -211,6 +218,9 @@ class Message {
   final String? replyTo;
   final List<String> readBy;
   final List<String> deliveredTo;
+  final List<String> starredBy; // userIds ayant mis en favori
+
+  bool starredFor(String userId) => starredBy.contains(userId);
 
   bool isMine(String me) => senderId == me;
 
@@ -264,6 +274,7 @@ class Message {
         replyTo: json['replyTo'] as String?,
         readBy: (json['readBy'] as List? ?? []).cast<String>(),
         deliveredTo: (json['deliveredTo'] as List? ?? []).cast<String>(),
+        starredBy: (json['starredBy'] as List? ?? []).cast<String>(),
       );
 
   static Map<String, List<String>> _reactionsFrom(dynamic raw) {
@@ -317,6 +328,7 @@ extension MessageCopyWith on Message {
     Map<String, List<String>>? reactions,
     List<String>? readBy,
     List<String>? deliveredTo,
+    List<String>? starredBy,
   }) =>
       Message(
         id: id,
@@ -333,5 +345,6 @@ extension MessageCopyWith on Message {
         replyTo: replyTo,
         readBy: readBy ?? this.readBy,
         deliveredTo: deliveredTo ?? this.deliveredTo,
+        starredBy: starredBy ?? this.starredBy,
       );
 }

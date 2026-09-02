@@ -129,6 +129,19 @@ class OfflineApi {
   Future<void> votePoll(String messageId, int optionIndex) async =>
       _s.votePoll(messageId, meId, optionIndex);
 
+  @override
+  Future<bool> toggleStar(String messageId) async =>
+      _s.toggleStar(messageId, meId);
+
+  @override
+  Future<void> setChatArchived(String chatId, {required bool archived}) async {
+    _s.setArchived(chatId, meId, archived);
+  }
+
+  @override
+  Future<void> sendTyping(String chatId) async {}
+  // Hors-ligne, il n'y a personne d'autre à qui signaler la saisie.
+
   // ---------- Appels ----------
 
   Future<void> logCall(String chatId,

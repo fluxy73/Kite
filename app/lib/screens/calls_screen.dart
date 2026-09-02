@@ -1,11 +1,15 @@
 import 'dart:async';
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 
 import '../api.dart';
+import '../call_engine.dart';
 import '../models.dart';
 import '../theme.dart';
+import 'real_call_screen.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart';
 
 /// Onglet Appels : favoris, récents, lien d'appel et appel en cours (timer réel).
 class CallsScreen extends StatelessWidget {
@@ -476,12 +480,27 @@ class CallsScreen extends StatelessWidget {
     }
   }
 
-  /// Démarre un appel (mock) et journalise l'appel dans la conversation (branché serveur).
+  /// Démarre un appel 1:1 réel (WebRTC via la signalisation serveur) quand
+  /// l'API est connectée, sinon appel simulé. Journalise dans la conversation.
   void _contactCall(BuildContext context, String id,
       {required String name, bool group = false, bool video = false}) {
     final chat = shell.chats.where((c) => c.id == id || c.name == name).firstOrNull;
     if (chat != null) {
       api.logCall(chat.id, kind: video ? 'video' : 'audio').catchError((_) => null);
+    }
+    // Appel 1:1 temps réel uniquement en mode serveur et hors groupe.
+    if (!group) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => RealCallScreen(
+            api: api,
+            chatId: chat?.id ?? '',
+            name: name,
+            video: video,
+          ),
+        ),
+      );
+      return;
     }
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -491,6 +510,7 @@ class CallsScreen extends StatelessWidget {
           video: video,
           memberNames: group ? _groupMembers(name) : [name],
         ),
+        fullscreenDialog: true,
       ),
     );
   }
@@ -929,7 +949,16 @@ class InCallScreen extends StatefulWidget {
     this.group = false,
     this.video = false,
     this.memberNames = const [],
+    this.engine,
+    this.isCaller = false,
   });
+
+  /// Appel simulé (hors-ligne / démo) — même écran, sans moteur WebRTC.
+  InCallScreen.simulated({
+    Key? key,
+    required String name,
+    bool video = false,
+  }) : this(key: key, name: name, video: video);
 
   final String name;
   final bool group;
@@ -937,6 +966,12 @@ class InCallScreen extends StatefulWidget {
 
   /// Participants (hors moi) pour la grille d'appel de groupe.
   final List<String> memberNames;
+
+  /// Moteur WebRTC (présent = appel 1:1 temps réel). Absent = rendu simulé.
+  final CallEngine? engine;
+
+  /// true : je suis l'appelant (l'offre part quand l'appelé décroche).
+  final bool isCaller;
 
   @override
   State<InCallScreen> createState() => _InCallScreenState();
@@ -956,7 +991,13 @@ class _InCallScreenState extends State<InCallScreen> {
   int _reactionSeq = 0;
   final List<_Reaction> _reactions = [];
 
+  // WebRTC (appel 1:1 temps réel ; null en mode simulé/groupe/hors-ligne).
+  RTCVideoRenderer? _localRenderer;
+  RTCVideoRenderer? _remoteRenderer;
+
   static const _emojis = ['❤️', '😂', '😮', '😢', '👍', '👏'];
+
+  CallEngine? get _engine => widget.engine;
 
   @override
   void initState() {
@@ -964,19 +1005,93 @@ class _InCallScreenState extends State<InCallScreen> {
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
       setState(() => _elapsed = _sw.elapsed.inSeconds);
     });
+    _initEngine();
+  }
+
+  Future<void> _initEngine() async {
+    final engine = _engine;
+    if (engine == null) return;
+    final local = RTCVideoRenderer();
+    final remote = RTCVideoRenderer();
+    await local.initialize();
+    await remote.initialize();
+    if (!mounted) {
+      await local.dispose();
+      await remote.dispose();
+      return;
+    }
+    setState(() {
+      _localRenderer = local;
+      _remoteRenderer = remote;
+    });
+    engine.state.addListener(_onEngineState);
+    engine.localStream.addListener(_onStreamsChanged);
+    engine.remoteStream.addListener(_onStreamsChanged);
+    if (widget.isCaller) {
+      await engine.startAsCaller(video: widget.video);
+    } else {
+      await engine.startAsCallee(video: widget.video);
+    }
+  }
+
+  void _onStreamsChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _onEngineState() {
+    if (!mounted) return;
+    final st = _engine?.state.value ?? 'idle';
+    if (st == 'connected') {
+      _sw.reset(); // le chrono démarre à la connexion effective
+    }
+    if (st == 'ended') {
+      // L'interlocuteur a raccroché / refusé : on quitte l'écran.
+      Future.delayed(const Duration(milliseconds: 1200), () {
+        if (mounted && Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        }
+      });
+    }
+    setState(() {});
   }
 
   @override
   void dispose() {
     _ticker.cancel();
     _sw.stop();
+    _engine?.state.removeListener(_onEngineState);
+    _localRenderer?.dispose();
+    _remoteRenderer?.dispose();
+    _engine?.dispose();
     super.dispose();
+  }
+
+  void _hangUp() {
+    _engine?.hangUp();
+    if (mounted) Navigator.of(context).pop();
   }
 
   String get _timerText {
     final m = (_elapsed ~/ 60).toString().padLeft(2, '0');
     final s = (_elapsed % 60).toString().padLeft(2, '0');
     return '$m:$s';
+  }
+
+  /// Statut affiché : chrono si connecté, sinon état de connexion WebRTC.
+  String get _statusText {
+    final st = _engine?.state.value ?? 'idle';
+    switch (st) {
+      case 'connected':
+        return _timerText;
+      case 'connecting':
+        return 'Connexion…';
+      case 'failed':
+        return 'Connexion impossible';
+      case 'ended':
+        return 'Appel terminé';
+      default:
+        return _timerText;
+    }
   }
 
   /// Participants affichés : les membres + moi, dans un ordre stable.
@@ -1087,13 +1202,13 @@ class _InCallScreenState extends State<InCallScreen> {
                 Expanded(
                   child: _sharing
                       ? _sharingLayout(participants)
-                      : (widget.video && !widget.group)
+                      : (widget.engine != null || (widget.video && !widget.group))
                           ? _oneToOneLayout(participants)
                           : _gridLayout(participants),
                 ),
                 _controls(),
                 const SizedBox(height: 14),
-                _HangupButton(onTap: () => Navigator.of(context).pop()),
+                _HangupButton(onTap: _hangUp),
                 const SizedBox(height: 16),
                 const Text('🔒 Chiffré de bout en bout',
                     style: TextStyle(color: KiteColors.muted, fontSize: 11)),
@@ -1136,7 +1251,7 @@ class _InCallScreenState extends State<InCallScreen> {
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontSize: 17, fontFamilyFallback: kDisplayFont, fontWeight: FontWeight.w500)),
                 const SizedBox(height: 2),
-                Text(_timerText, style: const TextStyle(color: KiteColors.muted, fontSize: 13)),
+                Text(_statusText, style: const TextStyle(color: KiteColors.muted, fontSize: 13)),
               ],
             ),
           ),
@@ -1178,8 +1293,10 @@ class _InCallScreenState extends State<InCallScreen> {
 
   /// Appel vidéo 1:1 : grande tuile de l'interlocuteur + vignette soi (PiP),
   /// avec options avancées : flou d'arrière-plan et mode portrait.
+  /// Avec un moteur WebRTC : flux vidéo réels (distant + local en PiP).
   Widget _oneToOneLayout(List<String> participants) {
     final remote = participants.firstWhere((p) => p != 'Moi', orElse: () => 'Contact');
+    final real = _localRenderer != null;
     return Stack(
       children: [
         if (_portrait)
@@ -1188,7 +1305,7 @@ class _InCallScreenState extends State<InCallScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 56),
               child: AspectRatio(
                 aspectRatio: 3 / 4,
-                child: _ParticipantTile(
+                child: real ? _remoteVideo() : _ParticipantTile(
                   name: remote,
                   isMe: false,
                   muted: false,
@@ -1202,7 +1319,7 @@ class _InCallScreenState extends State<InCallScreen> {
           Positioned.fill(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
-              child: _ParticipantTile(
+              child: real ? _remoteVideo() : _ParticipantTile(
                 name: remote,
                 isMe: false,
                 muted: false,
@@ -1214,9 +1331,53 @@ class _InCallScreenState extends State<InCallScreen> {
         Positioned(
           right: 14,
           bottom: 14,
-          child: _SelfPip(blur: _blur, muted: _muted, videoOn: _videoOn),
+          child: real
+              ? (widget.video
+                  ? _SelfVideoPip(
+                      renderer: _localRenderer!,
+                      muted: _muted,
+                      videoOn: _videoOn,
+                      blur: _blur,
+                    )
+                  : const SizedBox.shrink())
+              : _SelfPip(blur: _blur, muted: _muted, videoOn: _videoOn),
         ),
       ],
+    );
+  }
+
+  /// Flux vidéo distant (ou placeholder en attente de connexion).
+  Widget _remoteVideo() {
+    final hasVideo = _engine?.remoteStream.value?.getVideoTracks().isNotEmpty ?? false;
+    return Container(
+      decoration: BoxDecoration(
+        color: KiteColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: KiteColors.border),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          if (hasVideo)
+            RTCVideoView(
+              _remoteRenderer!,
+              objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+              mirror: false,
+            )
+          else
+            Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _Avatar(name: widget.name, size: 56),
+                  const SizedBox(height: 10),
+                  Text(_statusText, style: const TextStyle(color: KiteColors.muted, fontSize: 13)),
+                ],
+              ),
+            ),
+        ],
+      ),
     );
   }
 
@@ -1292,18 +1453,25 @@ class _InCallScreenState extends State<InCallScreen> {
   }
 
   Widget _controls() {
+    final engine = _engine;
     final items = [
       _Control(
         icon: _muted ? Icons.mic_off : Icons.mic,
         label: _muted ? 'Activer' : 'Muet',
         active: _muted,
-        onTap: () => setState(() => _muted = !_muted),
+        onTap: () {
+          setState(() => _muted = !_muted);
+          engine?.setMicMuted(_muted);
+        },
       ),
       _Control(
         icon: _speaker ? Icons.volume_up : Icons.volume_off,
         label: 'Haut-parleur',
         active: _speaker,
-        onTap: () => setState(() => _speaker = !_speaker),
+        onTap: () {
+          setState(() => _speaker = !_speaker);
+          Helper.setSpeakerphoneOn(_speaker);
+        },
       ),
       if (widget.video && !widget.group) ...[
         _Control(
@@ -1323,7 +1491,10 @@ class _InCallScreenState extends State<InCallScreen> {
         icon: _videoOn ? Icons.videocam : Icons.videocam_off,
         label: _videoOn ? 'Vidéo' : 'Caméra off',
         active: _videoOn,
-        onTap: () => setState(() => _videoOn = !_videoOn),
+        onTap: () {
+          setState(() => _videoOn = !_videoOn);
+          engine?.setCameraEnabled(_videoOn);
+        },
       ),
       _Control(
         icon: _sharing ? Icons.stop_screen_share : Icons.screen_share,
@@ -1460,6 +1631,56 @@ class _FloatingReaction extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(6),
         child: Text(emoji, style: const TextStyle(fontSize: 34)),
+      ),
+    );
+  }
+}
+
+/// Vignette vidéo « moi » (PiP) — flux local réel du moteur WebRTC,
+/// avec flou d'arrière-plan appliqué au flux (option avancée 1:1).
+class _SelfVideoPip extends StatelessWidget {
+  const _SelfVideoPip({
+    required this.renderer,
+    required this.muted,
+    required this.videoOn,
+    this.blur = false,
+  });
+
+  final RTCVideoRenderer renderer;
+  final bool muted;
+  final bool videoOn;
+  final bool blur;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget video = RTCVideoView(
+      renderer,
+      objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+      mirror: true,
+    );
+    if (blur) {
+      video = ImageFiltered(
+        imageFilter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+        child: video,
+      );
+    }
+    return Container(
+      width: 96,
+      height: 128,
+      decoration: BoxDecoration(
+        color: KiteColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: KiteColors.border),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          if (videoOn) video else const Center(child: Icon(Icons.videocam_off, size: 26, color: KiteColors.muted)),
+          Positioned(left: 6, bottom: 5, child: Text('Moi', style: TextStyle(fontSize: 11, color: KiteColors.fg))),
+          if (muted)
+            const Positioned(top: 6, right: 6, child: Icon(Icons.mic_off, size: 14, color: KiteColors.danger)),
+        ],
       ),
     );
   }

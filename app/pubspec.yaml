@@ -11,6 +11,13 @@ dependencies:
     sdk: flutter
   cupertino_icons: ^1.0.6
   flutter_contacts: ^1.1.9
+  flutter_webrtc: ^0.12.4
+
+# path_provider_foundation >=2.5 uses native-assets build hooks (objective_c),
+# qui échouent avec un chemin de SDK contenant des espaces sur Windows.
+# 2.4.x reste sur les method channels (aucun hook).
+dependency_overrides:
+  path_provider_foundation: 2.4.2
 
 dev_dependencies:
   flutter_test:

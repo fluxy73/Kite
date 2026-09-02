@@ -14,11 +14,15 @@ class LocalStore {
   LocalStore._(this._path);
 
   static LocalStore? _instance;
+  static String? _overridePath; // tests
+
+  /// Chemin de fichier imposé (tests uniquement).
+  static void overridePathForTest(String path) => _overridePath = path;
 
   /// Singleton (le chemin est résolu une seule fois).
   static Future<LocalStore> instance() async {
     if (_instance != null) return _instance!;
-    final path = await _dataFilePath();
+    final path = _overridePath ?? await _dataFilePath();
     final store = LocalStore._(path);
     await store._load();
     _instance = store;
@@ -117,6 +121,7 @@ class LocalStore {
                   'name': c.name,
                   'memberIds': c.memberIds,
                   'adminIds': c.adminIds,
+                  if (c.archived.isNotEmpty) 'archived': c.archived,
                 })
             .toList(),
         'messages': _messagesByChat.map((k, v) => MapEntry(
@@ -163,6 +168,7 @@ class LocalStore {
         if (m.replyTo != null) 'replyTo': m.replyTo,
         'readBy': m.readBy,
         'deliveredTo': m.deliveredTo,
+        if (m.starredBy.isNotEmpty) 'starredBy': m.starredBy,
       };
 
   Future<void> _persist() async {
@@ -407,6 +413,44 @@ class LocalStore {
       }
     }
     return null;
+  }
+
+  /// Marque/démarque un message en favori (retourne le nouvel état).
+  bool toggleStar(String messageId, String userId) {
+    final m = messageById(messageId);
+    if (m == null) return false;
+    final starred = !m.starredFor(userId);
+    upsertMessage(m.copyWith(
+      starredBy: starred
+          ? [...m.starredBy, userId]
+          : m.starredBy.where((u) => u != userId).toList(),
+    ));
+    return starred;
+  }
+
+  /// Archive/désarchive une conversation pour l'utilisateur donné.
+  void setArchived(String chatId, String userId, bool archived) {
+    final idx = chats.indexWhere((c) => c.id == chatId);
+    if (idx < 0) return;
+    final c = chats[idx];
+    final current = c.archived.contains(userId);
+    if (archived == current) return;
+    final updated = Chat(
+      id: c.id,
+      type: c.type,
+      name: c.name,
+      memberIds: c.memberIds,
+      adminIds: c.adminIds,
+      lastMessage: c.lastMessage,
+      unread: c.unread,
+      online: c.online,
+      archived: archived
+          ? [...c.archived, userId]
+          : c.archived.where((u) => u != userId).toList(),
+    );
+    chats[idx] = updated;
+    _persist();
+    _changes.add(null);
   }
 
   bool toggleReaction(String messageId, String userId, String emoji) {

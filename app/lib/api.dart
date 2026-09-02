@@ -44,6 +44,11 @@ class KiteApi {
 
   // ---------- Lecture ----------
 
+  /// Sonde de connectivité : vérifie que le serveur répond.
+  Future<void> pingHealth() async {
+    await _send('GET', '/api/health');
+  }
+
   Future<List<Chat>> fetchChats() async {
     final raw = await _send('GET', '/api/chats', query: {'userId': meId});
     return (raw as List).map((e) => Chat.fromJson(e as Map<String, dynamic>)).toList();
@@ -80,6 +85,15 @@ class KiteApi {
       'kind': kind,
     });
     return (raw as Map).cast<String, dynamic>();
+  }
+
+  /// Relaye un signal WebRTC (offer | answer | ice) aux autres participants.
+  Future<void> sendCallSignal(String callId, String kind, Map<String, dynamic> payload) async {
+    await _send('POST', '/api/calls/signal', query: {'userId': meId}, body: {
+      'callId': callId,
+      'kind': kind,
+      'payload': payload,
+    });
   }
 
   /// Répond à un appel entrant (accepted | declined) — broadcast temps réel.
@@ -150,6 +164,28 @@ class KiteApi {
     await _send('POST', '/api/messages/$messageId/vote', body: {
       'userId': meId,
       'optionIndex': optionIndex,
+    });
+  }
+
+  /// Marque/démarque un message en favori (retourne true si désormais favori).
+  Future<bool> toggleStar(String messageId) async {
+    final raw = await _send('POST', '/api/messages/$messageId/star', body: {
+      'userId': meId,
+    });
+    return ((raw as Map)['starredBy'] as List? ?? []).contains(meId);
+  }
+
+  /// Archive ou désarchive une conversation pour moi.
+  Future<void> setChatArchived(String chatId, {required bool archived}) async {
+    await _send('POST', '/api/chats/$chatId/archive', query: {'userId': meId}, body: {
+      'archived': archived,
+    });
+  }
+
+  /// Notifie les autres membres que je saisis dans cette conversation.
+  Future<void> sendTyping(String chatId) async {
+    await _send('POST', '/api/typing', query: {'userId': meId}, body: {
+      'chatId': chatId,
     });
   }
 

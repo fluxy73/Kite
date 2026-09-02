@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../api.dart';
+import '../drafts.dart';
 import '../models.dart';
 import '../theme.dart';
 
@@ -29,6 +30,13 @@ class _ConversationScreenState extends State<ConversationScreen> {
   Message? _editing;
   StreamSubscription<ServerEvent>? _sse;
 
+  // Indicateur de saisie distant (« Lucas écrit… »).
+  String? _remoteTyping;
+  Timer? _typingClear;
+  Timer? _typingThrottle;
+  // Brouillon local (persisté entre les sessions).
+  String _draft = '';
+
   // Enregistrement vocal simulé
   bool _recording = false;
   int _recSec = 0;
@@ -38,19 +46,51 @@ class _ConversationScreenState extends State<ConversationScreen> {
   final Map<String, _VoicePlayer> _players = {};
   // RSVP d'événements (state local)
   final Set<String> _rsvpYes = {};
-  final Set<String> _rsvpMaybe = {};
-
-  @override
+  final Set<String> _rsvpMaybe = {};  @override
   void initState() {
     super.initState();
+
     _load();
     _sse = widget.api.realtime().listen(_onEvent, onError: (_) {});
+    _loadDraft();
+  }
+
+  Future<void> _loadDraft() async {
+    final d = DraftStore.instance.load(widget.chat.id);
+    if (d.isNotEmpty && mounted) {
+      setState(() {
+        _draft = d;
+        _input.text = d;
+      });
+    }
+  }
+
+  void _onInputChanged(String text) {
+    DraftStore.instance.save(widget.chat.id, text);
+    // Indicateur de saisie : au plus 1 signal toutes les 3 s.
+    if (text.trim().isNotEmpty &&
+        (_typingThrottle == null || !_typingThrottle!.isActive)) {
+      _typingThrottle = Timer(const Duration(seconds: 3), () {});
+      widget.api.sendTyping(widget.chat.id).catchError((_) => null);
+    }
+  }
+
+  void _showRemoteTyping(String name) {
+    if (!mounted) return;
+    setState(() => _remoteTyping = name);
+    _typingClear?.cancel();
+    _typingClear = Timer(const Duration(seconds: 3), () {
+      if (mounted) setState(() => _remoteTyping = null);
+    });
   }
 
   @override
   void dispose() {
+    DraftStore.instance.flushIfNeeded(); // brouillon écrit sur disque
     _sse?.cancel();
     _recTimer?.cancel();
+    _typingClear?.cancel();
+    _typingThrottle?.cancel();
     for (final p in _players.values) {
       p.dispose();
     }
@@ -97,6 +137,10 @@ class _ConversationScreenState extends State<ConversationScreen> {
     if (!mounted) return;
     final data = ev.data;
     switch (ev.type) {
+      case 'typing':
+        if (data['chatId']?.toString() == widget.chat.id) {
+          _showRemoteTyping(data['name']?.toString() ?? 'Quelqu\u2019un');
+        }
       case 'message':
         _upsert(Message.fromJson(data));
       case 'pending':
@@ -197,6 +241,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
         _input.clear();
         _replyTo = null;
       });
+      DraftStore.instance.clear(widget.chat.id); // envoi réussi : brouillon parti
     } catch (e) {
       _toast('Message non envoyé — réessayer ?\n$e');
     }
@@ -461,6 +506,12 @@ class _ConversationScreenState extends State<ConversationScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (_remoteTyping != null)
+            Padding(
+              padding: const EdgeInsets.only(left: 20, bottom: 4),
+              child: Text('✍ $_remoteTyping écrit…',
+                  style: const TextStyle(color: KiteColors.tint2, fontSize: 12)),
+            ),
           if (_replyTo != null) _replyBar(_replyTo!),
           if (_editing != null) _editBar(_editing!),
           if (_recording)
@@ -480,7 +531,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                     focusNode: _inputFocus,
                     minLines: 1,
                     maxLines: 5,
-                    onChanged: (_) => setState(() {}),
+                    onChanged: _onInputChanged,
                     onSubmitted: (_) => _send(),
                     style: const TextStyle(color: KiteColors.fg),
                     decoration: InputDecoration(
@@ -658,7 +709,12 @@ class _ConversationScreenState extends State<ConversationScreen> {
             if (copyable) _menuItem(sheetCtx, Icons.copy_outlined, 'Copier', () => _copyText(m.text)),
             if (mine && copyable) _menuItem(sheetCtx, Icons.edit_outlined, 'Modifier', () => _startEdit(m)),
             _menuItem(sheetCtx, Icons.push_pin_outlined, 'Épingler', () => _toast('Message épinglé 📌')),
-            _menuItem(sheetCtx, Icons.star_border, 'Ajouter aux favoris', () => _toast('Ajouté aux favoris ⭐')),
+            _menuItem(
+              sheetCtx,
+              m.starredFor(widget.api.meId) ? Icons.star : Icons.star_border,
+              m.starredFor(widget.api.meId) ? 'Retirer des favoris' : 'Ajouter aux favoris',
+              () => _toggleStar(m),
+            ),
             _menuItem(sheetCtx, Icons.info_outline, 'Informations', () => _showInfo(context, m)),
             _menuItem(
               sheetCtx,
@@ -670,6 +726,27 @@ class _ConversationScreenState extends State<ConversationScreen> {
         ),
       ),
     );
+  }
+
+  /// Favori : appel l'API (serveur ou locale) et met à jour le message.
+  Future<void> _toggleStar(Message m) async {
+    try {
+      final nowStarred = await widget.api.toggleStar(m.id);
+      final idx = _messages.indexWhere((e) => e.id == m.id);
+      if (idx >= 0 && mounted) {
+        final starred = List<String>.from(_messages[idx].starredBy);
+        setState(() {
+          _messages[idx] = _messages[idx].copyWith(
+            starredBy: nowStarred
+                ? [...starred, widget.api.meId]
+                : starred.where((u) => u != widget.api.meId).toList(),
+          );
+        });
+      }
+      _toast(nowStarred ? 'Ajouté aux favoris ⭐' : 'Retiré des favoris');
+    } catch (_) {
+      _toast('Action indisponible');
+    }
   }
 
   Widget _menuItem(BuildContext ctx, IconData icon, String label, VoidCallback onTap) {

@@ -460,8 +460,8 @@ func (a *api) handleCallRespond(w http.ResponseWriter, r *http.Request) {
 		httpError(w, 400, "corps invalide: "+err.Error())
 		return
 	}
-	if body.Status != "accepted" && body.Status != "declined" && body.Status != "missed" {
-		httpError(w, 400, "status doit être accepted, declined ou missed")
+	if body.Status != "accepted" && body.Status != "declined" && body.Status != "missed" && body.Status != "ended" {
+		httpError(w, 400, "status doit être accepted, declined, missed ou ended")
 		return
 	}
 	updated, ok := a.store.respondCall(body.CallID, body.Status)
@@ -489,6 +489,49 @@ func (a *api) handleCallRespond(w http.ResponseWriter, r *http.Request) {
 	}
 	a.hub.broadcastToUsers(chat.MemberIDs, Event{Type: "call_respond", ChatID: updated.ChatID, Data: mustJSON(updated)})
 	wJSON(w, 200, updated)
+}// handleCallSignal relaie la signalisation WebRTC (offer/answer/ICE) entre
+// les participants d'un appel existant via le hub temps réel.
+func (a *api) handleCallSignal(w http.ResponseWriter, r *http.Request) {
+	uid, ok := a.userOrError(w, r)
+	if !ok {
+		return
+	}
+	var body struct {
+		CallID  string          `json:"callId"`
+		Kind    string          `json:"kind"` // offer | answer | ice
+		Payload json.RawMessage `json:"payload"`
+	}
+	if err := readJSON(r, &body); err != nil {
+		httpError(w, 400, "corps invalide: "+err.Error())
+		return
+	}
+	c, ok := a.store.callByID(body.CallID)
+	if !ok {
+		httpError(w, 404, "appel introuvable")
+		return
+	}
+	chat, ok := a.store.chatByID(c.ChatID)
+	if !ok || !inSlice(chat.MemberIDs, uid) {
+		httpError(w, 403, "pas membre de cette conversation")
+		return
+	}
+	if body.Kind != "offer" && body.Kind != "answer" && body.Kind != "ice" {
+		httpError(w, 400, "kind doit être offer, answer ou ice")
+		return
+	}
+	targets := []string{}
+	for _, m := range chat.MemberIDs {
+		if m != uid {
+			targets = append(targets, m)
+		}
+	}
+	a.hub.broadcastToUsers(targets, Event{Type: "call_signal", ChatID: c.ChatID, Data: mustJSON(map[string]any{
+		"callId": body.CallID,
+		"kind":   body.Kind,
+		"from":   uid,
+		"payload": body.Payload,
+	})})
+	wJSON(w, 200, map[string]bool{"relayed": true})
 }
 
 // ---------- SSE (temps réel + messages en attente) ----------
@@ -648,7 +691,87 @@ func (a *api) handleMessageAction(w http.ResponseWriter, r *http.Request) {
 		a.hub.broadcastToUsers(chat.MemberIDs, Event{Type: "vote", ChatID: m.ChatID, Data: mustJSON(map[string]any{"id": msgID, "media": updated.Media})})
 		wJSON(w, 200, map[string]any{"id": msgID, "media": updated.Media})
 
+	case "star":
+		starred, ok := a.store.toggleStar(msgID, uid)
+		if !ok {
+			httpError(w, 404, "message introuvable")
+			return
+		}
+		// Favori personnel : pas de broadcast (les autres ne sont pas concernés).
+		wJSON(w, 200, map[string]any{"id": msgID, "starredBy": starred})
+
 	default:
 		httpError(w, 404, "action inconnue")
 	}
+}
+
+// handleChatAction route /api/chats/{id}/... : messages vers le handler
+// existant, {id}/archive vers l'action d'archivage.
+func (a *api) handleChatAction(w http.ResponseWriter, r *http.Request) {
+	if strings.HasSuffix(r.URL.Path, "/messages") {
+		a.handleMessages(w, r)
+		return
+	}
+	uid, ok := a.userOrError(w, r)
+	if !ok {
+		return
+	}
+	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/chats/"), "/")
+	if len(parts) != 2 || parts[1] != "archive" {
+		httpError(w, 404, "action inconnue")
+		return
+	}
+	chatID := parts[0]
+	if !a.store.memberOf(uid, chatID) {
+		httpError(w, 403, "pas membre de cette conversation")
+		return
+	}
+	var body struct {
+		Archived bool `json:"archived"`
+	}
+	if err := readJSON(r, &body); err != nil {
+		httpError(w, 400, "corps invalide: "+err.Error())
+		return
+	}
+	if !a.store.setArchived(chatID, uid, body.Archived) {
+		httpError(w, 404, "conversation introuvable")
+		return
+	}
+	wJSON(w, 200, map[string]any{"id": chatID, "archived": body.Archived})
+}
+
+// handleTyping relaie l'indicateur de saisie (éphémère, sans log de replay).
+func (a *api) handleTyping(w http.ResponseWriter, r *http.Request) {
+	uid, ok := a.userOrError(w, r)
+	if !ok {
+		return
+	}
+	var body struct {
+		ChatID string `json:"chatId"`
+	}
+	if err := readJSON(r, &body); err != nil || body.ChatID == "" {
+		httpError(w, 400, "chatId requis")
+		return
+	}
+	if !a.store.memberOf(uid, body.ChatID) {
+		httpError(w, 403, "pas membre de cette conversation")
+		return
+	}
+	name := uid
+	if u, ok := a.store.userByID(uid); ok {
+		name = u.Name
+	}
+	chat, ok := a.store.chatByID(body.ChatID)
+	if !ok {
+		httpError(w, 404, "conversation introuvable")
+		return
+	}
+	targets := []string{}
+	for _, m := range chat.MemberIDs {
+		if m != uid {
+			targets = append(targets, m)
+		}
+	}
+	a.hub.broadcastToUsers(targets, Event{Type: "typing", ChatID: body.ChatID, Data: mustJSON(map[string]string{"chatId": body.ChatID, "userId": uid, "name": name})})
+	wJSON(w, 200, map[string]bool{"ok": true})
 }
