@@ -79,10 +79,17 @@ Sans `KITE_API`, l'app est **autonome** — aucun serveur requis :
   que le serveur). Un **écho simulé** d'un correspondant arrive ~3 s après
   chaque envoi (marqué livré + lu) pour rendre la conversation vivante, et
   déclenche une **notification locale** comme un vrai message entrant.
-- **Notifications locales** de messages entrants (snackbar avec expéditeur,
-  aperçu et bouton « Ouvrir ») : supprimées pour les conversations **muettes**
-  (`mutedFor`), les messages à soi-même et les conversations ouvertes à
-  l'écran — dans les deux modes (serveur et hors-ligne).
+- **Notifications locales** de messages entrants : supprimées pour les
+  conversations **muettes** (`mutedFor`), les messages à soi-même et les
+  conversations ouvertes à l'écran — dans les deux modes (serveur et
+  hors-ligne).
+- **Bannière OS en arrière-plan** (`flutter_local_notifications`) : quand
+  l'app n'est pas au premier plan, la notification part en alerte système
+  (toast Windows, canal Android « Messages » haute importance, iOS/macOS/
+  Linux) avec demande de permission ; un appui sur la bannière ouvre la
+  conversation (et efface la bannière). Au premier plan : snackbar in-app.
+  Si le plugin ou la permission est indisponible, bascule silencieuse en
+  snackbars seuls — jamais de crash.
 - **Brouillons** par conversation (`drafts.dart`), persistés entre sessions
   (fichier `kite-drafts.json`, TTL 30 jours) ; effacés après l'envoi.
 - Les **appels 1:1 WebRTC** nécessitent la signalisation serveur : hors-ligne,

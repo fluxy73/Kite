@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart' show AppLifecycleState, WidgetsBinding;
 
 import 'models.dart';
 
@@ -44,6 +45,11 @@ class MessageNotifier {
   String? _meId;
   dynamic _api;
 
+  /// Affichage OS injectable (bannière système). Fourni par main.dart quand
+  /// OsNotifications est disponible ; null = snackbars in-app uniquement
+  /// (mode dégradé, tests).
+  Future<void> Function(MessageNotification)? osShow;
+
   void start(dynamic api, {String? meId}) {
     if (_sub != null) return; // déjà démarré
     _api = api;
@@ -86,14 +92,32 @@ class MessageNotifier {
     if (_openChats.contains(m.chatId)) return; // conversation à l'écran
     final chat = await _chat(m.chatId);
     if (chat == null) return;
-    // Sourdine active : aucune notification.
+    // Sourdine active : aucune notification (ni OS ni in-app).
     if (chat.mutedFor(_meId ?? '')) return;
-    last.value = MessageNotification(
+    final n = MessageNotification(
       chatId: chat.id,
       message: m,
       chatName: chat.name.isNotEmpty ? chat.name : _otherName(chat),
       senderName: _userNames[m.senderId] ?? m.senderId,
     );
+    // Routage : app en arrière-plan + OS disponible → bannière système ;
+    // app au premier plan (ou OS indisponible) → snackbar in-app.
+    if (osShow != null && !_isResumed()) {
+      await osShow!(n);
+    } else {
+      last.value = n;
+    }
+  }
+
+  /// true si l'app est au premier plan. Sans binding (tests, embedding
+  /// particulier) : traité comme arrière-plan → voie OS si disponible.
+  bool _isResumed() {
+    try {
+      return WidgetsBinding.instance.lifecycleState ==
+          AppLifecycleState.resumed;
+    } catch (_) {
+      return false;
+    }
   }
 
   String _otherName(Chat chat) {
