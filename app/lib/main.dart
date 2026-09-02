@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'api.dart';
@@ -5,6 +7,7 @@ import 'call_center.dart';
 import 'message_notifier.dart';
 import 'models.dart';
 import 'offline_api.dart';
+import 'os_notifications.dart';
 import 'reminder_center.dart';
 import 'server_status.dart';
 import 'screens/home_shell.dart';
@@ -47,9 +50,11 @@ class _KiteAppState extends State<KiteApp> {
     CallCenter.instance.current.addListener(_onIncomingCall);
     ScheduledReminderCenter.instance.start(widget.api);
     ScheduledReminderCenter.instance.next.addListener(_onScheduledReminder);
-    // Notifications locales de messages entrants (ignorées si muettes).
+    // Notifications locales de messages entrants (ignorées si muettes) :
+    // bannière OS en arrière-plan, snackbar in-app en premier plan.
     MessageNotifier.instance.start(widget.api, meId: widget.api.meId);
     MessageNotifier.instance.last.addListener(_onMessageNotification);
+    _initOsNotifications();
   }
 
   void _onIncomingCall() {
@@ -76,11 +81,23 @@ class _KiteAppState extends State<KiteApp> {
     ScheduledReminderCenter.instance.next.removeListener(_onScheduledReminder);
     MessageNotifier.instance.last.removeListener(_onMessageNotification);
     MessageNotifier.instance.stop();
+    _osTapSub?.cancel();
     super.dispose();
   }
 
-  /// Popup (snackbar) quand un message entrant est notifiable
-  /// (non muet, conversation non ouverte).
+  Future<void> _initOsNotifications() async {
+    await OsNotifications.instance.init();
+    if (!OsNotifications.instance.available) return;
+    // Bannière OS activée : le notifier route en fonction du cycle de vie.
+    MessageNotifier.instance.osShow = OsNotifications.instance.show;
+    // Appui sur une bannière → ouvrir la conversation.
+    _osTapSub = OsNotifications.instance.taps.listen(_openChatById);
+  }
+
+  StreamSubscription<String>? _osTapSub;
+
+  /// Popup (snackbar) quand un message entrant est notifiable au premier
+  /// plan (non muet, conversation non ouverte).
   void _onMessageNotification() {
     final n = MessageNotifier.instance.last.value;
     if (n == null) return;
@@ -123,13 +140,14 @@ class _KiteAppState extends State<KiteApp> {
       final chat = chats.where((c) => c.id == chatId).firstOrNull;
       final ctx = _nav.currentState?.context;
       if (chat == null || ctx == null || !ctx.mounted) return;
+      OsNotifications.instance.cancelForChat(chatId);
       await Navigator.of(ctx, rootNavigator: true).push(
         MaterialPageRoute(builder: (_) => ConversationScreen(api: widget.api, chat: chat)),
       );
     } catch (_) {
       // Chat introuvable : notification expirée, on ignore.
     }
-    }
+  }
 
   /// Popup quand un appel planifié arrive dans moins d'une heure (rappel activé).
   void _onScheduledReminder() {
