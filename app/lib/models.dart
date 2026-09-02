@@ -155,6 +155,7 @@ class Chat {
     this.archived = const [],
     this.pinned = const [],
     this.deletedFor = const [],
+    this.mutes = const {},
   });
 
   final String id;
@@ -168,6 +169,7 @@ class Chat {
   final List<String> archived; // userIds ayant archivé cette conversation
   final List<String> pinned; // userIds ayant épinglé cette conversation
   final List<String> deletedFor; // userIds ayant supprimé la discussion pour eux
+  final Map<String, int> mutes; // userId -> expiration de la sourdine (epoch ms)
 
   bool get isGroup => type == 'group';
 
@@ -180,11 +182,19 @@ class Chat {
   /// true si [userId] a supprimé la discussion (pour lui).
   bool deletedForUser(String userId) => deletedFor.contains(userId);
 
+  /// true si la sourdine de [userId] est active (expiration future).
+  bool mutedFor(String userId, [int? nowMs]) {
+    final until = mutes[userId];
+    if (until == null) return false;
+    return until > (nowMs ?? DateTime.now().millisecondsSinceEpoch);
+  }
+
   Chat copyWith({
     String? name,
     List<String>? archived,
     List<String>? pinned,
     List<String>? deletedFor,
+    Map<String, int>? mutes,
   }) =>
       Chat(
         id: id,
@@ -198,6 +208,7 @@ class Chat {
         archived: archived ?? this.archived,
         pinned: pinned ?? this.pinned,
         deletedFor: deletedFor ?? this.deletedFor,
+        mutes: mutes ?? this.mutes,
       );
 
   factory Chat.fromJson(Map<String, dynamic> json) => Chat(
@@ -209,6 +220,8 @@ class Chat {
         archived: (json['archived'] as List? ?? []).cast<String>(),
         pinned: (json['pinned'] as List? ?? []).cast<String>(),
         deletedFor: (json['deletedFor'] as List? ?? []).cast<String>(),
+        mutes: (json['mutes'] as Map? ?? {})
+            .map((k, v) => MapEntry(k as String, (v as num).toInt())),
         lastMessage: json['lastMessage'] == null
             ? null
             : Message.fromJson(json['lastMessage'] as Map<String, dynamic>),

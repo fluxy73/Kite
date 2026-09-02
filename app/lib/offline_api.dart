@@ -142,6 +142,10 @@ class OfflineApi {
 
   Future<void> deleteChat(String chatId) async => _s.deleteChatFor(chatId, meId);
 
+  Future<void> setChatMuted(String chatId, {String? duration}) async {
+    _s.setMute(chatId, meId, duration);
+  }
+
   Future<void> sendTyping(String chatId) async {}
   // Hors-ligne, il n'y a personne d'autre à qui signaler la saisie.
 

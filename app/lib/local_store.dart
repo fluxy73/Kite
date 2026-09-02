@@ -133,6 +133,7 @@ class LocalStore {
                   if (c.archived.isNotEmpty) 'archived': c.archived,
                   if (c.pinned.isNotEmpty) 'pinned': c.pinned,
                   if (c.deletedFor.isNotEmpty) 'deletedFor': c.deletedFor,
+                  if (c.mutes.isNotEmpty) 'mutes': c.mutes,
                 })
             .toList(),
         'messages': _messagesByChat.map((k, v) => MapEntry(
@@ -481,7 +482,32 @@ class LocalStore {
         deletedFor: [...c.deletedFor, userId],
         pinned: c.pinned.where((u) => u != userId).toList(),
         archived: c.archived.where((u) => u != userId).toList(),
+        mutes: const {},
       );
+    });
+  }
+
+  /// Sourdine personnelle avec expiration (même sémantique que le serveur :
+  /// [duration] 8h | 1w | always, ou null pour démuter).
+  void setMute(String chatId, String userId, String? duration) {
+    _mutateChat(chatId, (c) {
+      final mutes = {...c.mutes};
+      if (duration == null) {
+        mutes.remove(userId);
+      } else {
+        final now = DateTime.now().millisecondsSinceEpoch;
+        switch (duration) {
+          case '8h':
+            mutes[userId] = now + 8 * 3600 * 1000;
+          case '1w':
+            mutes[userId] = now + 7 * 24 * 3600 * 1000;
+          case 'always':
+            mutes[userId] = 0x7fffffffffffff; // ~ praticamente jamais
+          default:
+            return c;
+        }
+      }
+      return c.copyWith(mutes: mutes);
     });
   }
 

@@ -68,6 +68,8 @@ type Chat struct {
 	Archived   []string `json:"archived,omitempty"`   // userIds ayant archivé cette conversation
 	Pinned     []string `json:"pinned,omitempty"`     // userIds ayant épinglé cette conversation
 	DeletedFor []string `json:"deletedFor,omitempty"` // userIds ayant supprimé la discussion pour eux
+	// Mutes : expiration du sourdine par utilisateur (0 = pas muet).
+	Mutes map[string]int64 `json:"mutes,omitempty"`
 }
 
 type Message struct {
@@ -435,9 +437,13 @@ func (s *Store) deleteChatFor(chatID, userID string) bool {
 		if !inSlice(c.DeletedFor, userID) {
 			c.DeletedFor = append(c.DeletedFor, userID)
 		}
-		// Épinglage et archivage personnels : nettoyés avec la suppression.
+		// Épinglage, archivage et sourdine personnels : nettoyés avec la
+		// suppression.
 		c.Pinned = removeFromSlice(c.Pinned, userID)
 		c.Archived = removeFromSlice(c.Archived, userID)
+		if c.Mutes != nil {
+			delete(c.Mutes, userID)
+		}
 		_ = s.save()
 		return true
 	}
@@ -470,6 +476,32 @@ func (s *Store) setArchived(chatID, userID string, archived bool) bool {
 				}
 			}
 			c.Archived = out
+		}
+		_ = s.save()
+		return true
+	}
+	return false
+}
+
+// SetMute rend muet (until > now) ou démute (until <= 0) une conversation
+// pour un utilisateur.
+func (s *Store) SetMute(chatID, userID string, until int64) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i := range s.state.Chats {
+		c := &s.state.Chats[i]
+		if c.ID != chatID {
+			continue
+		}
+		if until <= 0 {
+			if c.Mutes != nil {
+				delete(c.Mutes, userID)
+			}
+		} else {
+			if c.Mutes == nil {
+				c.Mutes = map[string]int64{}
+			}
+			c.Mutes[userID] = until
 		}
 		_ = s.save()
 		return true

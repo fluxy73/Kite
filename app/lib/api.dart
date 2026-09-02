@@ -195,6 +195,13 @@ class KiteApi {
     await _send('POST', '/api/chats/$chatId/delete', query: {'userId': meId});
   }
 
+  /// Rend muette la conversation pour moi jusqu'à l'expiration donnée
+  /// ([duration] : 8h | 1w | always), ou démute (duration: null).
+  Future<void> setChatMuted(String chatId, {String? duration}) async {
+    await _send('POST', '/api/chats/$chatId/mute', query: {'userId': meId},
+        body: {'duration': duration ?? 'off'});
+  }
+
   /// Notifie les autres membres que je saisis dans cette conversation.
   Future<void> sendTyping(String chatId) async {
     await _send('POST', '/api/typing', query: {'userId': meId}, body: {
