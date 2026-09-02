@@ -102,6 +102,8 @@ func (a *api) handleChats(w http.ResponseWriter, r *http.Request) {
 		chats := a.store.chatsFor(uid)
 		out := make([]chatSummary, 0, len(chats))
 		for _, c := range chats {
+			// Réglages personnels uniquement (voir scopedSettings).
+			c = scopedSettings(c, uid)
 			cs := chatSummary{Chat: c, Unread: a.store.unreadCount(c.ID, uid)}
 			if lm := a.store.lastMessage(c.ID); lm != nil {
 				cs.LastMessage = lm
@@ -208,12 +210,37 @@ func (a *api) handleShell(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	chats := a.store.chatsFor(uid)
+	for i := range chats {
+		chats[i] = scopedSettings(chats[i], uid)
+	}
 	wJSON(w, 200, map[string]any{
 		"users":          a.store.state.Users,
-		"chats":          a.store.chatsFor(uid),
+		"chats":          chats,
 		"calls":          a.store.state.Calls,
 		"scheduledCalls": a.store.scheduledCallsFor(uid),
 	})
+}
+
+// scopedSettings ne conserve dans le chat que les réglages personnels du
+// demandeur (sourdine, préférences de notification) — ceux des autres
+// membres ne le concernent pas et ne doivent pas lui être sérialisés.
+func scopedSettings(c Chat, uid string) Chat {
+	if c.Mutes != nil {
+		if u, ok := c.Mutes[uid]; ok {
+			c.Mutes = map[string]int64{uid: u}
+		} else {
+			c.Mutes = nil
+		}
+	}
+	if c.Notifs != nil {
+		if p, ok := c.Notifs[uid]; ok {
+			c.Notifs = map[string]NotifPrefs{uid: p}
+		} else {
+			c.Notifs = nil
+		}
+	}
+	return c
 }
 
 // handleContactMatch matcht Geräte-Kontakte (Namen + Telefonnummern) gegen
