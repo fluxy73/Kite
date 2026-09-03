@@ -182,13 +182,23 @@ screens/      maquettes HTML historiques
 
 Détails du protocole (formats JSON, événements, codes HTTP) : voir `PROTOCOL.md`.
 
+## Historique des livraisons
+
+| Version | Contenu | PRs |
+|---|---|---|
+| [v0.1.0](https://github.com/fluxy73/Kite/releases/tag/v0.1.0) | Première version complète : messagerie hors-ligne d'abord, serveur Go optionnel, appels 1:1 WebRTC réels, écrans Discussions/Appels, mise en page adaptative (2 panneaux sur grand écran) | #14 |
+| [v0.1.1](https://github.com/fluxy73/Kite/releases/tag/v0.1.1) | Sourdine par conversation avec expiration (`8h` / `1w` / `always`), persistée côté serveur comme pin/archive | #15 |
+| [v0.1.2](https://github.com/fluxy73/Kite/releases/tag/v0.1.2) | Sourdine : badge non-lus masqué + indicateur de saisie supprimé (live, relecture SSE et WS) ; notifications locales des messages entrants, respect de la sourdine, y compris hors-ligne (échos simulés notifiés) | #16, #17 |
+| [v0.1.3](https://github.com/fluxy73/Kite/releases/tag/v0.1.3) | Bannières OS en arrière-plan (`flutter_local_notifications`, Android/iOS/macOS/Windows/Linux, repli snackbars) ; préférences de notification par conversation (priorité, son, aperçu) ; correction de vie privée : les réglages d'un membre ne sont plus sérialisés aux autres | #18, #19 |
+
 ## Roadmap / Fonctionnalités à venir
 
 Fonctionnalités prévues (non implémentées aujourd'hui) :
 
 **Communication réelle**
 - Chiffrement de bout en bout réel (clés, sessions).
-- Notifications push (appels entrants et messages hors app).
+- Notifications push réelles (FCM/APNs) quand l'app est fermée — les
+  bannières OS de v0.1.3 couvrent l'app vivante en arrière-plan.
 - Serveur TURN pour les appels WebRTC derrière NAT strict.
 - Appels de groupe en WebRTC (mesh ou SFU) — actuellement simulés.
 
