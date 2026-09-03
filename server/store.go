@@ -114,7 +114,10 @@ type State struct {
 	Calls          []CallLog       `json:"calls"`
 	CallRecords    []CallRecord    `json:"callRecords"`
 	ScheduledCalls []ScheduledCall `json:"scheduledCalls"`
-	SeedVersion    int             `json:"seedVersion"`
+	// NotifDefaults : défauts de notification globaux par utilisateur
+	// (toutes ses conversations sans préférence propre).
+	NotifDefaults map[string]NotifPrefs `json:"notifDefaults,omitempty"`
+	SeedVersion   int                   `json:"seedVersion"`
 }
 
 // seedVersion is bumped whenever the shape of seedState() changes, so an
@@ -505,6 +508,30 @@ func (s *Store) setArchived(chatID, userID string, archived bool) bool {
 		return true
 	}
 	return false
+}
+
+// SetNotifDefaults enregistre les défauts de notification globaux de userID
+// (prefs vide = remise aux défauts de l'app).
+func (s *Store) SetNotifDefaults(userID string, prefs NotifPrefs) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.state.NotifDefaults == nil {
+		s.state.NotifDefaults = map[string]NotifPrefs{}
+	}
+	if prefs.Priority == "" && prefs.Sound == nil && prefs.Preview == nil {
+		delete(s.state.NotifDefaults, userID)
+	} else {
+		s.state.NotifDefaults[userID] = prefs
+	}
+	_ = s.save()
+}
+
+// notifDefaultsFor retourne les défauts de notification globaux de userID
+// (valeur zéro s'ils ne sont pas définis).
+func (s *Store) notifDefaultsFor(userID string) NotifPrefs {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.state.NotifDefaults[userID]
 }
 
 // mutedForUser indique si la sourdine de userID est active sur chatID.

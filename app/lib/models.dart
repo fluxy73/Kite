@@ -119,12 +119,17 @@ class AppShell {
     this.chats = const [],
     this.calls = const [],
     this.scheduledCalls = const [],
+    this.notifDefaults = const NotifPrefs(),
   });
 
   final List<User> users;
   final List<Chat> chats;
   final List<CallLog> calls;
   final List<ScheduledCall> scheduledCalls;
+
+  /// Défauts de notification globaux de l'utilisateur (pour toutes les
+  /// conversations sans préférence propre).
+  final NotifPrefs notifDefaults;
 
   factory AppShell.fromJson(Map<String, dynamic> json) => AppShell(
         users: (json['users'] as List? ?? [])
@@ -139,6 +144,9 @@ class AppShell {
         scheduledCalls: (json['scheduledCalls'] as List? ?? [])
             .map((e) => ScheduledCall.fromJson(e as Map<String, dynamic>))
             .toList(),
+        notifDefaults: json['notifDefaults'] == null
+            ? const NotifPrefs()
+            : NotifPrefs.fromJson(json['notifDefaults'] as Map<String, dynamic>),
       );
 }
 
@@ -161,6 +169,15 @@ class NotifPrefs {
   /// true si aucun réglage n'est positionné (remise aux défauts).
   bool get isEmpty =>
       priority == null && sound == null && preview == null;
+
+  /// Chaîne de résolution : chaque champ de ces préférences prime s'il est
+  /// positionné, sinon la valeur de [base] (défauts globaux), sinon le
+  /// défaut intégré (son on, aperçu on, priorité normale).
+  NotifPrefs resolveWith(NotifPrefs base) => NotifPrefs(
+        priority: priority ?? base.priority,
+        sound: sound ?? base.sound,
+        preview: preview ?? base.preview,
+      );
 
   NotifPrefs copyWith({NotifPriority? priority, bool? sound, bool? preview}) =>
       NotifPrefs(

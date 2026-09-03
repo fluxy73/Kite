@@ -56,6 +56,7 @@ Authentification mockée : paramètre `?userId=` sur chaque requête.
 | POST | `/api/chats/{id}/delete` | supprime la discussion pour moi (les autres membres la conservent ; un nouveau message la fait renaître) |
 | POST | `/api/chats/{id}/mute` | met en sourdine pour moi avec expiration (`8h` | `1w` | `always`), ou démute (`off`) — pendant la sourdine : badge non-lus masqué (compteur à 0, messages non marqués lus) et indicateur de saisie non diffusé vers moi (live et relecture) |
 | POST | `/api/chats/{id}/notifs` | préférences de notification pour moi : `priority` (`low`/`default`/`high`), `sound` et `preview` (booléens) ; corps vide = remise aux défauts — l'aperçu désactivé masque le texte du message dans les notifications |
+| GET/POST | `/api/notif-defaults` | défauts de notification **globaux** de l'utilisateur (toutes ses conversations sans réglage propre) ; POST corps vide = remise aux défauts de l'app ; transportés par `/api/shell` (`notifDefaults`) — chaîne de résolution : conversation > global > défauts de l'app |
 | POST | `/api/typing` | diffuse l'indicateur de saisie (éphémère, event `typing`) — sauf aux membres qui ont mis la conversation en sourdine |
 | GET/POST/PATCH/DELETE | `/api/scheduled-calls` | liste / crée / bascule le rappel / supprime un appel planifié |
 | GET | `/api/events` | temps réel **SSE** (repli) |
@@ -91,6 +92,12 @@ Sans `KITE_API`, l'app est **autonome** — aucun serveur requis :
   conversation (et efface la bannière). Au premier plan : snackbar in-app.
   Si le plugin ou la permission est indisponible, bascule silencieuse en
   snackbars seuls — jamais de crash.
+- **Défauts de notification globaux** (écran « Notifications » dans les
+  options de la liste des discussions) : priorité, son et aperçu pour
+  toutes les conversations d'un coup. Le réglage propre à une conversation
+  (fiche infos) **prime** sur ces défauts, qui priment eux-mêmes sur les
+  défauts de l'app — résolution appliquée à chaque notification dans les
+  deux modes (serveur et hors-ligne).
 - **Brouillons** par conversation (`drafts.dart`), persistés entre sessions
   (fichier `kite-drafts.json`, TTL 30 jours) ; effacés après l'envoi.
 - Les **appels 1:1 WebRTC** nécessitent la signalisation serveur : hors-ligne,

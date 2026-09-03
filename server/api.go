@@ -143,6 +143,30 @@ func mustJSON(v any) json.RawMessage {
 	return b
 }
 
+// handleNotifDefaults lit/écrit les défauts de notification globaux de
+// l'utilisateur (toutes les conversations sans préférence propre).
+// GET → prefs ; POST corps vide → remise aux défauts de l'app.
+func (a *api) handleNotifDefaults(w http.ResponseWriter, r *http.Request) {
+	uid, ok := a.userOrError(w, r)
+	if !ok {
+		return
+	}
+	switch r.Method {
+	case http.MethodGet:
+		wJSON(w, 200, a.store.notifDefaultsFor(uid))
+	case http.MethodPost:
+		var prefs NotifPrefs
+		if err := readJSON(r, &prefs); err != nil {
+			httpError(w, 400, "corps invalide: "+err.Error())
+			return
+		}
+		a.store.SetNotifDefaults(uid, prefs)
+		wJSON(w, 200, prefs)
+	default:
+		httpError(w, 405, "méthode non supportée")
+	}
+}
+
 // ---------- Messages ----------
 
 func (a *api) handleMessages(w http.ResponseWriter, r *http.Request) {
@@ -219,6 +243,7 @@ func (a *api) handleShell(w http.ResponseWriter, r *http.Request) {
 		"chats":          chats,
 		"calls":          a.store.state.Calls,
 		"scheduledCalls": a.store.scheduledCallsFor(uid),
+		"notifDefaults":  a.store.notifDefaultsFor(uid),
 	})
 }
 
