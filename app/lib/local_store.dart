@@ -70,6 +70,10 @@ class LocalStore {
   List<CallLog> calls = [];
   List<ScheduledCall> scheduledCalls = [];
 
+  /// Défauts de notification globaux par utilisateur (toutes ses
+  /// conversations sans préférence propre).
+  final Map<String, NotifPrefs> notifDefaults = {};
+
   /// Diffusé à chaque mutation (même sémantique que l'event "shell" serveur).
   final StreamController<void> _changes = StreamController<void>.broadcast();
   Stream<void> get changes => _changes.stream;
@@ -103,6 +107,9 @@ class LocalStore {
         calls = (decoded['calls'] as List? ?? [])
             .map((e) => CallLog.fromJson(e as Map<String, dynamic>))
             .toList();
+        notifDefaults.addAll((decoded['notifDefaults'] as Map? ?? {}).map(
+            (k, v) => MapEntry(k as String,
+                NotifPrefs.fromJson(v as Map<String, dynamic>))));
         scheduledCalls = (decoded['scheduledCalls'] as List? ?? [])
             .map((e) => ScheduledCall.fromJson(e as Map<String, dynamic>))
             .toList();
@@ -153,6 +160,9 @@ class LocalStore {
                   'createdAt': c.createdAt,
                 })
             .toList(),
+        if (notifDefaults.isNotEmpty)
+          'notifDefaults': notifDefaults
+              .map((k, v) => MapEntry(k, v.toJson())),
         'scheduledCalls': scheduledCalls
             .map((s) => {
                   'id': s.id,
@@ -374,6 +384,7 @@ class LocalStore {
       users: users,
       chats: myChats,
       calls: calls,
+      notifDefaults: notifDefaultsFor(meId),
       scheduledCalls: scheduledCalls
           .where((s) => s.userId == meId || s.memberIds.contains(meId))
           .toList(),
@@ -516,6 +527,20 @@ class LocalStore {
       }
       return c.copyWith(mutes: mutes);
     });
+  }
+
+  /// Défauts de notification globaux de [userId] (prefs null/vide = défauts
+  /// de l'app).
+  NotifPrefs notifDefaultsFor(String userId) => notifDefaults[userId] ?? const NotifPrefs();
+
+  void setNotifDefaults(String userId, NotifPrefs? prefs) {
+    if (prefs == null || prefs.isEmpty) {
+      notifDefaults.remove(userId);
+    } else {
+      notifDefaults[userId] = prefs;
+    }
+    _persist();
+    _changes.add(null);
   }
 
   /// Préférences de notification par conversation (prefs null = défauts).

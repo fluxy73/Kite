@@ -209,6 +209,13 @@ class KiteApi {
         body: prefs?.toJson() ?? const {});
   }
 
+  /// Défauts de notification globaux (toutes les conversations sans
+  /// préférence propre). [prefs] null = remise aux défauts de l'app.
+  Future<void> setNotifDefaults({NotifPrefs? prefs}) async {
+    await _send('POST', '/api/notif-defaults', query: {'userId': meId},
+        body: prefs?.toJson() ?? const {});
+  }
+
   /// Notifie les autres membres que je saisis dans cette conversation.
   Future<void> sendTyping(String chatId) async {
     await _send('POST', '/api/typing', query: {'userId': meId}, body: {

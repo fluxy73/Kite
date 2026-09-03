@@ -61,6 +61,11 @@ class MessageNotifier {
   /// (mode dégradé, tests).
   Future<void> Function(MessageNotification)? osShow;
 
+  /// Défauts de notification globaux (chaîne : conversation > global >
+  /// intégré). Injecté par main.dart depuis le shell ; vide = défauts de
+  /// l'app.
+  NotifPrefs globalDefaults = const NotifPrefs();
+
   void start(dynamic api, {String? meId}) {
     if (_sub != null) return; // déjà démarré
     _api = api;
@@ -75,6 +80,9 @@ class MessageNotifier {
       for (final u in shell.users) {
         _userNames[u.id] = u.name;
       }
+      // Défauts globaux transportés par le shell (conversation > global >
+      // intégré est appliqué à chaque notification).
+      globalDefaults = shell.notifDefaults;
     } catch (_) {
       // Noms indisponibles : les notifications tomberont sur l'id brut.
     }
@@ -105,17 +113,20 @@ class MessageNotifier {
     if (chat == null) return;
     // Sourdine active : aucune notification (ni OS ni in-app).
     if (chat.mutedFor(_meId ?? '')) return;
-    // Préférences par conversation : priorité, son, aperçu.
-    final prefs = chat.notifsFor(_meId ?? '');
+    // Préférences de notification : réglages de la conversation, sinon
+    // défauts globaux, sinon défauts de l'app (priorité, son, aperçu).
+    final prefs =
+        (chat.notifsFor(_meId ?? '') ?? const NotifPrefs())
+            .resolveWith(globalDefaults);
     final n = MessageNotification(
       chatId: chat.id,
       message: m,
       chatName: chat.name.isNotEmpty ? chat.name : _otherName(chat),
       senderName: _userNames[m.senderId] ?? m.senderId,
       // Aperçu masqué (préférence) : corps vide, jamais le texte du message.
-      body: (prefs?.previewOn ?? true) ? null : '',
-      priority: prefs?.priorityOrNormal ?? NotifPriority.normal,
-      soundOn: prefs?.soundOn ?? true,
+      body: prefs.previewOn ? null : '',
+      priority: prefs.priorityOrNormal,
+      soundOn: prefs.soundOn,
     );
     // Routage : app en arrière-plan + OS disponible → bannière système ;
     // app au premier plan (ou OS indisponible) → snackbar in-app.

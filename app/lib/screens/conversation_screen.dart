@@ -7,6 +7,7 @@ import '../drafts.dart';
 import '../message_notifier.dart';
 import '../models.dart';
 import '../theme.dart';
+import 'notif_defaults_screen.dart';
 
 /// Conversation temps réel : tous les types de messages, réactions,
 /// réponse, édition, suppression, pièces jointes (workflows simulés).
@@ -928,60 +929,18 @@ class _ConversationScreenState extends State<ConversationScreen> {
 
   Future<void> _showNotifSettings() async {
     final me = widget.api.meId;
-    NotifPrefs prefs =
-        widget.chat.notifsFor(me) ?? const NotifPrefs();
+    NotifPrefs prefs = widget.chat.notifsFor(me) ?? const NotifPrefs();
     final saved = await showDialog<bool>(
       context: context,
       builder: (dialogCtx) => StatefulBuilder(
         builder: (dialogCtx, setDialogState) => AlertDialog(
           backgroundColor: KiteColors.surface,
           title: const Text('Notifications'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Priorité', style: TextStyle(color: KiteColors.muted, fontSize: 12)),
-              RadioGroup<NotifPriority>(
-                groupValue: prefs.priority,
-                onChanged: (v) => setDialogState(() => prefs = prefs.copyWith(priority: v)),
-                child: const Column(
-                  children: [
-                    RadioListTile<NotifPriority>(
-                      dense: true,
-                      value: NotifPriority.low,
-                      title: Text('Basse (silencieuse)'),
-                    ),
-                    RadioListTile<NotifPriority>(
-                      dense: true,
-                      value: NotifPriority.normal,
-                      title: Text('Normale'),
-                    ),
-                    RadioListTile<NotifPriority>(
-                      dense: true,
-                      value: NotifPriority.high,
-                      title: Text('Haute (urgente)'),
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(color: KiteColors.border),
-              SwitchListTile(
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Son'),
-                value: prefs.soundOn,
-                onChanged: (v) => setDialogState(() => prefs = prefs.copyWith(sound: v)),
-              ),
-              SwitchListTile(
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Aperçu du message'),
-                subtitle: const Text('Masque le texte dans la notification',
-                    style: TextStyle(fontSize: 12, color: KiteColors.muted)),
-                value: prefs.previewOn,
-                onChanged: (v) => setDialogState(() => prefs = prefs.copyWith(preview: v)),
-              ),
-            ],
+          content: SingleChildScrollView(
+            child: NotifPrefsEditor(
+              prefs: prefs,
+              onChanged: (p) => setDialogState(() => prefs = p),
+            ),
           ),
           actions: [
             TextButton(

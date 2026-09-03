@@ -5,6 +5,7 @@ import '../models.dart';
 import '../theme.dart';
 import 'conversation_screen.dart';
 import 'global_search_screen.dart';
+import 'notif_defaults_screen.dart';
 
 /// Écran principal : liste des discussions (miroir de screens/chat-list.html).
 class ChatListScreen extends StatefulWidget {
@@ -285,6 +286,18 @@ class _ChatListScreenState extends State<ChatListScreen> {
               onTap: () {
                 Navigator.pop(sheetCtx);
                 _newChat(context);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.notifications_outlined, color: KiteColors.accent),
+              title: const Text('Notifications', style: TextStyle(color: KiteColors.fg)),
+              subtitle: const Text('Défauts pour toutes les conversations',
+                  style: TextStyle(fontSize: 12, color: KiteColors.muted)),
+              onTap: () {
+                Navigator.pop(sheetCtx);
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => NotifDefaultsScreen(api: widget.api)),
+                );
               },
             ),
             ListTile(
