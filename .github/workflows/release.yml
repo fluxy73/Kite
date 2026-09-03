@@ -42,8 +42,10 @@ jobs:
       - name: flutter build apk (release)
         run: flutter build apk --release
 
+      # Nom de fichier sûr : les branches (run manuel) peuvent contenir des
+      # '/' — remplacés par '-'. Sur un tag (v0.1.4) : kite-v0.1.4.apk.
       - name: Renommer l'artefact
-        run: mv build/app/outputs/flutter-apk/app-release.apk "kite-${GITHUB_REF_NAME}.apk"
+        run: mv build/app/outputs/flutter-apk/app-release.apk "kite-${GITHUB_REF_NAME//\//-}.apk"
 
       # Téléchargeable depuis le run (et seul livrable d'un run manuel).
       - name: Upload artefact du run
@@ -64,4 +66,4 @@ jobs:
         run: |
           gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1 \
             || gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes
-          gh release upload "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --clobber "app/kite-${GITHUB_REF_NAME}.apk"
+          gh release upload "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --clobber "app/kite-${GITHUB_REF_NAME//\//-}.apk"
