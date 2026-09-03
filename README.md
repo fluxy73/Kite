@@ -55,6 +55,7 @@ Authentification mockée : paramètre `?userId=` sur chaque requête.
 | POST | `/api/chats/{id}/pin` | épingle/détache la conversation pour moi (persistance, tri en tête) |
 | POST | `/api/chats/{id}/delete` | supprime la discussion pour moi (les autres membres la conservent ; un nouveau message la fait renaître) |
 | POST | `/api/chats/{id}/mute` | met en sourdine pour moi avec expiration (`8h` | `1w` | `always`), ou démute (`off`) — pendant la sourdine : badge non-lus masqué (compteur à 0, messages non marqués lus) et indicateur de saisie non diffusé vers moi (live et relecture) |
+| POST | `/api/chats/{id}/notifs` | préférences de notification pour moi : `priority` (`low`/`default`/`high`), `sound` et `preview` (booléens) ; corps vide = remise aux défauts — l'aperçu désactivé masque le texte du message dans les notifications |
 | POST | `/api/typing` | diffuse l'indicateur de saisie (éphémère, event `typing`) — sauf aux membres qui ont mis la conversation en sourdine |
 | GET/POST/PATCH/DELETE | `/api/scheduled-calls` | liste / crée / bascule le rappel / supprime un appel planifié |
 | GET | `/api/events` | temps réel **SSE** (repli) |

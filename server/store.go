@@ -70,6 +70,17 @@ type Chat struct {
 	DeletedFor []string `json:"deletedFor,omitempty"` // userIds ayant supprimé la discussion pour eux
 	// Mutes : expiration du sourdine par utilisateur (0 = pas muet).
 	Mutes map[string]int64 `json:"mutes,omitempty"`
+	// Notifs : préférences de notification par utilisateur (priorité,
+	// son, aperçu). Map vide = défauts de l'app.
+	Notifs map[string]NotifPrefs `json:"notifs,omitempty"`
+}
+
+// NotifPrefs : préférences de notification par conversation et par
+// utilisateur. Priorité : low | default | high. Son et aperçu : on/off.
+type NotifPrefs struct {
+	Priority string `json:"priority,omitempty"` // low | default | high
+	Sound    *bool  `json:"sound,omitempty"`
+	Preview  *bool  `json:"preview,omitempty"`
 }
 
 type Message struct {
@@ -454,6 +465,9 @@ func (s *Store) deleteChatFor(chatID, userID string) bool {
 		if c.Mutes != nil {
 			delete(c.Mutes, userID)
 		}
+		if c.Notifs != nil {
+			delete(c.Notifs, userID)
+		}
 		_ = s.save()
 		return true
 	}
@@ -501,6 +515,32 @@ func (s *Store) mutedForUser(chatID, userID string) bool {
 		if s.state.Chats[i].ID == chatID {
 			return mutedUntil(s.state.Chats[i].Mutes, userID) > 0
 		}
+	}
+	return false
+}
+
+// SetNotifs enregistre les préférences de notification de userID sur
+// chatID (prefs nil = remise aux défauts).
+func (s *Store) SetNotifs(chatID, userID string, prefs NotifPrefs) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i := range s.state.Chats {
+		c := &s.state.Chats[i]
+		if c.ID != chatID {
+			continue
+		}
+		if prefs.Priority == "" && prefs.Sound == nil && prefs.Preview == nil {
+			if c.Notifs != nil {
+				delete(c.Notifs, userID)
+			}
+		} else {
+			if c.Notifs == nil {
+				c.Notifs = map[string]NotifPrefs{}
+			}
+			c.Notifs[userID] = prefs
+		}
+		_ = s.save()
+		return true
 	}
 	return false
 }

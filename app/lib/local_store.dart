@@ -134,6 +134,9 @@ class LocalStore {
                   if (c.pinned.isNotEmpty) 'pinned': c.pinned,
                   if (c.deletedFor.isNotEmpty) 'deletedFor': c.deletedFor,
                   if (c.mutes.isNotEmpty) 'mutes': c.mutes,
+                  if (c.notifs.isNotEmpty)
+                    'notifs': c.notifs
+                        .map((k, v) => MapEntry(k, v.toJson())),
                 })
             .toList(),
         'messages': _messagesByChat.map((k, v) => MapEntry(
@@ -482,7 +485,10 @@ class LocalStore {
         deletedFor: [...c.deletedFor, userId],
         pinned: c.pinned.where((u) => u != userId).toList(),
         archived: c.archived.where((u) => u != userId).toList(),
-        mutes: const {},
+        // Seuls les réglages personnels sont nettoyés (parité serveur) :
+        // sourdine et préférences de notification du membre qui supprime.
+        mutes: {...c.mutes}..remove(userId),
+        notifs: {...c.notifs}..remove(userId),
       );
     });
   }
@@ -509,6 +515,19 @@ class LocalStore {
         }
       }
       return c.copyWith(mutes: mutes);
+    });
+  }
+
+  /// Préférences de notification par conversation (prefs null = défauts).
+  void setNotifs(String chatId, String userId, NotifPrefs? prefs) {
+    _mutateChat(chatId, (c) {
+      final notifs = {...c.notifs};
+      if (prefs == null || prefs.isEmpty) {
+        notifs.remove(userId);
+      } else {
+        notifs[userId] = prefs;
+      }
+      return c.copyWith(notifs: notifs);
     });
   }
 
