@@ -1,0 +1,67 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    name: APK + publication
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.2
+          channel: stable
+          cache: true
+
+      - name: flutter pub get
+        run: flutter pub get
+
+      - name: flutter test
+        run: flutter test
+
+      - name: flutter build apk (release)
+        run: flutter build apk --release
+
+      - name: Renommer l'artefact
+        run: mv build/app/outputs/flutter-apk/app-release.apk "kite-${GITHUB_REF_NAME}.apk"
+
+      # Téléchargeable depuis le run (et seul livrable d'un run manuel).
+      - name: Upload artefact du run
+        uses: actions/upload-artifact@v4
+        with:
+          name: kite-apk
+          path: app/kite-*.apk
+          if-no-files-found: error
+
+      # Uniquement sur un tag : crée la release si elle n'existe pas encore
+      # (notes générées) — si elle existe déjà avec des notes rédigées, seule
+      # la pièce jointe est ajoutée, le corps n'est jamais écrasé.
+      - name: Publier sur la release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        working-directory: .
+        run: |
+          gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1 \
+            || gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes
+          gh release upload "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --clobber "app/kite-${GITHUB_REF_NAME}.apk"
