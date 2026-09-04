@@ -119,8 +119,8 @@ class OfflineApi {
     Map<String, dynamic>? media,
     String? replyTo,
   }) async {
-    final m = _s.addMessage(chatId, meId, type, text,
-        media: media, replyTo: replyTo);
+    final m =
+        _s.addMessage(chatId, meId, type, text, media: media, replyTo: replyTo);
     _maybeEcho(chatId);
     return m;
   }
@@ -153,7 +153,8 @@ class OfflineApi {
     _s.setPinned(chatId, meId, pinned);
   }
 
-  Future<void> deleteChat(String chatId) async => _s.deleteChatFor(chatId, meId);
+  Future<void> deleteChat(String chatId) async =>
+      _s.deleteChatFor(chatId, meId);
 
   Future<void> setChatMuted(String chatId, {String? duration}) async {
     _s.setMute(chatId, meId, duration);
@@ -161,6 +162,11 @@ class OfflineApi {
 
   Future<void> setChatNotifs(String chatId, {NotifPrefs? prefs}) async {
     _s.setNotifs(chatId, meId, prefs);
+  }
+
+  Future<void> setChatDisappearing(String chatId, int ms) async {
+    _s.setDisappearing(chatId, ms);
+    _events.add(ServerEvent('shell', {'userId': meId}));
   }
 
   Future<void> setNotifDefaults({NotifPrefs? prefs}) async {
@@ -204,10 +210,9 @@ class OfflineApi {
 
   // ---------- Appels planifiés ----------
 
-  Future<List<ScheduledCall>> fetchScheduledCalls() async =>
-      _s.scheduledCalls
-          .where((s) => s.userId == meId || s.memberIds.contains(meId))
-          .toList();
+  Future<List<ScheduledCall>> fetchScheduledCalls() async => _s.scheduledCalls
+      .where((s) => s.userId == meId || s.memberIds.contains(meId))
+      .toList();
 
   Future<ScheduledCall> createScheduledCall({
     required String title,
@@ -308,6 +313,11 @@ class OfflineApi {
   /// event "message" est émis pour l'UI et les notifications.
   void _dispatchDue() {
     if (_store == null) return;
+    // Éphémères : retire les messages échus (parité avec le sweep serveur).
+    final swept = _s.expireSweep();
+    swept.forEach((chatId, ids) {
+      _events.add(ServerEvent('expired', {'chatId': chatId, 'ids': ids}));
+    });
     for (final m in _s.dispatchDueScheduledMessages()) {
       _events.add(ServerEvent('message', _s.messageToJson(m)));
     }

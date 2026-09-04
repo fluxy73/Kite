@@ -284,6 +284,37 @@ func (a *api) handleScheduledMessages(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// disappearingLabel libellé système du changement de minuteur éphémère.
+func disappearingLabel(ms int64) string {
+	switch ms {
+	case 24 * 3600 * 1000:
+		return "Les messages éphémères sont activés (24 h)."
+	case 7 * 24 * 3600 * 1000:
+		return "Les messages éphémères sont activés (7 jours)."
+	case 90 * 24 * 3600 * 1000:
+		return "Les messages éphémères sont activés (90 jours)."
+	default:
+		return "Les messages éphémères sont désactivés."
+	}
+}
+
+// expireSweep supprime les messages éphémères échus et diffuse un événement
+// 'expired' par conversation touchée (les clients retirent les bulles).
+func (a *api) expireSweep() {
+	sweep := a.store.expireSweep(time.Now().UnixMilli())
+	for chatID, ids := range sweep {
+		chat, ok := a.store.chatByID(chatID)
+		if !ok {
+			continue
+		}
+		a.hub.broadcastToUsers(chat.MemberIDs, Event{
+			Type:   "expired",
+			ChatID: chatID,
+			Data:   mustJSON(map[string]any{"ids": ids}),
+		})
+	}
+}
+
 // dispatchScheduledMessages délivre tous les messages programmés échus :
 // création du message réel, diffusion temps réel, file d'attente hors-ligne.
 func (a *api) dispatchScheduledMessages() {
@@ -311,6 +342,7 @@ func (a *api) dispatchScheduledMessages() {
 func (a *api) handleShell(w http.ResponseWriter, r *http.Request) {
 	// Chaque accès shell collecte les messages programmés échus (robuste).
 	a.dispatchScheduledMessages()
+	a.expireSweep()
 	uid, ok := a.userOrError(w, r)
 	if !ok {
 		return
@@ -873,6 +905,7 @@ func (a *api) handleChatAction(w http.ResponseWriter, r *http.Request) {
 		NotifPriority string `json:"priority"` // notifs : low | default | high
 		NotifSound    *bool  `json:"sound"`    // notifs : son on/off
 		NotifPreview  *bool  `json:"preview"`  // notifs : aperçu on/off
+		Disappearing  int64  `json:"disappearing"` // éphémère : durée en ms (0 = off)
 	}
 	// delete n'a pas de corps : tout ce qui compte est l'utilisateur.
 	if action != "delete" {
@@ -903,6 +936,22 @@ func (a *api) handleChatAction(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		wJSON(w, 200, map[string]any{"id": chatID, "deletedFor": uid})
+	case "disappearing":
+		// Minuteur des messages éphémères de la conversation (comme WhatsApp) :
+		// 0 (off) | 24h | 7j | 90j. Message système diffusé à tous les membres.
+		dur := map[int64]bool{0: true, 24 * 3600 * 1000: true, 7 * 24 * 3600 * 1000: true, 90 * 24 * 3600 * 1000: true}[body.Disappearing]
+		if !dur {
+			httpError(w, 400, "durée éphémère invalide")
+			return
+		}
+		if !a.store.setDisappearing(chatID, body.Disappearing) {
+			httpError(w, 404, "conversation introuvable")
+			return
+		}
+		sys := a.store.addMessage(chatID, uid, "system", disappearingLabel(body.Disappearing), nil, "")
+		chat, _ := a.store.chatByID(chatID)
+		a.hub.broadcastToUsers(chat.MemberIDs, Event{Type: "message", ChatID: chatID, Data: mustJSON(sys)})
+		wJSON(w, 200, map[string]any{"id": chatID, "disappearing": body.Disappearing})
 	case "mute":
 		// Sourdine personnelle avec expiration. Accepte soit une durée
 		// symbolique (8h | 1w | always), soit un epoch ms direct (`until`).

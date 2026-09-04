@@ -1,4 +1,5 @@
 import 'dart:convert';
+
 /// Modèles miroirs de l'API du serveur Go (server/).
 class User {
   const User({required this.id, required this.name, this.phone = ''});
@@ -184,7 +185,8 @@ class AppShell {
             .toList(),
         notifDefaults: json['notifDefaults'] == null
             ? const NotifPrefs()
-            : NotifPrefs.fromJson(json['notifDefaults'] as Map<String, dynamic>),
+            : NotifPrefs.fromJson(
+                json['notifDefaults'] as Map<String, dynamic>),
       );
 }
 
@@ -205,8 +207,7 @@ class NotifPrefs {
   NotifPriority get priorityOrNormal => priority ?? NotifPriority.normal;
 
   /// true si aucun réglage n'est positionné (remise aux défauts).
-  bool get isEmpty =>
-      priority == null && sound == null && preview == null;
+  bool get isEmpty => priority == null && sound == null && preview == null;
 
   /// Chaîne de résolution : chaque champ de ces préférences prime s'il est
   /// positionné, sinon la valeur de [base] (défauts globaux), sinon le
@@ -230,7 +231,7 @@ class NotifPrefs {
           'high' => NotifPriority.high,
           'default' => NotifPriority.normal,
           _ => null,
-  	},
+        },
         sound: json['sound'] as bool?,
         preview: json['preview'] as bool?,
       );
@@ -262,6 +263,7 @@ class Chat {
     this.deletedFor = const [],
     this.mutes = const {},
     this.notifs = const {},
+    this.disappearing = 0,
   });
 
   final String id;
@@ -274,10 +276,15 @@ class Chat {
   final int online;
   final List<String> archived; // userIds ayant archivé cette conversation
   final List<String> pinned; // userIds ayant épinglé cette conversation
-  final List<String> deletedFor; // userIds ayant supprimé la discussion pour eux
-  final Map<String, int> mutes; // userId -> expiration de la sourdine (epoch ms)
-  final Map<String, NotifPrefs>
-      notifs; // userId -> préférences de notification
+  final List<String>
+      deletedFor; // userIds ayant supprimé la discussion pour eux
+  final Map<String, int>
+      mutes; // userId -> expiration de la sourdine (epoch ms)
+  final Map<String, NotifPrefs> notifs; // userId -> préférences de notification
+
+  /// Minuteur de messages éphémères de la conversation (epoch ms — les
+  /// messages envoyés disparaissent après cette durée ; 0 = désactivé).
+  final int disappearing;
 
   bool get isGroup => type == 'group';
 
@@ -307,6 +314,7 @@ class Chat {
     List<String>? deletedFor,
     Map<String, int>? mutes,
     Map<String, NotifPrefs>? notifs,
+    int? disappearing,
   }) =>
       Chat(
         id: id,
@@ -322,6 +330,7 @@ class Chat {
         deletedFor: deletedFor ?? this.deletedFor,
         mutes: mutes ?? this.mutes,
         notifs: notifs ?? this.notifs,
+        disappearing: disappearing ?? this.disappearing,
       );
 
   factory Chat.fromJson(Map<String, dynamic> json) => Chat(
@@ -335,8 +344,9 @@ class Chat {
         deletedFor: (json['deletedFor'] as List? ?? []).cast<String>(),
         mutes: (json['mutes'] as Map? ?? {})
             .map((k, v) => MapEntry(k as String, (v as num).toInt())),
-        notifs: (json['notifs'] as Map? ?? {})
-            .map((k, v) => MapEntry(k as String, NotifPrefs.fromJson(v as Map<String, dynamic>))),
+        notifs: (json['notifs'] as Map? ?? {}).map((k, v) => MapEntry(
+            k as String, NotifPrefs.fromJson(v as Map<String, dynamic>))),
+        disappearing: json['disappearing'] as int? ?? 0,
         lastMessage: json['lastMessage'] == null
             ? null
             : Message.fromJson(json['lastMessage'] as Map<String, dynamic>),
@@ -362,12 +372,14 @@ class Message {
     this.readBy = const [],
     this.deliveredTo = const [],
     this.starredBy = const [],
+    this.expiresAt,
   });
 
   final String id;
   final String chatId;
   final String senderId;
-  final String type; // text, image, video, document, audio, voice, videonote, gif, sticker, contact, location, poll, event, call, system
+  final String
+      type; // text, image, video, document, audio, voice, videonote, gif, sticker, contact, location, poll, event, call, system
   final String text;
   final Map<String, dynamic>? media;
   final int createdAt;
@@ -380,11 +392,18 @@ class Message {
   final List<String> deliveredTo;
   final List<String> starredBy; // userIds ayant mis en favori
 
+  /// Éphémère : epoch ms après lequel le message disparaît (null = jamais).
+  final int? expiresAt;
+
   bool starredFor(String userId) => starredBy.contains(userId);
 
   bool isMine(String me) => senderId == me;
 
-  bool visibleTo(String me) => !deleted && !deletedFor.contains(me);
+  bool visibleTo(String me, [int? nowMs]) =>
+      !deleted &&
+      !deletedFor.contains(me) &&
+      (expiresAt == null ||
+          expiresAt! > (nowMs ?? DateTime.now().millisecondsSinceEpoch));
 
   String preview() {
     switch (type) {
@@ -435,6 +454,7 @@ class Message {
         readBy: (json['readBy'] as List? ?? []).cast<String>(),
         deliveredTo: (json['deliveredTo'] as List? ?? []).cast<String>(),
         starredBy: (json['starredBy'] as List? ?? []).cast<String>(),
+        expiresAt: json['expiresAt'] as int?,
       );
 
   static Map<String, List<String>> _reactionsFrom(dynamic raw) {
@@ -453,12 +473,15 @@ class ServerEvent {
   factory ServerEvent.fromJson(Map<String, dynamic> json) {
     final data = json['data'];
     if (data is Map) {
-      return ServerEvent(json['type'] as String? ?? 'message', Map<String, dynamic>.from(data));
+      return ServerEvent(json['type'] as String? ?? 'message',
+          Map<String, dynamic>.from(data));
     }
     if (data is List) {
-      return ServerEvent(json['type'] as String? ?? 'message', {'__list': data});
+      return ServerEvent(
+          json['type'] as String? ?? 'message', {'__list': data});
     }
-    return ServerEvent(json['type'] as String? ?? 'message', <String, dynamic>{});
+    return ServerEvent(
+        json['type'] as String? ?? 'message', <String, dynamic>{});
   }
 
   factory ServerEvent.parse(String type, String rawData) {
@@ -489,6 +512,7 @@ extension MessageCopyWith on Message {
     List<String>? readBy,
     List<String>? deliveredTo,
     List<String>? starredBy,
+    int? expiresAt,
   }) =>
       Message(
         id: id,
@@ -506,5 +530,6 @@ extension MessageCopyWith on Message {
         readBy: readBy ?? this.readBy,
         deliveredTo: deliveredTo ?? this.deliveredTo,
         starredBy: starredBy ?? this.starredBy,
+        expiresAt: expiresAt ?? this.expiresAt,
       );
 }

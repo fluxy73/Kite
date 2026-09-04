@@ -51,7 +51,9 @@ class KiteApi {
 
   Future<List<Chat>> fetchChats() async {
     final raw = await _send('GET', '/api/chats', query: {'userId': meId});
-    return (raw as List).map((e) => Chat.fromJson(e as Map<String, dynamic>)).toList();
+    return (raw as List)
+        .map((e) => Chat.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   /// Agrégat de l'écran principal : discussions + appels.
@@ -70,8 +72,11 @@ class KiteApi {
   }
 
   /// Journalise un appel (message de type "call") dans une conversation.
-  Future<void> logCall(String chatId, {String kind = 'audio', String direction = 'outgoing'}) async {
-    await _send('POST', '/api/calls/log', query: {'userId': meId}, body: {
+  Future<void> logCall(String chatId,
+      {String kind = 'audio', String direction = 'outgoing'}) async {
+    await _send('POST', '/api/calls/log', query: {
+      'userId': meId
+    }, body: {
       'chatId': chatId,
       'kind': kind,
       'direction': direction,
@@ -79,8 +84,11 @@ class KiteApi {
   }
 
   /// Signalisation temps réel : initie un appel (broadcast WebSocket/SSE).
-  Future<Map<String, dynamic>> initiateCall(String chatId, {String kind = 'audio'}) async {
-    final raw = await _send('POST', '/api/calls/initiate', query: {'userId': meId}, body: {
+  Future<Map<String, dynamic>> initiateCall(String chatId,
+      {String kind = 'audio'}) async {
+    final raw = await _send('POST', '/api/calls/initiate', query: {
+      'userId': meId
+    }, body: {
       'chatId': chatId,
       'kind': kind,
     });
@@ -88,8 +96,11 @@ class KiteApi {
   }
 
   /// Relaye un signal WebRTC (offer | answer | ice) aux autres participants.
-  Future<void> sendCallSignal(String callId, String kind, Map<String, dynamic> payload) async {
-    await _send('POST', '/api/calls/signal', query: {'userId': meId}, body: {
+  Future<void> sendCallSignal(
+      String callId, String kind, Map<String, dynamic> payload) async {
+    await _send('POST', '/api/calls/signal', query: {
+      'userId': meId
+    }, body: {
       'callId': callId,
       'kind': kind,
       'payload': payload,
@@ -98,15 +109,20 @@ class KiteApi {
 
   /// Répond à un appel entrant (accepted | declined) — broadcast temps réel.
   Future<void> respondCall(String callId, String status) async {
-    await _send('POST', '/api/calls/respond', query: {'userId': meId}, body: {
+    await _send('POST', '/api/calls/respond', query: {
+      'userId': meId
+    }, body: {
       'callId': callId,
       'status': status,
     });
   }
 
   Future<List<Message>> fetchMessages(String chatId) async {
-    final raw = await _send('GET', '/api/chats/$chatId/messages', query: {'userId': meId});
-    return (raw as List).map((e) => Message.fromJson(e as Map<String, dynamic>)).toList();
+    final raw = await _send('GET', '/api/chats/$chatId/messages',
+        query: {'userId': meId});
+    return (raw as List)
+        .map((e) => Message.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   // ---------- Envoi ----------
@@ -118,7 +134,9 @@ class KiteApi {
     Map<String, dynamic>? media,
     String? replyTo,
   }) async {
-    final raw = await _send('POST', '/api/chats/$chatId/messages', query: {'userId': meId}, body: {
+    final raw = await _send('POST', '/api/chats/$chatId/messages', query: {
+      'userId': meId
+    }, body: {
       'senderId': meId,
       'type': type,
       'text': text,
@@ -128,8 +146,11 @@ class KiteApi {
     return Message.fromJson(raw as Map<String, dynamic>);
   }
 
-  Future<Chat> createChat(String type, String name, List<String> memberIds) async {
-    final raw = await _send('POST', '/api/chats', query: {'userId': meId}, body: {
+  Future<Chat> createChat(
+      String type, String name, List<String> memberIds) async {
+    final raw = await _send('POST', '/api/chats', query: {
+      'userId': meId
+    }, body: {
       'type': type,
       'name': name,
       'memberIds': memberIds,
@@ -177,14 +198,18 @@ class KiteApi {
 
   /// Archive ou désarchive une conversation pour moi.
   Future<void> setChatArchived(String chatId, {required bool archived}) async {
-    await _send('POST', '/api/chats/$chatId/archive', query: {'userId': meId}, body: {
+    await _send('POST', '/api/chats/$chatId/archive', query: {
+      'userId': meId
+    }, body: {
       'archived': archived,
     });
   }
 
   /// Épingle ou détache une conversation pour moi.
   Future<void> setChatPinned(String chatId, {required bool pinned}) async {
-    await _send('POST', '/api/chats/$chatId/pin', query: {'userId': meId}, body: {
+    await _send('POST', '/api/chats/$chatId/pin', query: {
+      'userId': meId
+    }, body: {
       'pinned': pinned,
     });
   }
@@ -198,27 +223,35 @@ class KiteApi {
   /// Rend muette la conversation pour moi jusqu'à l'expiration donnée
   /// ([duration] : 8h | 1w | always), ou démute (duration: null).
   Future<void> setChatMuted(String chatId, {String? duration}) async {
-    await _send('POST', '/api/chats/$chatId/mute', query: {'userId': meId},
-        body: {'duration': duration ?? 'off'});
+    await _send('POST', '/api/chats/$chatId/mute',
+        query: {'userId': meId}, body: {'duration': duration ?? 'off'});
   }
 
   /// Préférences de notification de cette conversation pour moi
   /// (priorité, son, aperçu). [prefs] null = remise aux défauts.
   Future<void> setChatNotifs(String chatId, {NotifPrefs? prefs}) async {
-    await _send('POST', '/api/chats/$chatId/notifs', query: {'userId': meId},
-        body: prefs?.toJson() ?? const {});
+    await _send('POST', '/api/chats/$chatId/notifs',
+        query: {'userId': meId}, body: prefs?.toJson() ?? const {});
+  }
+
+  /// Minuteur de messages éphémères de la conversation (ms ; 0 = off).
+  Future<void> setChatDisappearing(String chatId, int ms) async {
+    await _send('POST', '/api/chats/$chatId/disappearing',
+        query: {'userId': meId}, body: {'disappearing': ms});
   }
 
   /// Défauts de notification globaux (toutes les conversations sans
   /// préférence propre). [prefs] null = remise aux défauts de l'app.
   Future<void> setNotifDefaults({NotifPrefs? prefs}) async {
-    await _send('POST', '/api/notif-defaults', query: {'userId': meId},
-        body: prefs?.toJson() ?? const {});
+    await _send('POST', '/api/notif-defaults',
+        query: {'userId': meId}, body: prefs?.toJson() ?? const {});
   }
 
   /// Notifie les autres membres que je saisis dans cette conversation.
   Future<void> sendTyping(String chatId) async {
-    await _send('POST', '/api/typing', query: {'userId': meId}, body: {
+    await _send('POST', '/api/typing', query: {
+      'userId': meId
+    }, body: {
       'chatId': chatId,
     });
   }
@@ -227,8 +260,11 @@ class KiteApi {
 
   /// Liste les appels planifiés visibles pour moi.
   Future<List<ScheduledCall>> fetchScheduledCalls() async {
-    final raw = await _send('GET', '/api/scheduled-calls', query: {'userId': meId});
-    return (raw as List).map((e) => ScheduledCall.fromJson(e as Map<String, dynamic>)).toList();
+    final raw =
+        await _send('GET', '/api/scheduled-calls', query: {'userId': meId});
+    return (raw as List)
+        .map((e) => ScheduledCall.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   /// Crée un appel planifié (titre, date/heure, participants, rappel).
@@ -240,7 +276,9 @@ class KiteApi {
     String chatId = '',
     bool reminder = false,
   }) async {
-    final raw = await _send('POST', '/api/scheduled-calls', query: {'userId': meId}, body: {
+    final raw = await _send('POST', '/api/scheduled-calls', query: {
+      'userId': meId
+    }, body: {
       'title': title,
       'scheduledAt': scheduledAt,
       'kind': kind,
@@ -253,7 +291,8 @@ class KiteApi {
 
   /// Active/désactive le rappel d'un appel planifié.
   Future<ScheduledCall> toggleScheduledReminder(String id) async {
-    final raw = await _send('PATCH', '/api/scheduled-calls', query: {'userId': meId}, body: {'id': id});
+    final raw = await _send('PATCH', '/api/scheduled-calls',
+        query: {'userId': meId}, body: {'id': id});
     return ScheduledCall.fromJson(raw as Map<String, dynamic>);
   }
 
@@ -266,7 +305,8 @@ class KiteApi {
 
   /// Liste les messages programmés de l'utilisateur.
   Future<List<ScheduledMessage>> fetchScheduledMessages() async {
-    final raw = await _send('GET', '/api/scheduled-messages', query: {'userId': meId});
+    final raw =
+        await _send('GET', '/api/scheduled-messages', query: {'userId': meId});
     return (raw as List)
         .map((e) => ScheduledMessage.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -279,20 +319,21 @@ class KiteApi {
     required int scheduledAt,
     String? replyTo,
   }) async {
-    final raw = await _send('POST', '/api/scheduled-messages',
-        query: {'userId': meId},
-        body: {
-          'chatId': chatId,
-          'text': text,
-          'replyTo': replyTo,
-          'scheduledAt': scheduledAt,
-        });
+    final raw = await _send('POST', '/api/scheduled-messages', query: {
+      'userId': meId
+    }, body: {
+      'chatId': chatId,
+      'text': text,
+      'replyTo': replyTo,
+      'scheduledAt': scheduledAt,
+    });
     return ScheduledMessage.fromJson(raw as Map<String, dynamic>);
   }
 
   /// Annule un message programmé.
   Future<void> deleteScheduledMessage(String id) async {
-    await _send('DELETE', '/api/scheduled-messages/$id', query: {'userId': meId});
+    await _send('DELETE', '/api/scheduled-messages/$id',
+        query: {'userId': meId});
   }
 
   // ---------- Temps réel (WebSocket, repli SSE) ----------
