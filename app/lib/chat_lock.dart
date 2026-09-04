@@ -58,8 +58,9 @@ class LocalAuthAuthenticator implements BiometricAuthenticator {
   }
 }
 
-/// Clé méta dans kite-chatlock.json pour la préférence biométrique.
-const String _bioKey = '_biometrics';
+/// Clé méta héritée (ancien réglage global) dans kite-chatlock.json ;
+/// migrée vers la préférence par conversation au chargement.
+const String _legacyBioKey = '_biometrics';
 
 class ChatLockStore extends ChangeNotifier {
   ChatLockStore._();
@@ -67,9 +68,10 @@ class ChatLockStore extends ChangeNotifier {
 
   final Map<String, String> _hashes = {}; // chatId -> sha256(code)
 
-  /// Préférence appareil : déverrouillage biométrique autorisé sur les portes.
-  /// (La capacité réelle est vérifiée via local_auth à l'affichage.)
-  bool _biometricsEnabled = false;
+  /// Conversations dont la porte accepte la biométrie (préférence par
+  /// conversation, persistée ; la capacité réelle est vérifiée via
+  /// local_auth à l'affichage).
+  final Set<String> _biometricChats = {};
   File? _file;
   bool _loaded = false;
 
@@ -106,14 +108,20 @@ class ChatLockStore extends ChangeNotifier {
     if (f == null || !f.existsSync()) return;
     try {
       final raw = jsonDecode(f.readAsStringSync()) as Map<String, dynamic>;
+      var legacyBio = false;
       raw.forEach((k, v) {
+        if (k == _legacyBioKey) {
+          legacyBio = v == true; // ancien réglage global
+          return;
+        }
         final h = v is Map<String, dynamic> ? v['hash'] as String? : null;
-        if (k == _bioKey) {
-          _biometricsEnabled = v == true;
-        } else if (h != null && h.isNotEmpty) {
+        if (h != null && h.isNotEmpty) {
           _hashes[k] = h;
+          if (v['bio'] == true) _biometricChats.add(k);
         }
       });
+      // Migration : l'ancien réglage global s'applique à tous les verrous.
+      if (legacyBio) _biometricChats.addAll(_hashes.keys);
     } catch (_) {
       // fichier corrompu : on repart de zéro (aucun verrou actif)
     }
@@ -123,9 +131,10 @@ class ChatLockStore extends ChangeNotifier {
     final f = _storeFile;
     if (f == null) return;
     try {
-      final Map<String, Object> data =
-          _hashes.map((k, v) => MapEntry(k, {'hash': v}));
-      data[_bioKey] = _biometricsEnabled;
+      final data = _hashes.map((k, v) => MapEntry(k, <String, Object>{
+            'hash': v,
+            if (_biometricChats.contains(k)) 'bio': true,
+          }));
       f.writeAsStringSync(jsonEncode(data));
     } catch (_) {}
   }
@@ -181,23 +190,30 @@ class ChatLockStore extends ChangeNotifier {
     _ensureLoaded();
     if (_hashes[chatId] != _hash(code)) return false;
     _hashes.remove(chatId);
+    _biometricChats.remove(chatId);
     _unlocked.remove(chatId);
     _flush();
     notifyListeners();
     return true;
   }
 
-  /// Biométrie activée (préférence appareil, persistée).
-  bool get biometricsEnabled {
+  /// Biométrie autorisée pour cette conversation (persisté).
+  bool biometricsFor(String chatId) {
     _ensureLoaded();
-    return _biometricsEnabled;
+    return _biometricChats.contains(chatId);
   }
 
-  /// Active/désactive le déverrouillage biométrique sur les portes PIN.
-  void setBiometricsEnabled(bool enabled) {
+  /// Active/désactive le déverrouillage biométrique d'une conversation.
+  /// Sans effet si la conversation n'a pas de verrou.
+  void setBiometricsFor(String chatId, bool enabled) {
     _ensureLoaded();
-    if (_biometricsEnabled == enabled) return;
-    _biometricsEnabled = enabled;
+    if (!_hashes.containsKey(chatId)) return;
+    if (_biometricChats.contains(chatId) == enabled) return;
+    if (enabled) {
+      _biometricChats.add(chatId);
+    } else {
+      _biometricChats.remove(chatId);
+    }
     _flush();
     notifyListeners();
   }
@@ -206,7 +222,9 @@ class ChatLockStore extends ChangeNotifier {
   /// vérifie au préalable que la biométrie est activée et disponible).
   void unlockBiometric(String chatId) {
     _ensureLoaded();
-    if (!_biometricsEnabled || !_hashes.containsKey(chatId)) return;
+    if (!_biometricChats.contains(chatId) || !_hashes.containsKey(chatId)) {
+      return;
+    }
     _unlocked.add(chatId);
     notifyListeners();
   }
@@ -236,7 +254,7 @@ class ChatLockStore extends ChangeNotifier {
   @visibleForTesting
   void resetForTest({File? file}) {
     _hashes.clear();
-    _biometricsEnabled = false;
+    _biometricChats.clear();
     _unlocked.clear();
     _file = file;
     _loaded = false;
@@ -296,7 +314,7 @@ class _LockGateState extends State<LockGate> {
 
   Future<void> _initBiometrics() async {
     final store = ChatLockStore.instance;
-    final wanted = store.biometricsEnabled ||
+    final wanted = store.biometricsFor(widget.chatId) ||
         widget.mode == LockGateMode.setup;
     if (!wanted) return;
     final ok = await _bio.isAvailable();
@@ -304,7 +322,7 @@ class _LockGateState extends State<LockGate> {
     setState(() => _bioAvailable = ok);
     // Déverrouillage : invite biométrique automatique à l'ouverture.
     if (ok &&
-        store.biometricsEnabled &&
+        store.biometricsFor(widget.chatId) &&
         widget.mode == LockGateMode.unlock) {
       await _authenticate();
     }
@@ -375,7 +393,7 @@ class _LockGateState extends State<LockGate> {
         return;
       }
       // Proposer la biométrie si l'appareil le permet (une seule demande).
-      if (_bioAvailable && !store.biometricsEnabled) {
+      if (_bioAvailable && !store.biometricsFor(widget.chatId)) {
         final useBio = await showDialog<bool>(
           context: context,
           builder: (dialogCtx) => AlertDialog(
@@ -398,7 +416,7 @@ class _LockGateState extends State<LockGate> {
             ],
           ),
         );
-        if (useBio == true) store.setBiometricsEnabled(true);
+        if (useBio == true) store.setBiometricsFor(widget.chatId, true);
       }
       if (mounted) widget.onDone();
       return;
@@ -469,7 +487,9 @@ class _LockGateState extends State<LockGate> {
                         color: Colors.redAccent, fontSize: 12.5)),
               ),
               _Keypad(onDigit: _push, onBackspace: _backspace),
-              if (!isSetup && _bioAvailable)
+              if (!isSetup &&
+                  _bioAvailable &&
+                  ChatLockStore.instance.biometricsFor(widget.chatId))
                 TextButton.icon(
                   onPressed: _bioPromptOpen ? null : _authenticate,
                   icon: const Icon(Icons.fingerprint,
