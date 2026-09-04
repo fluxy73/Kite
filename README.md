@@ -200,6 +200,8 @@ Détails du protocole (formats JSON, événements, codes HTTP) : voir `PROTOCOL.
 | [v0.1.3](https://github.com/fluxy73/Kite/releases/tag/v0.1.3) | Bannières OS en arrière-plan (`flutter_local_notifications`, Android/iOS/macOS/Windows/Linux, repli snackbars) ; préférences de notification par conversation (priorité, son, aperçu) ; correction de vie privée : les réglages d'un membre ne sont plus sérialisés aux autres | #18, #19 |
 | [v0.1.4](https://github.com/fluxy73/Kite/releases/tag/v0.1.4) | Défauts de notification globaux (écran de réglages, chaîne de résolution avec les préférences par conversation) ; releases automatisées (workflow de build APK + publication à chaque tag, ci-dessous) | #20, #21, #23, #22 |
 | [v0.1.5](https://github.com/fluxy73/Kite/releases/tag/v0.1.5) | Messages programmés (date/heure dans le composer, dispatch serveur automatique, livraison simulée hors-ligne, rappel local) ; messages éphémères (minuteur 24 h / 7 j / 90 j par conversation, sweep serveur, parité offline) ; verrou de discussion (code PIN 4 chiffres haché SHA-256 sur l'appareil, porte à l'ouverture, auto-lock au premier plan, aperçu masqué dans la liste) ; dossiers de conversations façon Telegram (onglets épinglés Toutes · Non lues · dossiers · +, persistés par utilisateur, appartenance multiple) | #24, #25, #26, #27 |
+| [v0.1.6](https://github.com/fluxy73/Kite/releases/tag/v0.1.6) | Déverrouillage biométrique du verrou de discussion : invite automatique à l'ouverture (local_auth, BiometricPrompt), repli code PIN, proposition à la pose du verrou, réglage dans la fiche info, préférence persistée sur l'appareil | #28 |
+| [v0.1.7](https://github.com/fluxy73/Kite/releases/tag/v0.1.7) | Biométrie du verrou **par conversation** (choix par discussion, migration transparente du réglage global) ; traduction de messages par appui long (service MyMemory sans clé API, résultat sous la bulle, bascule afficher/masquer) + fix overflow du menu contextuel sur petit écran | #31, #30 |
 
 ## Roadmap / Fonctionnalités à venir
 
@@ -218,8 +220,8 @@ Fonctionnalités prévues (non implémentées aujourd'hui) :
 
 **Messagerie**
 - Sauvegarde/export de l'historique.
-- Traduction des messages (appui long).
 - Livré en v0.1.5 : messages programmés, messages éphémères, verrou de discussion, dossiers de conversations.
+- Livré en v0.1.6/v0.1.7 : déverrouillage biométrique du verrou (global puis choix par conversation), traduction des messages.
 - Enregistrement vocal et vidéo réels, statuts de lecture précis.
 - Sondages avancés, réactions multiples.
 
