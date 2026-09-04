@@ -84,7 +84,7 @@ Sans `KITE_API`, l'app est **autonome** — aucun serveur requis :
   chaque envoi (marqué livré + lu) pour rendre la conversation vivante, et
   déclenche une **notification locale** comme un vrai message entrant.
 - **Messages éphémères** : minuteur par conversation (24 h / 7 j / 90 j) rejoué en local — horodatage `expiresAt` à l'envoi, sweep à chaque tick, filtrage à la lecture (parité avec le serveur).
-- **Verrou de discussion** : code PIN à 4 chiffres par conversation, stocké **haché (SHA-256)** sur l'appareil (`kite-chatlock.json`) — aperçu masqué dans la liste, porte PIN à l'ouverture, re-verrouillage en quittant l'écran et au retour au premier plan (auto-lock). Réglage volontairement **hors-serveur** : il protège l'accès local à la conversation, comme les brouillons.
+- **Verrou de discussion** : Code PIN à 4 chiffres par conversation, stocké **haché (SHA-256)** sur l'appareil (`kite-chatlock.json`) — aperçu masqué dans la liste, porte PIN à l'ouverture, re-verrouillage en quittant l'écran et au retour au premier plan (auto-lock). Biométrie optionnelle par conversation (empreinte/visage via local_auth, BiometricPrompt) avec repli code PIN — choix activable par discussion, persisté sur lappareil. Volontairement **hors-serveur** : il protège l'accès local à la conversation, comme les brouillons.
 - **Dossiers de conversations** : organisation Telegram-style — onglets épinglés (Toutes · Non lues · dossiers · +), appartenance multiple, miroir `LocalStore` persisté à l'identique du serveur.
 - **Notifications locales** de messages entrants : supprimées pour les
   conversations **muettes** (`mutedFor`), les messages à soi-même et les
@@ -198,6 +198,8 @@ Détails du protocole (formats JSON, événements, codes HTTP) : voir `PROTOCOL.
 | [v0.1.1](https://github.com/fluxy73/Kite/releases/tag/v0.1.1) | Sourdine par conversation avec expiration (`8h` / `1w` / `always`), persistée côté serveur comme pin/archive | #15 |
 | [v0.1.2](https://github.com/fluxy73/Kite/releases/tag/v0.1.2) | Sourdine : badge non-lus masqué + indicateur de saisie supprimé (live, relecture SSE et WS) ; notifications locales des messages entrants, respect de la sourdine, y compris hors-ligne (échos simulés notifiés) | #16, #17 |
 | [v0.1.3](https://github.com/fluxy73/Kite/releases/tag/v0.1.3) | Bannières OS en arrière-plan (`flutter_local_notifications`, Android/iOS/macOS/Windows/Linux, repli snackbars) ; préférences de notification par conversation (priorité, son, aperçu) ; correction de vie privée : les réglages d'un membre ne sont plus sérialisés aux autres | #18, #19 |
+| [v0.1.4](https://github.com/fluxy73/Kite/releases/tag/v0.1.4) | Défauts de notification globaux (écran de réglages, chaîne de résolution avec les préférences par conversation) ; releases automatisées (workflow de build APK + publication à chaque tag, ci-dessous) | #20, #21, #23, #22 |
+| [v0.1.5](https://github.com/fluxy73/Kite/releases/tag/v0.1.5) | Messages programmés (date/heure dans le composer, dispatch serveur automatique, livraison simulée hors-ligne, rappel local) ; messages éphémères (minuteur 24 h / 7 j / 90 j par conversation, sweep serveur, parité offline) ; verrou de discussion (code PIN 4 chiffres haché SHA-256 sur l'appareil, porte à l'ouverture, auto-lock au premier plan, aperçu masqué dans la liste) ; dossiers de conversations façon Telegram (onglets épinglés Toutes · Non lues · dossiers · +, persistés par utilisateur, appartenance multiple) | #24, #25, #26, #27 |
 
 ## Roadmap / Fonctionnalités à venir
 
@@ -216,12 +218,17 @@ Fonctionnalités prévues (non implémentées aujourd'hui) :
 
 **Messagerie**
 - Sauvegarde/export de l'historique.
+- Traduction des messages (appui long).
+- Livré en v0.1.5 : messages programmés, messages éphémères, verrou de discussion, dossiers de conversations.
 - Enregistrement vocal et vidéo réels, statuts de lecture précis.
 - Sondages avancés, réactions multiples.
 
 **Appels**
 - Appel entrant hors application (push + sonnerie système).
 - Rappels récurrents pour les appels planifiés.
+
+**Sécurité**
+- Verrouillage biométrique de l'app entière (au lancement), en plus du verrou par conversation.
 
 **Plateformes & distribution**
 - Synchronisation multi-appareils : fusion de l'état hors-ligne local avec le

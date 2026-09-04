@@ -39,6 +39,7 @@ class _ConversationScreenState extends State<ConversationScreen>
   Message? _editing;
   DateTime? _scheduleAt; // envoi programmé armé (null = envoi immédiat)
   bool _armingLock = false; // pose du verrou en cours (porte en mode setup)
+  bool _lockBioAvailable = false; // capacité biométrique de l'appareil (option du réglage verrou)
   late final TranslationService _translator =
       widget.translator ?? TranslationService();
   final Map<String, String> _translations = {}; // messageId -> texte traduit
@@ -63,6 +64,7 @@ class _ConversationScreenState extends State<ConversationScreen>
   @override
   void initState() {
     super.initState();
+    _probeLockBiometrics();
     WidgetsBinding.instance.addObserver(this);
 
     _load();
@@ -98,6 +100,14 @@ class _ConversationScreenState extends State<ConversationScreen>
     });
   }
 
+
+  /// Sonde la capacité biométrique une seule fois (affichage de l'option).
+  Future<void> _probeLockBiometrics() async {
+    final ok = await LocalAuthAuthenticator().isAvailable();
+    if (mounted && ok != _lockBioAvailable) {
+      setState(() => _lockBioAvailable = ok);
+    }
+  }
   @override
   void dispose() {
     DraftStore.instance.flushIfNeeded(); // brouillon écrit sur disque
@@ -1197,6 +1207,28 @@ class _ConversationScreenState extends State<ConversationScreen>
                 }
               },
             ),
+            if (_lockBioAvailable && ChatLockStore.instance.isLocked(widget.chat.id))
+              ListTile(
+                leading: Icon(Icons.fingerprint,
+                    color: ChatLockStore.instance.biometricsFor(widget.chat.id)
+                        ? KiteColors.accent
+                        : KiteColors.muted),
+                title: Text(
+                    ChatLockStore.instance.biometricsFor(widget.chat.id)
+                        ? 'Biométrie pour cette discussion : activée'
+                        : 'Biométrie pour cette discussion',
+                    style: const TextStyle(fontSize: 14.5)),
+                onTap: () {
+                  Navigator.pop(sheetCtx);
+                  final on =
+                      !ChatLockStore.instance.biometricsFor(widget.chat.id);
+                  setState(() => ChatLockStore.instance
+                      .setBiometricsFor(widget.chat.id, on));
+                  _toast(on
+                      ? 'Biométrie activée pour cette discussion — code PIN en secours'
+                      : 'Biométrie désactivée pour cette discussion — code PIN uniquement');
+                },
+              ),
             ListTile(
               leading: Icon(Icons.timer_outlined,
                   color: widget.chat.disappearing > 0
