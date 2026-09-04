@@ -33,8 +33,8 @@ class _ConversationScreenState extends State<ConversationScreen>
   Message? _replyTo;
   Message? _editing;
   DateTime? _scheduleAt; // envoi programmé armé (null = envoi immédiat)
-  bool _armingLock = false;
-  bool _lockBioAvailable = false; // pose du verrou en cours (porte en mode setup)
+  bool _armingLock = false; // pose du verrou en cours (porte en mode setup)
+  bool _lockBioAvailable = false; // capacité biométrique de l'appareil (option du réglage verrou)
   StreamSubscription<ServerEvent>? _sse;
 
   // Indicateur de saisie distant (« Lucas écrit… »).
