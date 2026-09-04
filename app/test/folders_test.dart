@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:kite/local_store.dart';
-import 'package:kite/models.dart';
 import 'package:kite/offline_api.dart';
 
 /// Dossiers façon Telegram : CRUD via OfflineApi (LocalStore miroir),
