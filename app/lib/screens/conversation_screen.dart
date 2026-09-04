@@ -34,6 +34,7 @@ class _ConversationScreenState extends State<ConversationScreen>
   Message? _editing;
   DateTime? _scheduleAt; // envoi programmé armé (null = envoi immédiat)
   bool _armingLock = false; // pose du verrou en cours (porte en mode setup)
+  bool _lockBioAvailable = false; // capacité biométrique de l'appareil (option du réglage verrou)
   StreamSubscription<ServerEvent>? _sse;
 
   // Indicateur de saisie distant (« Lucas écrit… »).
@@ -55,6 +56,7 @@ class _ConversationScreenState extends State<ConversationScreen>
   @override
   void initState() {
     super.initState();
+    _probeLockBiometrics();
     WidgetsBinding.instance.addObserver(this);
 
     _load();
@@ -90,6 +92,14 @@ class _ConversationScreenState extends State<ConversationScreen>
     });
   }
 
+
+  /// Sonde la capacité biométrique une seule fois (affichage de l'option).
+  Future<void> _probeLockBiometrics() async {
+    final ok = await LocalAuthAuthenticator().isAvailable();
+    if (mounted && ok != _lockBioAvailable) {
+      setState(() => _lockBioAvailable = ok);
+    }
+  }
   @override
   void dispose() {
     DraftStore.instance.flushIfNeeded(); // brouillon écrit sur disque
@@ -1160,6 +1170,33 @@ class _ConversationScreenState extends State<ConversationScreen>
                 }
               },
             ),
+            if (_lockBioAvailable && ChatLockStore.instance.biometricsEnabled)
+              ListTile(
+                leading: const Icon(Icons.fingerprint, color: KiteColors.accent),
+                title: const Text('Déverrouillage biométrique : activé',
+                    style: TextStyle(fontSize: 14.5)),
+                onTap: () {
+                  Navigator.pop(sheetCtx);
+                  setState(() =>
+                      ChatLockStore.instance.setBiometricsEnabled(false));
+                  _toast('Biométrie désactivée — code PIN uniquement');
+                },
+              )
+            else if (_lockBioAvailable)
+              ListTile(
+                leading: Icon(Icons.fingerprint,
+                    color: ChatLockStore.instance.biometricsEnabled
+                        ? KiteColors.accent
+                        : KiteColors.muted),
+                title: const Text('Déverrouillage biométrique',
+                    style: TextStyle(fontSize: 14.5)),
+                onTap: () {
+                  Navigator.pop(sheetCtx);
+                  setState(() =>
+                      ChatLockStore.instance.setBiometricsEnabled(true));
+                  _toast('Biométrie activée — code PIN en secours');
+                },
+              ),
             ListTile(
               leading: Icon(Icons.timer_outlined,
                   color: widget.chat.disappearing > 0
