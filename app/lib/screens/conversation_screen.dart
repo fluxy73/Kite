@@ -1170,31 +1170,26 @@ class _ConversationScreenState extends State<ConversationScreen>
                 }
               },
             ),
-            if (_lockBioAvailable && ChatLockStore.instance.biometricsEnabled)
-              ListTile(
-                leading: const Icon(Icons.fingerprint, color: KiteColors.accent),
-                title: const Text('Déverrouillage biométrique : activé',
-                    style: TextStyle(fontSize: 14.5)),
-                onTap: () {
-                  Navigator.pop(sheetCtx);
-                  setState(() =>
-                      ChatLockStore.instance.setBiometricsEnabled(false));
-                  _toast('Biométrie désactivée — code PIN uniquement');
-                },
-              )
-            else if (_lockBioAvailable)
+            if (_lockBioAvailable && ChatLockStore.instance.isLocked(widget.chat.id))
               ListTile(
                 leading: Icon(Icons.fingerprint,
-                    color: ChatLockStore.instance.biometricsEnabled
+                    color: ChatLockStore.instance.biometricsFor(widget.chat.id)
                         ? KiteColors.accent
                         : KiteColors.muted),
-                title: const Text('Déverrouillage biométrique',
-                    style: TextStyle(fontSize: 14.5)),
+                title: Text(
+                    ChatLockStore.instance.biometricsFor(widget.chat.id)
+                        ? 'Biométrie pour cette discussion : activée'
+                        : 'Biométrie pour cette discussion',
+                    style: const TextStyle(fontSize: 14.5)),
                 onTap: () {
                   Navigator.pop(sheetCtx);
-                  setState(() =>
-                      ChatLockStore.instance.setBiometricsEnabled(true));
-                  _toast('Biométrie activée — code PIN en secours');
+                  final on =
+                      !ChatLockStore.instance.biometricsFor(widget.chat.id);
+                  setState(() => ChatLockStore.instance
+                      .setBiometricsFor(widget.chat.id, on));
+                  _toast(on
+                      ? 'Biométrie activée pour cette discussion — code PIN en secours'
+                      : 'Biométrie désactivée pour cette discussion — code PIN uniquement');
                 },
               ),
             ListTile(
