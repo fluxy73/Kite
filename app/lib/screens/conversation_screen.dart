@@ -165,7 +165,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
           if (raw is Map) {
             final reac = <String, List<String>>{};
             raw.forEach((k, v) {
-              reac[k.toString()] = (v as List).map((e) => e.toString()).toList();
+              reac[k.toString()] =
+                  (v as List).map((e) => e.toString()).toList();
             });
             return m.copyWith(reactions: reac);
           }
@@ -187,6 +188,13 @@ class _ConversationScreenState extends State<ConversationScreen> {
             return m.copyWith(deleted: true);
           }
           return m.copyWith(deletedFor: [...m.deletedFor, widget.api.meId]);
+        });
+      case 'expired':
+        // Éphémères : le serveur (ou l'app locale) signale les messages disparus.
+        final ids = (data['ids'] as List?)?.map((e) => e.toString()).toSet() ??
+            const <String>{};
+        setState(() {
+          _messages.removeWhere((m) => ids.contains(m.id));
         });
       default:
         break;
@@ -266,7 +274,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
         _input.clear();
         _replyTo = null;
       });
-      DraftStore.instance.clear(widget.chat.id); // envoi réussi : brouillon parti
+      DraftStore.instance
+          .clear(widget.chat.id); // envoi réussi : brouillon parti
     } catch (e) {
       _toast('Message non envoyé — réessayer ?\n$e');
     }
@@ -401,7 +410,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
                   widget.chat.name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w600, fontSize: 15),
                 ),
                 Text(
                   widget.chat.isGroup
@@ -422,6 +432,12 @@ class _ConversationScreenState extends State<ConversationScreen> {
             tooltip: 'Appel vocal',
             onPressed: () => _toast('Appel vocal — workflow simulé'),
           ),
+          if (widget.chat.disappearing > 0)
+            IconButton(
+              icon: const Icon(Icons.timer_outlined, color: KiteColors.accent),
+              tooltip: 'Messages éphémères actifs',
+              onPressed: () => _showDisappearingPicker(context),
+            ),
           IconButton(
             icon: const Icon(Icons.more_horiz),
             tooltip: 'Infos',
@@ -439,7 +455,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
     if (_error != null) {
       return _ListError(message: _error!, onRetry: _load);
     }
-    final visible = _messages.where((m) => m.visibleTo(widget.api.meId)).toList();
+    final visible =
+        _messages.where((m) => m.visibleTo(widget.api.meId)).toList();
     if (visible.isEmpty) {
       return const _NoMessages();
     }
@@ -501,7 +518,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
         }
       }
     });
-    _toast(choice == 'yes' ? 'Vous participez 🎉' : 'Vous participez peut-être');
+    _toast(
+        choice == 'yes' ? 'Vous participez 🎉' : 'Vous participez peut-être');
   }
 
   String _senderName(String id) {
@@ -535,7 +553,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
             Padding(
               padding: const EdgeInsets.only(left: 20, bottom: 4),
               child: Text('✍ $_remoteTyping écrit…',
-                  style: const TextStyle(color: KiteColors.tint2, fontSize: 12)),
+                  style:
+                      const TextStyle(color: KiteColors.tint2, fontSize: 12)),
             ),
           if (_scheduleAt != null) _scheduleBar(),
           if (_replyTo != null) _replyBar(_replyTo!),
@@ -561,22 +580,23 @@ class _ConversationScreenState extends State<ConversationScreen> {
                     onSubmitted: (_) => _send(),
                     style: const TextStyle(color: KiteColors.fg),
                     decoration: InputDecoration(
-                      hintText: _editing != null ? 'Modifier le message…' : 'Message…',
+                      hintText: _editing != null
+                          ? 'Modifier le message…'
+                          : 'Message…',
                       hintStyle: const TextStyle(color: KiteColors.muted),
                       isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 10),
                     ),
                   ),
                 ),
                 const SizedBox(width: 8),
                 if (canSend)
                   _RoundBtn(
-                    icon: _scheduleAt != null
-                        ? Icons.schedule_send
-                        : Icons.send,
-                    tooltip: _scheduleAt != null
-                        ? 'Programmer l\'envoi'
-                        : 'Envoyer',
+                    icon:
+                        _scheduleAt != null ? Icons.schedule_send : Icons.send,
+                    tooltip:
+                        _scheduleAt != null ? 'Programmer l\'envoi' : 'Envoyer',
                     accent: true,
                     onTap: _send,
                   )
@@ -608,7 +628,15 @@ class _ConversationScreenState extends State<ConversationScreen> {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final day = DateTime(dt.year, dt.month, dt.day);
-    const days = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'];
+    const days = [
+      'lundi',
+      'mardi',
+      'mercredi',
+      'jeudi',
+      'vendredi',
+      'samedi',
+      'dimanche'
+    ];
     String two(int n) => n.toString().padLeft(2, '0');
     final hhmm = '${two(dt.hour)}:${two(dt.minute)}';
     if (day == today) return 'aujourd\'hui à $hhmm';
@@ -635,14 +663,14 @@ class _ConversationScreenState extends State<ConversationScreen> {
       helpText: 'Heure d\'envoi',
     );
     if (time == null) return;
-    final dt = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+    final dt =
+        DateTime(date.year, date.month, date.day, time.hour, time.minute);
     if (!dt.isAfter(DateTime.now())) {
       _toast('Choisis une date/heure future.');
       return;
     }
     setState(() => _scheduleAt = dt);
   }
-
 
   Widget _replyBar(Message m) {
     return _quoteBar(
@@ -679,7 +707,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
       decoration: BoxDecoration(
         color: KiteColors.surface,
         borderRadius: BorderRadius.circular(14),
-        border: const Border(left: BorderSide(color: KiteColors.accent, width: 3)),
+        border:
+            const Border(left: BorderSide(color: KiteColors.accent, width: 3)),
       ),
       child: Row(
         children: [
@@ -692,11 +721,15 @@ class _ConversationScreenState extends State<ConversationScreen> {
                 Text(title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: KiteColors.accent, fontWeight: FontWeight.w600, fontSize: 12.5)),
+                    style: const TextStyle(
+                        color: KiteColors.accent,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12.5)),
                 Text(preview,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: KiteColors.muted, fontSize: 12.5)),
+                    style: const TextStyle(
+                        color: KiteColors.muted, fontSize: 12.5)),
               ],
             ),
           ),
@@ -714,7 +747,10 @@ class _ConversationScreenState extends State<ConversationScreen> {
     final ss = (_recSec % 60).toString().padLeft(2, '0');
     return Row(
       children: [
-        _RoundBtn(icon: Icons.delete_outline, tooltip: 'Annuler', onTap: _stopRecording),
+        _RoundBtn(
+            icon: Icons.delete_outline,
+            tooltip: 'Annuler',
+            onTap: _stopRecording),
         const SizedBox(width: 8),
         Expanded(
           child: Container(
@@ -729,15 +765,27 @@ class _ConversationScreenState extends State<ConversationScreen> {
                 Container(
                   width: 8,
                   height: 8,
-                  decoration: const BoxDecoration(color: KiteColors.danger, shape: BoxShape.circle),
+                  decoration: const BoxDecoration(
+                      color: KiteColors.danger, shape: BoxShape.circle),
                 ),
                 const SizedBox(width: 10),
-                Text('$mm:$ss', style: const TextStyle(fontFamilyFallback: ['monospace'], color: KiteColors.fg)),
+                Text('$mm:$ss',
+                    style: const TextStyle(
+                        fontFamilyFallback: ['monospace'],
+                        color: KiteColors.fg)),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [for (final h in [6, 14, 22, 10, 18, 24, 12, 16]) Container(width: 2.5, height: h.toDouble(), decoration: BoxDecoration(color: KiteColors.accent.withValues(alpha: 0.7), borderRadius: BorderRadius.circular(2)))],
+                    children: [
+                      for (final h in [6, 14, 22, 10, 18, 24, 12, 16])
+                        Container(
+                            width: 2.5,
+                            height: h.toDouble(),
+                            decoration: BoxDecoration(
+                                color: KiteColors.accent.withValues(alpha: 0.7),
+                                borderRadius: BorderRadius.circular(2)))
+                    ],
                   ),
                 ),
               ],
@@ -745,7 +793,11 @@ class _ConversationScreenState extends State<ConversationScreen> {
           ),
         ),
         const SizedBox(width: 8),
-        _RoundBtn(icon: Icons.send, tooltip: 'Envoyer le vocal', accent: true, onTap: _sendVoice),
+        _RoundBtn(
+            icon: Icons.send,
+            tooltip: 'Envoyer le vocal',
+            accent: true,
+            onTap: _sendVoice),
       ],
     );
   }
@@ -787,16 +839,24 @@ class _ConversationScreenState extends State<ConversationScreen> {
             ),
             const Divider(height: 1, color: KiteColors.border),
             _menuItem(sheetCtx, Icons.reply, 'Répondre', () => _startReply(m)),
-            if (copyable) _menuItem(sheetCtx, Icons.copy_outlined, 'Copier', () => _copyText(m.text)),
-            if (mine && copyable) _menuItem(sheetCtx, Icons.edit_outlined, 'Modifier', () => _startEdit(m)),
-            _menuItem(sheetCtx, Icons.push_pin_outlined, 'Épingler', () => _toast('Message épinglé 📌')),
+            if (copyable)
+              _menuItem(sheetCtx, Icons.copy_outlined, 'Copier',
+                  () => _copyText(m.text)),
+            if (mine && copyable)
+              _menuItem(sheetCtx, Icons.edit_outlined, 'Modifier',
+                  () => _startEdit(m)),
+            _menuItem(sheetCtx, Icons.push_pin_outlined, 'Épingler',
+                () => _toast('Message épinglé 📌')),
             _menuItem(
               sheetCtx,
               m.starredFor(widget.api.meId) ? Icons.star : Icons.star_border,
-              m.starredFor(widget.api.meId) ? 'Retirer des favoris' : 'Ajouter aux favoris',
+              m.starredFor(widget.api.meId)
+                  ? 'Retirer des favoris'
+                  : 'Ajouter aux favoris',
               () => _toggleStar(m),
             ),
-            _menuItem(sheetCtx, Icons.info_outline, 'Informations', () => _showInfo(context, m)),
+            _menuItem(sheetCtx, Icons.info_outline, 'Informations',
+                () => _showInfo(context, m)),
             _menuItem(
               sheetCtx,
               Icons.delete_outline,
@@ -830,12 +890,19 @@ class _ConversationScreenState extends State<ConversationScreen> {
     }
   }
 
-  Widget _menuItem(BuildContext ctx, IconData icon, String label, VoidCallback onTap) {
+  Widget _menuItem(
+      BuildContext ctx, IconData icon, String label, VoidCallback onTap) {
     return ListTile(
-      leading: Icon(icon, color: label.startsWith('Supprimer') ? KiteColors.danger : KiteColors.accent),
+      leading: Icon(icon,
+          color: label.startsWith('Supprimer')
+              ? KiteColors.danger
+              : KiteColors.accent),
       title: Text(
         label,
-        style: TextStyle(color: label.startsWith('Supprimer') ? KiteColors.danger : KiteColors.fg),
+        style: TextStyle(
+            color: label.startsWith('Supprimer')
+                ? KiteColors.danger
+                : KiteColors.fg),
       ),
       onTap: () {
         Navigator.pop(ctx);
@@ -846,7 +913,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
 
   void _copyText(String text) {
     // Clipboard via services — simple fallback snackbar.
-    _toast('Copié : « ${text.length > 30 ? '${text.substring(0, 30)}…' : text} »');
+    _toast(
+        'Copié : « ${text.length > 30 ? '${text.substring(0, 30)}…' : text} »');
   }
 
   Future<void> _confirmDelete(BuildContext ctx, Message m, String mode) async {
@@ -855,16 +923,21 @@ class _ConversationScreenState extends State<ConversationScreen> {
       context: context,
       builder: (dialogCtx) => AlertDialog(
         backgroundColor: KiteColors.surface,
-        title: Text(mode == 'all' ? 'Supprimer pour tout le monde ?' : 'Supprimer pour moi ?'),
+        title: Text(mode == 'all'
+            ? 'Supprimer pour tout le monde ?'
+            : 'Supprimer pour moi ?'),
         content: const Text(
           'Cette action supprime le message du chat (simulation locale).',
           style: TextStyle(color: KiteColors.muted),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogCtx, 'cancel'), child: const Text('Annuler')),
+          TextButton(
+              onPressed: () => Navigator.pop(dialogCtx, 'cancel'),
+              child: const Text('Annuler')),
           TextButton(
             onPressed: () => Navigator.pop(dialogCtx, 'ok'),
-            child: const Text('Supprimer', style: TextStyle(color: KiteColors.danger)),
+            child: const Text('Supprimer',
+                style: TextStyle(color: KiteColors.danger)),
           ),
         ],
       ),
@@ -898,23 +971,29 @@ class _ConversationScreenState extends State<ConversationScreen> {
               ],
               if (widget.chat.isGroup) ...[
                 const SizedBox(height: 8),
-                const Text('Lu par', style: TextStyle(color: KiteColors.muted, fontSize: 12.5)),
+                const Text('Lu par',
+                    style: TextStyle(color: KiteColors.muted, fontSize: 12.5)),
                 for (final id in m.readBy.where((x) => x != m.senderId))
                   Padding(
                     padding: const EdgeInsets.only(top: 6),
-                    child: Text('• ${_senderName(id)}', style: const TextStyle(fontSize: 14)),
+                    child: Text('• ${_senderName(id)}',
+                        style: const TextStyle(fontSize: 14)),
                   ),
                 const SizedBox(height: 8),
-                const Text('Distribué à', style: TextStyle(color: KiteColors.muted, fontSize: 12.5)),
+                const Text('Distribué à',
+                    style: TextStyle(color: KiteColors.muted, fontSize: 12.5)),
                 for (final id in m.deliveredTo)
                   Padding(
                     padding: const EdgeInsets.only(top: 6),
-                    child: Text('• ${_senderName(id)}', style: const TextStyle(fontSize: 14)),
+                    child: Text('• ${_senderName(id)}',
+                        style: const TextStyle(fontSize: 14)),
                   ),
               ],
               const SizedBox(height: 12),
-              Text('Réactions : ${m.reactions.entries.map((e) => '${e.key} ${e.value.length}').join(' · ')}',
-                  style: const TextStyle(color: KiteColors.muted, fontSize: 12.5)),
+              Text(
+                  'Réactions : ${m.reactions.entries.map((e) => '${e.key} ${e.value.length}').join(' · ')}',
+                  style:
+                      const TextStyle(color: KiteColors.muted, fontSize: 12.5)),
             ],
           ),
         ),
@@ -929,7 +1008,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: const TextStyle(color: KiteColors.muted)),
-          Text(value, style: const TextStyle(fontFamilyFallback: ['monospace'])),
+          Text(value,
+              style: const TextStyle(fontFamilyFallback: ['monospace'])),
         ],
       ),
     );
@@ -957,12 +1037,18 @@ class _ConversationScreenState extends State<ConversationScreen> {
               padding: const EdgeInsets.all(20),
               child: Column(
                 children: [
-                  _MiniAvatar(name: widget.chat.name, group: widget.chat.isGroup, large: true),
+                  _MiniAvatar(
+                      name: widget.chat.name,
+                      group: widget.chat.isGroup,
+                      large: true),
                   const SizedBox(height: 10),
                   Text(widget.chat.name,
-                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
+                      style: const TextStyle(
+                          fontSize: 20, fontWeight: FontWeight.w600)),
                   Text(
-                    widget.chat.isGroup ? '${widget.chat.memberIds.length} membres' : 'en ligne',
+                    widget.chat.isGroup
+                        ? '${widget.chat.memberIds.length} membres'
+                        : 'en ligne',
                     style: const TextStyle(color: KiteColors.muted),
                   ),
                 ],
@@ -976,12 +1062,22 @@ class _ConversationScreenState extends State<ConversationScreen> {
                   leading: _MiniAvatar(name: _senderName(id), group: false),
                   title: Text(_senderName(id)),
                   subtitle: widget.chat.adminIds.contains(id)
-                      ? const Text('Admin', style: TextStyle(color: KiteColors.accent, fontSize: 11))
+                      ? const Text('Admin',
+                          style:
+                              TextStyle(color: KiteColors.accent, fontSize: 11))
                       : null,
                 ),
-            for (final item in const ['Médias, liens et documents', 'Messages favoris', 'Thème du chat', 'Verrouiller la discussion', 'Bloquer', 'Signaler'])
+            for (final item in const [
+              'Médias, liens et documents',
+              'Messages favoris',
+              'Thème du chat',
+              'Verrouiller la discussion',
+              'Bloquer',
+              'Signaler'
+            ])
               ListTile(
-                leading: const Icon(Icons.chevron_right, color: KiteColors.muted),
+                leading:
+                    const Icon(Icons.chevron_right, color: KiteColors.muted),
                 title: Text(item, style: const TextStyle(fontSize: 14.5)),
                 onTap: () {
                   Navigator.pop(sheetCtx);
@@ -989,8 +1085,25 @@ class _ConversationScreenState extends State<ConversationScreen> {
                 },
               ),
             ListTile(
+              leading: Icon(Icons.timer_outlined,
+                  color: widget.chat.disappearing > 0
+                      ? KiteColors.accent
+                      : KiteColors.muted),
+              title: Text(
+                widget.chat.disappearing > 0
+                    ? 'Messages éphémères : ${_disappearingLabel(widget.chat.disappearing)}'
+                    : 'Messages éphémères',
+                style: const TextStyle(fontSize: 14.5),
+              ),
+              onTap: () {
+                Navigator.pop(sheetCtx);
+                _showDisappearingPicker(context);
+              },
+            ),
+            ListTile(
               leading: const Icon(Icons.chevron_right, color: KiteColors.muted),
-              title: const Text('Notifications', style: TextStyle(fontSize: 14.5)),
+              title:
+                  const Text('Notifications', style: TextStyle(fontSize: 14.5)),
               onTap: () {
                 Navigator.pop(sheetCtx);
                 _showNotifSettings();
@@ -1000,6 +1113,90 @@ class _ConversationScreenState extends State<ConversationScreen> {
         ),
       ),
     );
+  }
+
+  // ---------- Messages éphémères (minuteur de conversation) ----------
+
+  static const int _dm24h = 24 * 3600 * 1000;
+  static const int _dm7d = 7 * 24 * 3600 * 1000;
+  static const int _dm90d = 90 * 24 * 3600 * 1000;
+
+  static String _disappearingLabel(int ms) {
+    switch (ms) {
+      case _dm24h:
+        return '24 h';
+      case _dm7d:
+        return '7 jours';
+      case _dm90d:
+        return '90 jours';
+      default:
+        return 'désactivés';
+    }
+  }
+
+  int _disappearingOverride = -1; // -1 = suivre widget.chat
+
+  Future<void> _showDisappearingPicker(BuildContext context) async {
+    const options = <int, String>{
+      0: 'Désactivé',
+      _dm24h: '24 heures',
+      _dm7d: '7 jours',
+      _dm90d: '90 jours',
+    };
+    final current = _disappearingOverride >= 0
+        ? _disappearingOverride
+        : widget.chat.disappearing;
+    final picked = await showDialog<int>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: KiteColors.surface,
+        title: const Text('Messages éphémères', style: TextStyle(fontSize: 17)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Les nouveaux messages de cette conversation disparaissent après la durée choisie.',
+              style: TextStyle(color: KiteColors.muted, fontSize: 12.5),
+            ),
+            const SizedBox(height: 8),
+            RadioGroup<int>(
+              groupValue: current,
+              onChanged: (v) => Navigator.pop(ctx, v),
+              child: Column(
+                children: [
+                  for (final e in options.entries)
+                    RadioListTile<int>(
+                      value: e.key,
+                      title:
+                          Text(e.value, style: const TextStyle(fontSize: 14.5)),
+                      activeColor: KiteColors.accent,
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Annuler'),
+          ),
+        ],
+      ),
+    );
+    if (picked == null || picked == current) return;
+    try {
+      await widget.api.setChatDisappearing(widget.chat.id, picked);
+      if (!mounted) return;
+      _toast(picked == 0
+          ? 'Messages éphémères désactivés'
+          : 'Messages éphémères : ${_disappearingLabel(picked)}');
+      setState(() {
+        _disappearingOverride = picked;
+      });
+    } catch (e) {
+      if (mounted) _toast('Échec : $e');
+    }
   }
 
   // ---------- Préférences de notification (priorité, son, aperçu) ----------
@@ -1061,7 +1258,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
           children: [
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 12),
-              child: Text('Pièces jointes', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+              child: Text('Pièces jointes',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
             ),
             GridView.count(
               crossAxisCount: 4,
@@ -1070,16 +1268,24 @@ class _ConversationScreenState extends State<ConversationScreen> {
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
               mainAxisSpacing: 14,
               children: [
-                _attachItem(sheetCtx, Icons.description_outlined, 'Document', () => _mockDocument(sheetCtx)),
-                _attachItem(sheetCtx, Icons.photo_camera_outlined, 'Caméra', () => _mockCamera(sheetCtx)),
-                _attachItem(sheetCtx, Icons.photo_library_outlined, 'Galerie', () => _mockGallery(sheetCtx)),
-                _attachItem(sheetCtx, Icons.mic_none, 'Audio', () => _mockAudio(sheetCtx)),
-                _attachItem(sheetCtx, Icons.location_on_outlined, 'Localisation', () => _mockLocation(sheetCtx)),
-                _attachItem(sheetCtx, Icons.person_outline, 'Contact', () => _mockContact(sheetCtx)),
-                _attachItem(sheetCtx, Icons.poll_outlined, 'Sondage', () => _mockPoll(sheetCtx)),
-                _attachItem(sheetCtx, Icons.event_outlined, 'Événement', () => _mockEvent(sheetCtx)),
-                _attachItem(sheetCtx, Icons.schedule_send_outlined, 'Programmer',
-                    () {
+                _attachItem(sheetCtx, Icons.description_outlined, 'Document',
+                    () => _mockDocument(sheetCtx)),
+                _attachItem(sheetCtx, Icons.photo_camera_outlined, 'Caméra',
+                    () => _mockCamera(sheetCtx)),
+                _attachItem(sheetCtx, Icons.photo_library_outlined, 'Galerie',
+                    () => _mockGallery(sheetCtx)),
+                _attachItem(sheetCtx, Icons.mic_none, 'Audio',
+                    () => _mockAudio(sheetCtx)),
+                _attachItem(sheetCtx, Icons.location_on_outlined,
+                    'Localisation', () => _mockLocation(sheetCtx)),
+                _attachItem(sheetCtx, Icons.person_outline, 'Contact',
+                    () => _mockContact(sheetCtx)),
+                _attachItem(sheetCtx, Icons.poll_outlined, 'Sondage',
+                    () => _mockPoll(sheetCtx)),
+                _attachItem(sheetCtx, Icons.event_outlined, 'Événement',
+                    () => _mockEvent(sheetCtx)),
+                _attachItem(
+                    sheetCtx, Icons.schedule_send_outlined, 'Programmer', () {
                   Navigator.pop(sheetCtx);
                   _pickSchedule();
                 }),
@@ -1116,7 +1322,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
             child: Icon(icon, color: KiteColors.accent, size: 22),
           ),
           const SizedBox(height: 6),
-          Text(label, style: const TextStyle(color: KiteColors.muted, fontSize: 10.5)),
+          Text(label,
+              style: const TextStyle(color: KiteColors.muted, fontSize: 10.5)),
         ],
       ),
     );
@@ -1124,19 +1331,28 @@ class _ConversationScreenState extends State<ConversationScreen> {
 
   // ---------- Workflows simulés de pièces jointes ----------
 
-  Future<void> _sendMedia(String type, String text, [Map<String, dynamic>? media]) async {
+  Future<void> _sendMedia(String type, String text,
+      [Map<String, dynamic>? media]) async {
     try {
-      await widget.api.sendMessage(widget.chat.id, type: type, text: text, media: media);
+      await widget.api
+          .sendMessage(widget.chat.id, type: type, text: text, media: media);
     } catch (e) {
       _toast('Envoi impossible : $e');
     }
   }
 
   Future<void> _mockDocument(BuildContext ctx) async {
-    final names = ['projet-final.pdf', 'specs.docx', 'budget.xlsx', 'presentation.pptx', 'archive.zip'];
+    final names = [
+      'projet-final.pdf',
+      'specs.docx',
+      'budget.xlsx',
+      'presentation.pptx',
+      'archive.zip'
+    ];
     final name = names[DateTime.now().millisecond % names.length];
     final ext = name.split('.').last.toUpperCase();
-    await _sendMedia('document', name, {'ext': ext, 'size': '7,8 Mo', 'pages': 24});
+    await _sendMedia(
+        'document', name, {'ext': ext, 'size': '7,8 Mo', 'pages': 24});
     _toast('Document envoyé 📄');
   }
 
@@ -1156,12 +1372,14 @@ class _ConversationScreenState extends State<ConversationScreen> {
   }
 
   Future<void> _mockLocation(BuildContext ctx) async {
-    await _sendMedia('location', '', {'name': 'Position actuelle', 'live': false});
+    await _sendMedia(
+        'location', '', {'name': 'Position actuelle', 'live': false});
     _toast('Localisation envoyée 📍');
   }
 
   Future<void> _mockContact(BuildContext ctx) async {
-    await _sendMedia('contact', '', {'name': 'Lucas Martin', 'phone': '+33 6 12 34 56 78'});
+    await _sendMedia(
+        'contact', '', {'name': 'Lucas Martin', 'phone': '+33 6 12 34 56 78'});
     _toast('Contact partagé 👤');
   }
 
@@ -1276,7 +1494,8 @@ class _RoundBtn extends StatelessWidget {
 }
 
 class _MiniAvatar extends StatelessWidget {
-  const _MiniAvatar({required this.name, required this.group, this.large = false});
+  const _MiniAvatar(
+      {required this.name, required this.group, this.large = false});
 
   final String name;
   final bool group;
@@ -1302,7 +1521,8 @@ class _MiniAvatar extends StatelessWidget {
       alignment: Alignment.center,
       child: Text(
         initials,
-        style: TextStyle(fontWeight: FontWeight.w600, fontSize: large ? 22 : 13),
+        style:
+            TextStyle(fontWeight: FontWeight.w600, fontSize: large ? 22 : 13),
       ),
     );
   }
@@ -1324,7 +1544,9 @@ class _ListError extends StatelessWidget {
           children: [
             const Icon(Icons.cloud_off, size: 44, color: KiteColors.danger),
             const SizedBox(height: 10),
-            Text(message, textAlign: TextAlign.center, style: const TextStyle(color: KiteColors.muted)),
+            Text(message,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: KiteColors.muted)),
             const SizedBox(height: 14),
             FilledButton.icon(
               onPressed: onRetry,
@@ -1410,7 +1632,8 @@ class _MessageBubble extends StatelessWidget {
             ),
             child: Text(m.text,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: KiteColors.muted, fontSize: 11.5)),
+                style:
+                    const TextStyle(color: KiteColors.muted, fontSize: 11.5)),
           ),
         ),
       );
@@ -1425,22 +1648,29 @@ class _MessageBubble extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 2),
         child: Column(
-          crossAxisAlignment: mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          crossAxisAlignment:
+              mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           children: [
             if (!mine && chat.isGroup)
               Padding(
                 padding: const EdgeInsets.only(left: 14, bottom: 2),
                 child: Text(senderName,
-                    style: const TextStyle(color: KiteColors.tint2, fontSize: 12, fontWeight: FontWeight.w600)),
+                    style: const TextStyle(
+                        color: KiteColors.tint2,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600)),
               ),
             if (replyPreview != null)
               Padding(
-                padding: EdgeInsets.only(left: mine ? 0 : 14, right: mine ? 14 : 0, bottom: 3),
+                padding: EdgeInsets.only(
+                    left: mine ? 0 : 14, right: mine ? 14 : 0, bottom: 3),
                 child: Container(
                   constraints: const BoxConstraints(maxWidth: 220),
-                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
                   decoration: BoxDecoration(
-                    border: const Border(left: BorderSide(color: KiteColors.accent, width: 2.5)),
+                    border: const Border(
+                        left: BorderSide(color: KiteColors.accent, width: 2.5)),
                     color: KiteColors.fg.withValues(alpha: 0.05),
                     borderRadius: BorderRadius.circular(8),
                   ),
@@ -1448,11 +1678,15 @@ class _MessageBubble extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(_name(replyPreview!.senderId),
-                          style: const TextStyle(color: KiteColors.accent, fontWeight: FontWeight.w600, fontSize: 12.5)),
+                          style: const TextStyle(
+                              color: KiteColors.accent,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12.5)),
                       Text(replyPreview!.preview(),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(color: KiteColors.muted, fontSize: 12.5)),
+                          style: const TextStyle(
+                              color: KiteColors.muted, fontSize: 12.5)),
                     ],
                   ),
                 ),
@@ -1471,14 +1705,17 @@ class _MessageBubble extends StatelessWidget {
                   bottomRight: Radius.circular(mine ? 6 : 18),
                 ),
                 border: Border.all(
-                  color: mine ? KiteColors.accent.withValues(alpha: 0.3) : KiteColors.border,
+                  color: mine
+                      ? KiteColors.accent.withValues(alpha: 0.3)
+                      : KiteColors.border,
                 ),
               ),
               child: _content(context, m),
             ),
             if (m.reactions.isNotEmpty)
               Padding(
-                padding: EdgeInsets.only(left: mine ? 0 : 8, right: mine ? 8 : 0, top: 3),
+                padding: EdgeInsets.only(
+                    left: mine ? 0 : 8, right: mine ? 8 : 0, top: 3),
                 child: Wrap(
                   spacing: 4,
                   children: [
@@ -1494,9 +1731,22 @@ class _MessageBubble extends StatelessWidget {
               ),
             Padding(
               padding: const EdgeInsets.only(top: 3),
-              child: Text(
-                '${_time(m.createdAt)}${m.edited ? ' · modifié' : ''}',
-                style: const TextStyle(color: KiteColors.muted, fontSize: 10, fontFamilyFallback: ['monospace']),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '${_time(m.createdAt)}${m.edited ? ' · modifié' : ''}',
+                    style: const TextStyle(
+                        color: KiteColors.muted,
+                        fontSize: 10,
+                        fontFamilyFallback: ['monospace']),
+                  ),
+                  if (m.expiresAt != null) ...[
+                    const SizedBox(width: 3),
+                    const Icon(Icons.timer_outlined,
+                        size: 11, color: KiteColors.muted),
+                  ],
+                ],
               ),
             ),
           ],
@@ -1554,7 +1804,8 @@ class _MessageBubble extends StatelessWidget {
           child: Container(
             width: 34,
             height: 34,
-            decoration: const BoxDecoration(color: KiteColors.accent, shape: BoxShape.circle),
+            decoration: const BoxDecoration(
+                color: KiteColors.accent, shape: BoxShape.circle),
             child: Icon(isPlaying ? Icons.pause : Icons.play_arrow,
                 size: 17, color: KiteColors.accentInk),
           ),
@@ -1581,7 +1832,11 @@ class _MessageBubble extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 8),
-        Text('$mm:$ss', style: const TextStyle(color: KiteColors.muted, fontSize: 11, fontFamilyFallback: ['monospace'])),
+        Text('$mm:$ss',
+            style: const TextStyle(
+                color: KiteColors.muted,
+                fontSize: 11,
+                fontFamilyFallback: ['monospace'])),
         const SizedBox(width: 6),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
@@ -1589,7 +1844,8 @@ class _MessageBubble extends StatelessWidget {
             border: Border.all(color: KiteColors.border),
             borderRadius: BorderRadius.circular(6),
           ),
-          child: const Text('1×', style: TextStyle(color: KiteColors.muted, fontSize: 10.5)),
+          child: const Text('1×',
+              style: TextStyle(color: KiteColors.muted, fontSize: 10.5)),
         ),
       ],
     );
@@ -1629,7 +1885,8 @@ class _MessageBubble extends StatelessWidget {
           children: [
             Icon(icon, size: 32, color: KiteColors.fg.withValues(alpha: 0.8)),
             const SizedBox(height: 6),
-            Text(label, style: const TextStyle(fontSize: 12, color: KiteColors.muted)),
+            Text(label,
+                style: const TextStyle(fontSize: 12, color: KiteColors.muted)),
           ],
         ),
       ),
@@ -1657,16 +1914,26 @@ class _MessageBubble extends StatelessWidget {
                 ),
                 alignment: Alignment.center,
                 child: Text(ext,
-                    style: const TextStyle(color: KiteColors.accent, fontSize: 9, fontWeight: FontWeight.w700)),
+                    style: const TextStyle(
+                        color: KiteColors.accent,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700)),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(m.text, maxLines: 1, overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
-                    Text(meta, style: const TextStyle(color: KiteColors.muted, fontSize: 11, fontFamilyFallback: ['monospace'])),
+                    Text(m.text,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w600, fontSize: 13.5)),
+                    Text(meta,
+                        style: const TextStyle(
+                            color: KiteColors.muted,
+                            fontSize: 11,
+                            fontFamilyFallback: ['monospace'])),
                   ],
                 ),
               ),
@@ -1676,7 +1943,10 @@ class _MessageBubble extends StatelessWidget {
           InkWell(
             onTap: onOpenMedia,
             child: const Text('Télécharger / Ouvrir',
-                style: TextStyle(color: KiteColors.accent, fontSize: 12.5, fontWeight: FontWeight.w600)),
+                style: TextStyle(
+                    color: KiteColors.accent,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600)),
           ),
         ],
       ),
@@ -1695,7 +1965,8 @@ class _MessageBubble extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(m.text.isNotEmpty ? m.text : 'Sondage',
-              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14.5)),
+              style:
+                  const TextStyle(fontWeight: FontWeight.w600, fontSize: 14.5)),
           const SizedBox(height: 10),
           for (var i = 0; i < rawOptions.length; i++)
             InkWell(
@@ -1713,7 +1984,9 @@ class _MessageBubble extends StatelessWidget {
                     const SizedBox(width: 8),
                     SizedBox(
                       width: 100,
-                      child: Text(rawOptions[i].toString(), maxLines: 1, overflow: TextOverflow.ellipsis,
+                      child: Text(rawOptions[i].toString(),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(fontSize: 13.5)),
                     ),
                     const SizedBox(width: 8),
@@ -1721,7 +1994,9 @@ class _MessageBubble extends StatelessWidget {
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(3),
                         child: LinearProgressIndicator(
-                          value: total == 0 ? 0 : (rawVotes[i] as num).toInt() / total,
+                          value: total == 0
+                              ? 0
+                              : (rawVotes[i] as num).toInt() / total,
                           minHeight: 6,
                           backgroundColor: KiteColors.surface2,
                           color: KiteColors.accent,
@@ -1730,7 +2005,10 @@ class _MessageBubble extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     Text('${(rawVotes[i] as num).toInt()}',
-                        style: const TextStyle(color: KiteColors.muted, fontSize: 11, fontFamilyFallback: ['monospace'])),
+                        style: const TextStyle(
+                            color: KiteColors.muted,
+                            fontSize: 11,
+                            fontFamilyFallback: ['monospace'])),
                   ],
                 ),
               ),
@@ -1740,8 +2018,12 @@ class _MessageBubble extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text('$total votes${myVoted ? ' · vous avez voté' : ''}',
-                  style: const TextStyle(color: KiteColors.muted, fontSize: 11, fontFamilyFallback: ['monospace'])),
-              const Text('Voir les votes', style: TextStyle(color: KiteColors.accent, fontSize: 11)),
+                  style: const TextStyle(
+                      color: KiteColors.muted,
+                      fontSize: 11,
+                      fontFamilyFallback: ['monospace'])),
+              const Text('Voir les votes',
+                  style: TextStyle(color: KiteColors.accent, fontSize: 11)),
             ],
           ),
         ],
@@ -1760,18 +2042,24 @@ class _MessageBubble extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.celebration_outlined, size: 17, color: KiteColors.accent),
+              const Icon(Icons.celebration_outlined,
+                  size: 17, color: KiteColors.accent),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(m.text.isNotEmpty ? m.text : 'Événement',
-                    maxLines: 1, overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w600, fontSize: 15)),
               ),
             ],
           ),
           const SizedBox(height: 4),
           Text('${media?['date'] ?? ''} · ${media?['time'] ?? ''}',
-              style: const TextStyle(color: KiteColors.muted, fontSize: 12, fontFamilyFallback: ['monospace'])),
+              style: const TextStyle(
+                  color: KiteColors.muted,
+                  fontSize: 12,
+                  fontFamilyFallback: ['monospace'])),
           const SizedBox(height: 2),
           Text('📍 ${media?['location'] ?? ''}',
               style: const TextStyle(color: KiteColors.muted, fontSize: 12)),
@@ -1783,7 +2071,8 @@ class _MessageBubble extends StatelessWidget {
             children: [
               _chip('Participer', on: rsvpYes, onTap: () => onEventRsvp('yes')),
               const SizedBox(width: 6),
-              _chip('Peut-être', on: rsvpMaybe, onTap: () => onEventRsvp('maybe')),
+              _chip('Peut-être',
+                  on: rsvpMaybe, onTap: () => onEventRsvp('maybe')),
               const SizedBox(width: 6),
               _chip('Non', on: false, onTap: () {}),
             ],
@@ -1800,13 +2089,19 @@ class _MessageBubble extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
         decoration: BoxDecoration(
-          color: on ? KiteColors.accent.withValues(alpha: 0.16) : Colors.transparent,
+          color: on
+              ? KiteColors.accent.withValues(alpha: 0.16)
+              : Colors.transparent,
           border: Border.all(
-            color: on ? KiteColors.accent.withValues(alpha: 0.5) : KiteColors.border,
+            color: on
+                ? KiteColors.accent.withValues(alpha: 0.5)
+                : KiteColors.border,
           ),
           borderRadius: BorderRadius.circular(999),
         ),
-        child: Text(label, style: TextStyle(fontSize: 12, color: on ? KiteColors.accent : KiteColors.fg)),
+        child: Text(label,
+            style: TextStyle(
+                fontSize: 12, color: on ? KiteColors.accent : KiteColors.fg)),
       ),
     );
   }
@@ -1827,9 +2122,15 @@ class _MessageBubble extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                    Text(name,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w600, fontSize: 14)),
                     if (phone.isNotEmpty)
-                      Text(phone, style: const TextStyle(color: KiteColors.muted, fontSize: 12, fontFamilyFallback: ['monospace'])),
+                      Text(phone,
+                          style: const TextStyle(
+                              color: KiteColors.muted,
+                              fontSize: 12,
+                              fontFamilyFallback: ['monospace'])),
                   ],
                 ),
               ),
@@ -1862,14 +2163,20 @@ class _MessageBubble extends StatelessWidget {
               height: 110,
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [KiteColors.tint3.withValues(alpha: 0.3), KiteColors.tint1.withValues(alpha: 0.2)],
+                  colors: [
+                    KiteColors.tint3.withValues(alpha: 0.3),
+                    KiteColors.tint1.withValues(alpha: 0.2)
+                  ],
                 ),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(Icons.location_on, size: 34, color: KiteColors.accent),
+              child: const Icon(Icons.location_on,
+                  size: 34, color: KiteColors.accent),
             ),
             const SizedBox(height: 6),
-            Text(name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+            Text(name,
+                style:
+                    const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
             const Text('Carte simulée · aucun GPS nécessaire',
                 style: TextStyle(color: KiteColors.muted, fontSize: 11)),
           ],
@@ -1887,12 +2194,14 @@ class _MessageBubble extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(missed ? Icons.call_missed : Icons.call, size: 18,
+              Icon(missed ? Icons.call_missed : Icons.call,
+                  size: 18,
                   color: missed ? KiteColors.danger : KiteColors.tint2),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(m.text.isNotEmpty ? m.text : 'Appel',
-                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w600, fontSize: 13.5)),
               ),
             ],
           ),
@@ -1925,9 +2234,13 @@ class _ReactionChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
         decoration: BoxDecoration(
-          color: mine ? KiteColors.accent.withValues(alpha: 0.16) : KiteColors.surface,
+          color: mine
+              ? KiteColors.accent.withValues(alpha: 0.16)
+              : KiteColors.surface,
           border: Border.all(
-            color: mine ? KiteColors.accent.withValues(alpha: 0.5) : KiteColors.border,
+            color: mine
+                ? KiteColors.accent.withValues(alpha: 0.5)
+                : KiteColors.border,
           ),
           borderRadius: BorderRadius.circular(999),
         ),
@@ -1988,7 +2301,8 @@ class _PollCreateDialogState extends State<_PollCreateDialog> {
             Align(
               alignment: Alignment.centerLeft,
               child: TextButton.icon(
-                onPressed: () => setState(() => _options.add(TextEditingController())),
+                onPressed: () =>
+                    setState(() => _options.add(TextEditingController())),
                 icon: const Icon(Icons.add, size: 18),
                 label: const Text('Ajouter une option'),
               ),
@@ -1996,7 +2310,8 @@ class _PollCreateDialogState extends State<_PollCreateDialog> {
             CheckboxListTile(
               value: _multi,
               onChanged: (v) => setState(() => _multi = v ?? false),
-              title: const Text('Autoriser plusieurs réponses', style: TextStyle(fontSize: 14)),
+              title: const Text('Autoriser plusieurs réponses',
+                  style: TextStyle(fontSize: 14)),
               contentPadding: EdgeInsets.zero,
               controlAffinity: ListTileControlAffinity.leading,
             ),
@@ -2011,14 +2326,19 @@ class _PollCreateDialogState extends State<_PollCreateDialog> {
         FilledButton(
           onPressed: () {
             final question = _question.text.trim();
-            final options = _options.map((c) => c.text.trim()).where((s) => s.isNotEmpty).toList();
+            final options = _options
+                .map((c) => c.text.trim())
+                .where((s) => s.isNotEmpty)
+                .toList();
             if (question.isEmpty || options.length < 2) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Question + au moins 2 options requises')),
+                const SnackBar(
+                    content: Text('Question + au moins 2 options requises')),
               );
               return;
             }
-            Navigator.pop(context, {'question': question, 'options': options, 'multi': _multi});
+            Navigator.pop(context,
+                {'question': question, 'options': options, 'multi': _multi});
           },
           child: const Text('Créer'),
         ),
@@ -2059,15 +2379,29 @@ class _EventCreateDialogState extends State<_EventCreateDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(controller: _title, autofocus: true, decoration: const InputDecoration(hintText: 'Nom')),
+            TextField(
+                controller: _title,
+                autofocus: true,
+                decoration: const InputDecoration(hintText: 'Nom')),
             const SizedBox(height: 8),
-            TextField(controller: _date, decoration: const InputDecoration(hintText: 'Date (ex. 12 septembre)')),
+            TextField(
+                controller: _date,
+                decoration:
+                    const InputDecoration(hintText: 'Date (ex. 12 septembre)')),
             const SizedBox(height: 8),
-            TextField(controller: _time, decoration: const InputDecoration(hintText: 'Heure (ex. 18:30)')),
+            TextField(
+                controller: _time,
+                decoration:
+                    const InputDecoration(hintText: 'Heure (ex. 18:30)')),
             const SizedBox(height: 8),
-            TextField(controller: _location, decoration: const InputDecoration(hintText: 'Lieu')),
+            TextField(
+                controller: _location,
+                decoration: const InputDecoration(hintText: 'Lieu')),
             const SizedBox(height: 8),
-            TextField(controller: _link, decoration: const InputDecoration(hintText: 'Lien d’appel (optionnel)')),
+            TextField(
+                controller: _link,
+                decoration: const InputDecoration(
+                    hintText: 'Lien d’appel (optionnel)')),
           ],
         ),
       ),

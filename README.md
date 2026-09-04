@@ -55,6 +55,7 @@ Authentification mockée : paramètre `?userId=` sur chaque requête.
 | POST | `/api/chats/{id}/pin` | épingle/détache la conversation pour moi (persistance, tri en tête) |
 | POST | `/api/chats/{id}/delete` | supprime la discussion pour moi (les autres membres la conservent ; un nouveau message la fait renaître) |
 | POST | `/api/chats/{id}/mute` | met en sourdine pour moi avec expiration (`8h` | `1w` | `always`), ou démute (`off`) — pendant la sourdine : badge non-lus masqué (compteur à 0, messages non marqués lus) et indicateur de saisie non diffusé vers moi (live et relecture) |
+| POST | `/api/chats/{id}/disappearing` | minuteur de **messages éphémères** de la conversation (`0` = off, `86400000` = 24 h, `604800000` = 7 j, `7776000000` = 90 j) — les messages envoyés pendant que le minuteur est actif portent `expiresAt` et disparaissent pour tous après la durée (sweep serveur 15 s + event `expired`, filtrage à la lecture) ; message système diffusé à chaque changement |
 | POST | `/api/chats/{id}/notifs` | préférences de notification pour moi : `priority` (`low`/`default`/`high`), `sound` et `preview` (booléens) ; corps vide = remise aux défauts — l'aperçu désactivé masque le texte du message dans les notifications |
 | GET/POST | `/api/notif-defaults` | défauts de notification **globaux** de l'utilisateur (toutes ses conversations sans réglage propre) ; POST corps vide = remise aux défauts de l'app ; transportés par `/api/shell` (`notifDefaults`) — chaîne de résolution : conversation > global > défauts de l'app |
 | POST | `/api/typing` | diffuse l'indicateur de saisie (éphémère, event `typing`) — sauf aux membres qui ont mis la conversation en sourdine |
@@ -81,6 +82,7 @@ Sans `KITE_API`, l'app est **autonome** — aucun serveur requis :
   que le serveur). Un **écho simulé** d'un correspondant arrive ~3 s après
   chaque envoi (marqué livré + lu) pour rendre la conversation vivante, et
   déclenche une **notification locale** comme un vrai message entrant.
+- **Messages éphémères** : minuteur par conversation (24 h / 7 j / 90 j) rejoué en local — horodatage `expiresAt` à l'envoi, sweep à chaque tick, filtrage à la lecture (parité avec le serveur).
 - **Notifications locales** de messages entrants : supprimées pour les
   conversations **muettes** (`mutedFor`), les messages à soi-même et les
   conversations ouvertes à l'écran — dans les deux modes (serveur et
@@ -121,6 +123,7 @@ Sans `KITE_API`, l'app est **autonome** — aucun serveur requis :
 | Flutter | `app/test/adaptive_shell_test.dart` | shell réel : onglets étroits vs **2 panneaux larges** avec conversation rendue dans le volet droit |
 | Flutter | `app/test/offline_lifecycle_test.dart` | cycle hors-ligne complet : seed → envoi → écho → réaction/édition/suppression → vote → appels → matching contacts → **persistance après redémarrage** |
 | Flutter | `app/test/call_center_test.dart` · `server_status_test.dart` | routage des signaux WebRTC / sonde de connexion et badge |
+| Flutter | `app/test/disappearing_messages_test.dart` | messages éphémères : minuteur → horodatage → disparition au sweep → **persistance après redémarrage** → désactivation |
 | Flutter | `app/test/new_features_test.dart` | favoris, archivage et brouillons : état + **persistance disque** (double « process ») |
 | Serveur | — | vérifications `go vet` / `go build` + flux e2e manuels (curl / WebSocket) |
 

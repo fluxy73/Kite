@@ -44,9 +44,7 @@ class LocalStore {
       final env = Platform.environment;
       String base;
       if (Platform.isWindows) {
-        base = env['APPDATA'] ??
-            env['HOME'] ??
-            Directory.current.path;
+        base = env['APPDATA'] ?? env['HOME'] ?? Directory.current.path;
       } else if (Platform.isMacOS) {
         base =
             '${env['HOME'] ?? Directory.current.path}/Library/Application Support';
@@ -89,7 +87,8 @@ class LocalStore {
     try {
       final f = File(_path);
       if (f.existsSync()) {
-        final decoded = jsonDecode(f.readAsStringSync()) as Map<String, dynamic>;
+        final decoded =
+            jsonDecode(f.readAsStringSync()) as Map<String, dynamic>;
         users = (decoded['users'] as List? ?? [])
             .map((e) => User.fromJson(e as Map<String, dynamic>))
             .toList();
@@ -109,8 +108,8 @@ class LocalStore {
             .map((e) => CallLog.fromJson(e as Map<String, dynamic>))
             .toList();
         notifDefaults.addAll((decoded['notifDefaults'] as Map? ?? {}).map(
-            (k, v) => MapEntry(k as String,
-                NotifPrefs.fromJson(v as Map<String, dynamic>))));
+            (k, v) => MapEntry(
+                k as String, NotifPrefs.fromJson(v as Map<String, dynamic>))));
         scheduledCalls = (decoded['scheduledCalls'] as List? ?? [])
             .map((e) => ScheduledCall.fromJson(e as Map<String, dynamic>))
             .toList();
@@ -133,7 +132,9 @@ class LocalStore {
   }
 
   Map<String, dynamic> _serialize() => {
-        'users': users.map((u) => {'id': u.id, 'name': u.name, 'phone': u.phone}).toList(),
+        'users': users
+            .map((u) => {'id': u.id, 'name': u.name, 'phone': u.phone})
+            .toList(),
         'chats': chats
             .map((c) => {
                   'id': c.id,
@@ -146,12 +147,12 @@ class LocalStore {
                   if (c.deletedFor.isNotEmpty) 'deletedFor': c.deletedFor,
                   if (c.mutes.isNotEmpty) 'mutes': c.mutes,
                   if (c.notifs.isNotEmpty)
-                    'notifs': c.notifs
-                        .map((k, v) => MapEntry(k, v.toJson())),
+                    'notifs': c.notifs.map((k, v) => MapEntry(k, v.toJson())),
+                  if (c.disappearing > 0) 'disappearing': c.disappearing,
                 })
             .toList(),
-        'messages': _messagesByChat.map((k, v) => MapEntry(
-            k, v.map((m) => messageToJson(m)).toList())),
+        'messages': _messagesByChat.map(
+            (k, v) => MapEntry(k, v.map((m) => messageToJson(m)).toList())),
         'calls': calls
             .map((c) => {
                   'id': c.id,
@@ -165,8 +166,7 @@ class LocalStore {
                 })
             .toList(),
         if (notifDefaults.isNotEmpty)
-          'notifDefaults': notifDefaults
-              .map((k, v) => MapEntry(k, v.toJson())),
+          'notifDefaults': notifDefaults.map((k, v) => MapEntry(k, v.toJson())),
         'scheduledMessages': scheduledMessages
             .map((m) => {
                   'id': m.id,
@@ -264,11 +264,18 @@ class LocalStore {
           chatId: 'c-lucas',
           senderId: 'u-lucas',
           type: 'text',
-          text: 'Salut ! Tu viens ce soir ? On se retrouve à 20h devant le cinéma',
+          text:
+              'Salut ! Tu viens ce soir ? On se retrouve à 20h devant le cinéma',
           createdAt: min(14),
-          reactions: const {'❤️': ['u-julien']},
-          readBy: const ['u-julien'],
-          deliveredTo: const ['u-julien']),
+          reactions: const {
+            '❤️': ['u-julien']
+          },
+          readBy: const [
+            'u-julien'
+          ],
+          deliveredTo: const [
+            'u-julien'
+          ]),
       Message(
           id: 'm-102',
           chatId: 'c-lucas',
@@ -402,8 +409,8 @@ class LocalStore {
     // Même sémantique que le serveur : masque les conversations que
     // l'utilisateur a supprimées pour lui.
     final myChats = chats
-        .where((c) =>
-            c.memberIds.contains(meId) && !c.deletedFor.contains(meId))
+        .where(
+            (c) => c.memberIds.contains(meId) && !c.deletedFor.contains(meId))
         .toList();
     return AppShell(
       users: users,
@@ -419,9 +426,7 @@ class LocalStore {
 
   List<Message> messagesFor(String chatId, String meId) {
     final list = _messagesByChat[chatId] ?? [];
-    final out = list
-        .where((m) => m.visibleTo(meId))
-        .toList()
+    final out = list.where((m) => m.visibleTo(meId)).toList()
       ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
     return out;
   }
@@ -430,6 +435,19 @@ class LocalStore {
 
   Message addMessage(String chatId, String senderId, String type, String text,
       {Map<String, dynamic>? media, String? replyTo}) {
+    // Éphémère : horodatage d'après le minuteur courant de la conversation
+    // (les messages système restent visibles).
+    int? exp;
+    if (type != 'system') {
+      for (final x in chats) {
+        if (x.id == chatId) {
+          if (x.disappearing > 0) {
+            exp = DateTime.now().millisecondsSinceEpoch + x.disappearing;
+          }
+          break;
+        }
+      }
+    }
     final m = Message(
       id: 'm-${DateTime.now().microsecondsSinceEpoch}',
       chatId: chatId,
@@ -438,6 +456,7 @@ class LocalStore {
       text: text,
       media: media,
       createdAt: DateTime.now().millisecondsSinceEpoch,
+      expiresAt: exp,
       replyTo: replyTo,
       readBy: const [],
       deliveredTo: const [],
@@ -446,8 +465,8 @@ class LocalStore {
     list.add(m);
     // Un nouveau message fait renaître la conversation pour ceux qui
     // l'avaient supprimée (comportement WhatsApp).
-    _mutateChat(chatId, (c) =>
-        c.deletedFor.isEmpty ? c : c.copyWith(deletedFor: const []));
+    _mutateChat(chatId,
+        (c) => c.deletedFor.isEmpty ? c : c.copyWith(deletedFor: const []));
     _persist();
     _changes.add(null);
     return m;
@@ -557,7 +576,8 @@ class LocalStore {
 
   /// Défauts de notification globaux de [userId] (prefs null/vide = défauts
   /// de l'app).
-  NotifPrefs notifDefaultsFor(String userId) => notifDefaults[userId] ?? const NotifPrefs();
+  NotifPrefs notifDefaultsFor(String userId) =>
+      notifDefaults[userId] ?? const NotifPrefs();
 
   void setNotifDefaults(String userId, NotifPrefs? prefs) {
     if (prefs == null || prefs.isEmpty) {
@@ -580,6 +600,51 @@ class LocalStore {
       }
       return c.copyWith(notifs: notifs);
     });
+  }
+
+  /// Minuteur de messages éphémères de la conversation (ms ; 0 = off).
+  /// Même sémantique que le serveur : réglage global, message système.
+  bool setDisappearing(String chatId, int ms) {
+    Chat? c;
+    for (final x in chats) {
+      if (x.id == chatId) {
+        c = x;
+        break;
+      }
+    }
+    if (c == null) return false;
+    addMessage(chatId, 'system', 'system', _disappearingLabel(ms));
+    _mutateChat(chatId, (x) => x.copyWith(disappearing: ms));
+    return true;
+  }
+
+  static String _disappearingLabel(int ms) {
+    if (ms == 86400000) return 'Les messages éphémères sont activés (24 h).';
+    if (ms == 604800000) return 'Les messages éphémères sont activés (7 jours).';
+    if (ms == 7776000000) return 'Les messages éphémères sont activés (90 jours).';
+    return 'Les messages éphémères sont désactivés.';
+  }
+
+  /// Retire les messages éphémères échus. Retourne les ids supprimés par
+  /// conversation (parité avec le sweep serveur).
+  Map<String, List<String>> expireSweep() {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final swept = <String, List<String>>{};
+    _messagesByChat.forEach((chatId, list) {
+      final gone = list
+          .where(
+              (m) => m.expiresAt != null && m.expiresAt! <= now && !m.deleted)
+          .map((m) => m.id)
+          .toList();
+      if (gone.isEmpty) return;
+      _messagesByChat[chatId] = [
+        for (final m in list)
+          if (gone.contains(m.id)) m.copyWith(deleted: true) else m
+      ];
+      swept[chatId] = gone;
+    });
+    if (swept.isNotEmpty) _persist();
+    return swept;
   }
 
   void _mutateChat(String chatId, Chat Function(Chat) fn) {
@@ -639,7 +704,8 @@ class LocalStore {
     if (options is! List || optionIndex < 0 || optionIndex >= options.length) {
       return false;
     }
-    final votes = List<int>.from((media['votes'] as List? ?? []).map<int>((v) => v as int));
+    final votes = List<int>.from(
+        (media['votes'] as List? ?? []).map<int>((v) => v as int));
     if (optionIndex < votes.length) {
       votes[optionIndex] += 1;
     } else {
@@ -649,7 +715,8 @@ class LocalStore {
       votes.add(1);
     }
     media['votes'] = votes;
-    final voters = List<String>.from((media['voters'] as List? ?? []).cast<String>());
+    final voters =
+        List<String>.from((media['voters'] as List? ?? []).cast<String>());
     if (!voters.contains(userId)) voters.add(userId);
     media['voters'] = voters;
     upsertMessage(m.copyWith(media: media));
@@ -767,7 +834,8 @@ class LocalStore {
   // ---------- Messages programmés ----------
 
   List<ScheduledMessage> scheduledMessagesFor(String meId) {
-    final member = chats.where((c) => c.memberIds.contains(meId)).map((c) => c.id).toSet();
+    final member =
+        chats.where((c) => c.memberIds.contains(meId)).map((c) => c.id).toSet();
     return scheduledMessages
         .where((m) => m.senderId == meId || member.contains(m.chatId))
         .toList();

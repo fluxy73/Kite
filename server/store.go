@@ -85,6 +85,10 @@ type Chat struct {
 	// Notifs : préférences de notification par utilisateur (priorité,
 	// son, aperçu). Map vide = défauts de l'app.
 	Notifs map[string]NotifPrefs `json:"notifs,omitempty"`
+	// Disappearing : durée des messages éphémères en ms (0 = désactivé).
+	// Les messages envoyés pendant que le minuteur est actif portent un
+	// ExpiresAt = createdAt + Disappearing.
+	Disappearing int64 `json:"disappearing,omitempty"`
 }
 
 // NotifPrefs : préférences de notification par conversation et par
@@ -111,6 +115,7 @@ type Message struct {
 	ReadBy      []string            `json:"readBy,omitempty"`
 	DeliveredTo []string            `json:"deliveredTo,omitempty"`
 	StarredBy   []string            `json:"starredBy,omitempty"` // userIds ayant mis en favori
+	ExpiresAt   int64               `json:"expiresAt,omitempty"` // éphémère : disparait après (epoch ms)
 }
 
 type Pending struct {
@@ -251,6 +256,41 @@ func (s *Store) memberOf(userID, chatID string) bool {
 	return ok && inSlice(c.MemberIDs, userID)
 }
 
+// setDisappearing règle le minuteur des messages éphémères de la
+// conversation (ms ; 0 = désactivé). Réglage global à la conversation,
+// comme WhatsApp.
+func (s *Store) setDisappearing(chatID string, ms int64) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i := range s.state.Chats {
+		if s.state.Chats[i].ID == chatID {
+			s.state.Chats[i].Disappearing = ms
+			_ = s.save()
+			return true
+		}
+	}
+	return false
+}
+
+// expireSweep retire définitivement tous les messages éphémères échus et
+// retourne (chatID, ids) par conversation pour diffusion de l'événement.
+func (s *Store) expireSweep(now int64) map[string][]string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	sweep := map[string][]string{}
+	for i := range s.state.Messages {
+		m := &s.state.Messages[i]
+		if m.ExpiresAt > 0 && m.ExpiresAt <= now && !m.Deleted {
+			m.Deleted = true
+			sweep[m.ChatID] = append(sweep[m.ChatID], m.ID)
+		}
+	}
+	if len(sweep) > 0 {
+		_ = s.save()
+	}
+	return sweep
+}
+
 func (s *Store) chatMessages(chatID, userID string) []Message {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -260,6 +300,9 @@ func (s *Store) chatMessages(chatID, userID string) []Message {
 			continue
 		}
 		if m.Deleted || inSlice(m.DeletedFor, userID) {
+			continue
+		}
+		if m.ExpiresAt > 0 && m.ExpiresAt <= time.Now().UnixMilli() {
 			continue
 		}
 		out = append(out, m)
@@ -761,6 +804,21 @@ func (s *Store) dueScheduledMessages(now int64) []ScheduledMessage {
 }
 
 func (s *Store) addMessage(chatID, senderID, typ, text string, media map[string]any, replyTo string) Message {
+	s.mu.Lock()
+	var exp int64
+	for i := range s.state.Chats {
+		if s.state.Chats[i].ID == chatID {
+			// Un nouveau message fait renaître la conversation pour tous ceux
+			// qui l'avaient supprimée (comportement WhatsApp).
+			s.state.Chats[i].DeletedFor = nil
+			// Éphémère : horodatage d'après le minuteur de la conversation
+			// (les messages système restent visibles).
+			if typ != "system" && s.state.Chats[i].Disappearing > 0 {
+				exp = time.Now().UnixMilli() + s.state.Chats[i].Disappearing
+			}
+			break
+		}
+	}
 	m := Message{
 		ID:        newID("m"),
 		ChatID:    chatID,
@@ -769,17 +827,9 @@ func (s *Store) addMessage(chatID, senderID, typ, text string, media map[string]
 		Text:      text,
 		Media:     media,
 		CreatedAt: time.Now().UnixMilli(),
+		ExpiresAt: exp,
 		Reactions: map[string][]string{},
 		ReplyTo:   replyTo,
-	}
-	s.mu.Lock()
-	// Un nouveau message fait renaître la conversation pour tous ceux qui
-	// l'avaient supprimée (comportement WhatsApp).
-	for i := range s.state.Chats {
-		if s.state.Chats[i].ID == chatID {
-			s.state.Chats[i].DeletedFor = nil
-			break
-		}
 	}
 	s.state.Messages = append(s.state.Messages, m)
 	s.mu.Unlock()
