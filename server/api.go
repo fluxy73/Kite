@@ -284,6 +284,81 @@ func (a *api) handleScheduledMessages(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// handleFolders gère /api/folders : CRUD des dossiers de conversations
+// (façon Telegram), persistance par utilisateur.
+//   GET    /api/folders                  -> liste des dossiers
+//   POST   /api/folders                  {name}            -> crée
+//   POST   /api/folders/{id}             {name|chatId|op}  -> renomme ou ajoute/retire ('op':'add'|'remove')
+//   DELETE /api/folders/{id}                               -> supprime
+func (a *api) handleFolders(w http.ResponseWriter, r *http.Request) {
+	uid, ok := a.userOrError(w, r)
+	if !ok {
+		return
+	}
+	switch r.Method {
+	case http.MethodGet:
+		wJSON(w, 200, a.store.foldersFor(uid))
+	case http.MethodPost:
+		if r.URL.Path == "/api/folders" {
+			var body struct {
+				Name string `json:"name"`
+			}
+			if err := readJSON(r, &body); err != nil {
+				httpError(w, 400, "corps invalide: "+err.Error())
+				return
+			}
+			f, ok := a.store.addFolder(uid, body.Name)
+			if !ok {
+				httpError(w, 400, "nom de dossier invalide ou doublon")
+				return
+			}
+			wJSON(w, 201, f)
+			return
+		}
+		folderID := strings.TrimPrefix(r.URL.Path, "/api/folders/")
+		var body struct {
+			Name  string `json:"name"`
+			ChatID string `json:"chatId"`
+			Op    string `json:"op"`
+		}
+		if err := readJSON(r, &body); err != nil {
+			httpError(w, 400, "corps invalide: "+err.Error())
+			return
+		}
+		if body.Name != "" && body.ChatID == "" {
+			if !a.store.renameFolder(uid, folderID, body.Name) {
+				httpError(w, 404, "dossier introuvable")
+				return
+			}
+			wJSON(w, 200, map[string]any{"id": folderID, "name": body.Name})
+			return
+		}
+		if body.ChatID != "" {
+			add := body.Op != "remove"
+			if !a.store.folderMembership(uid, folderID, body.ChatID, add) {
+				httpError(w, 404, "dossier ou conversation introuvable")
+				return
+			}
+			wJSON(w, 200, map[string]any{"id": folderID, "chatId": body.ChatID, "op": body.Op})
+			return
+		}
+		httpError(w, 400, "rien à faire")
+	case http.MethodDelete:
+		folderID := strings.TrimPrefix(r.URL.Path, "/api/folders/")
+		if folderID == "" {
+			httpError(w, 400, "id requis")
+			return
+		}
+		if !a.store.deleteFolder(uid, folderID) {
+			httpError(w, 404, "dossier introuvable")
+			return
+		}
+		wJSON(w, 200, map[string]any{"ok": true})
+	default:
+		httpError(w, 405, "méthode non supportée")
+	}
+}
+
 // disappearingLabel libellé système du changement de minuteur éphémère.
 func disappearingLabel(ms int64) string {
 	switch ms {
@@ -358,6 +433,7 @@ func (a *api) handleShell(w http.ResponseWriter, r *http.Request) {
 		"scheduledCalls":    a.store.scheduledCallsFor(uid),
 		"scheduledMessages": a.store.scheduledMessagesFor(uid),
 		"notifDefaults":     a.store.notifDefaultsFor(uid),
+		"folders":           a.store.foldersFor(uid),
 	})
 }
 

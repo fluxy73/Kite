@@ -240,6 +240,41 @@ class KiteApi {
         query: {'userId': meId}, body: {'disappearing': ms});
   }
 
+  // ---------- Dossiers (façon Telegram) ----------
+
+  /// Dossiers de l'utilisateur courant.
+  Future<List<ChatFolder>> fetchFolders() async {
+    final raw = await _send('GET', '/api/folders', query: {'userId': meId});
+    return (raw as List)
+        .map((e) => ChatFolder.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Crée un dossier nommé pour l'utilisateur courant.
+  Future<ChatFolder> createFolder(String name) async {
+    final raw = await _send('POST', '/api/folders',
+        query: {'userId': meId}, body: {'name': name});
+    return ChatFolder.fromJson(raw as Map<String, dynamic>);
+  }
+
+  /// Renomme un dossier.
+  Future<void> renameFolder(String folderId, String name) async {
+    await _send('POST', '/api/folders/$folderId',
+        query: {'userId': meId}, body: {'name': name});
+  }
+
+  /// Supprime un dossier (les conversations ne sont pas touchées).
+  Future<void> deleteFolder(String folderId) async =>
+      _send('DELETE', '/api/folders/$folderId', query: {'userId': meId});
+
+  /// Ajoute/retire une conversation d'un dossier.
+  Future<void> folderMembership(String folderId, String chatId,
+      {required bool add}) async {
+    await _send('POST', '/api/folders/$folderId',
+        query: {'userId': meId},
+        body: {'chatId': chatId, 'op': add ? 'add' : 'remove'});
+  }
+
   /// Défauts de notification globaux (toutes les conversations sans
   /// préférence propre). [prefs] null = remise aux défauts de l'app.
   Future<void> setNotifDefaults({NotifPrefs? prefs}) async {

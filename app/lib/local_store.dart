@@ -69,6 +69,9 @@ class LocalStore {
   List<ScheduledCall> scheduledCalls = [];
   List<ScheduledMessage> scheduledMessages = [];
 
+  /// Dossiers de conversations de l'utilisateur principal (façon Telegram).
+  final List<ChatFolder> folders = [];
+
   /// Défauts de notification globaux par utilisateur (toutes ses
   /// conversations sans préférence propre).
   final Map<String, NotifPrefs> notifDefaults = {};
@@ -116,6 +119,8 @@ class LocalStore {
         scheduledMessages = (decoded['scheduledMessages'] as List? ?? [])
             .map((e) => ScheduledMessage.fromJson(e as Map<String, dynamic>))
             .toList();
+        folders.addAll((decoded['folders'] as List? ?? [])
+            .map((e) => ChatFolder.fromJson(e as Map<String, dynamic>)));
         final msgs = decoded['messages'] as Map<String, dynamic>? ?? {};
         msgs.forEach((chatId, list) {
           _messagesByChat[chatId] = (list as List)
@@ -167,6 +172,8 @@ class LocalStore {
             .toList(),
         if (notifDefaults.isNotEmpty)
           'notifDefaults': notifDefaults.map((k, v) => MapEntry(k, v.toJson())),
+        if (folders.isNotEmpty)
+          'folders': folders.map((f) => f.toJson()).toList(),
         'scheduledMessages': scheduledMessages
             .map((m) => {
                   'id': m.id,
@@ -619,9 +626,15 @@ class LocalStore {
   }
 
   static String _disappearingLabel(int ms) {
-    if (ms == 86400000) return 'Les messages éphémères sont activés (24 h).';
-    if (ms == 604800000) return 'Les messages éphémères sont activés (7 jours).';
-    if (ms == 7776000000) return 'Les messages éphémères sont activés (90 jours).';
+    if (ms == 86400000) {
+      return 'Les messages éphémères sont activés (24 h).';
+    }
+    if (ms == 604800000) {
+      return 'Les messages éphémères sont activés (7 jours).';
+    }
+    if (ms == 7776000000) {
+      return 'Les messages éphémères sont activés (90 jours).';
+    }
     return 'Les messages éphémères sont désactivés.';
   }
 
@@ -645,6 +658,45 @@ class LocalStore {
     });
     if (swept.isNotEmpty) _persist();
     return swept;
+  }
+
+  // ---------- Dossiers (façon Telegram) ----------
+
+  void createFolder(String name) {
+    folders.add(ChatFolder(
+      id: 'fold-${DateTime.now().microsecondsSinceEpoch}',
+      name: name,
+    ));
+    _persist();
+    _changes.add(null);
+  }
+
+  void renameFolder(String folderId, String name) {
+    final i = folders.indexWhere((f) => f.id == folderId);
+    if (i < 0) return;
+    folders[i] = folders[i].copyWith(name: name);
+    _persist();
+    _changes.add(null);
+  }
+
+  void deleteFolder(String folderId) {
+    folders.removeWhere((f) => f.id == folderId);
+    _persist();
+    _changes.add(null);
+  }
+
+  void folderMembership(String folderId, String chatId, {required bool add}) {
+    final i = folders.indexWhere((f) => f.id == folderId);
+    if (i < 0) return;
+    final ids = [...folders[i].chatIds];
+    if (add) {
+      if (!ids.contains(chatId)) ids.add(chatId);
+    } else {
+      ids.remove(chatId);
+    }
+    folders[i] = folders[i].copyWith(chatIds: ids);
+    _persist();
+    _changes.add(null);
   }
 
   void _mutateChat(String chatId, Chat Function(Chat) fn) {

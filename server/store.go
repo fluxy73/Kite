@@ -1,6 +1,7 @@
 package main
 
 import (
+	"strings"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -123,6 +124,13 @@ type Pending struct {
 	Message Message `json:"message"`
 }
 
+// Folder : dossier de conversations d'un utilisateur (façon Telegram).
+type Folder struct {
+	ID      string   `json:"id"`
+	Name    string   `json:"name"`
+	ChatIDs []string `json:"chatIds"`
+}
+
 type State struct {
 	Users          []User             `json:"users"`
 	Chats          []Chat             `json:"chats"`
@@ -135,7 +143,9 @@ type State struct {
 	// NotifDefaults : défauts de notification globaux par utilisateur
 	// (toutes ses conversations sans préférence propre).
 	NotifDefaults map[string]NotifPrefs `json:"notifDefaults,omitempty"`
-	SeedVersion   int                   `json:"seedVersion"`
+	// Folders : dossiers de conversations par utilisateur (façon Telegram).
+	Folders      map[string][]Folder `json:"folders,omitempty"`
+	SeedVersion  int                 `json:"seedVersion"`
 }
 
 // seedVersion is bumped whenever the shape of seedState() changes, so an
@@ -254,6 +264,122 @@ func (s *Store) chatByID(id string) (*Chat, bool) {
 func (s *Store) memberOf(userID, chatID string) bool {
 	c, ok := s.chatByID(chatID)
 	return ok && inSlice(c.MemberIDs, userID)
+}
+
+// ---------- Dossiers (façon Telegram) ----------
+
+// foldersFor retourne les dossiers de l'utilisateur (jamais nil).
+func (s *Store) foldersFor(userID string) []Folder {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := s.state.Folders[userID]
+	if out == nil {
+		return []Folder{}
+	}
+	return out
+}
+
+// addFolder crée un dossier nommé pour l'utilisateur (nom unique, non vide).
+func (s *Store) addFolder(userID, name string) (Folder, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	name = strings.TrimSpace(name)
+	if name == "" || len(name) > 40 {
+		return Folder{}, false
+	}
+	for _, f := range s.state.Folders[userID] {
+		if strings.EqualFold(f.Name, name) {
+			return Folder{}, false // doublon (insensible à la casse)
+		}
+	}
+	f := Folder{ID: newID("fold"), Name: name, ChatIDs: []string{}}
+	if s.state.Folders == nil {
+		s.state.Folders = map[string][]Folder{}
+	}
+	s.state.Folders[userID] = append(s.state.Folders[userID], f)
+	_ = s.save()
+	return f, true
+}
+
+// renameFolder renomme un dossier APPARTENANT à l'utilisateur.
+func (s *Store) renameFolder(userID, folderID, name string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	name = strings.TrimSpace(name)
+	if name == "" || len(name) > 40 {
+		return false
+	}
+	fs := s.state.Folders[userID]
+	for i := range fs {
+		if fs[i].ID == folderID {
+			fs[i].Name = name
+			_ = s.save()
+			return true
+		}
+	}
+	return false
+}
+
+// deleteFolder supprime un dossier de l'utilisateur. Les conversations ne
+// sont pas touchées (l'appartenance à un dossier n'est qu'une étiquette).
+func (s *Store) deleteFolder(userID, folderID string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	fs := s.state.Folders[userID]
+	for i := range fs {
+		if fs[i].ID == folderID {
+			s.state.Folders[userID] = append(fs[:i], fs[i+1:]...)
+			if len(s.state.Folders[userID]) == 0 {
+				delete(s.state.Folders, userID)
+			}
+			_ = s.save()
+			return true
+		}
+	}
+	return false
+}
+
+// folderMembership ajoute/retire une conversation d'un dossier. Vérifie que
+// la conversation existe et que l'utilisateur en est membre.
+func (s *Store) folderMembership(userID, folderID, chatID string, add bool) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	fs := s.state.Folders[userID]
+	for i := range fs {
+		if fs[i].ID != folderID {
+			continue
+		}
+		if add {
+			// Vérifie l'existence du chat et l'appartenance (sans reprendre le
+			// verrou : memberOf le prend lui-même).
+			var found bool
+			for k := range s.state.Chats {
+				if s.state.Chats[k].ID == chatID {
+					found = inSlice(s.state.Chats[k].MemberIDs, userID)
+					break
+				}
+			}
+			if !found {
+				return false
+			}
+			for _, id := range fs[i].ChatIDs {
+				if id == chatID {
+					return true // déjà dedans
+				}
+			}
+			fs[i].ChatIDs = append(fs[i].ChatIDs, chatID)
+		} else {
+			for j := range fs[i].ChatIDs {
+				if fs[i].ChatIDs[j] == chatID {
+					fs[i].ChatIDs = append(fs[i].ChatIDs[:j], fs[i].ChatIDs[j+1:]...)
+					break
+				}
+			}
+		}
+		_ = s.save()
+		return true
+	}
+	return false
 }
 
 // setDisappearing règle le minuteur des messages éphémères de la

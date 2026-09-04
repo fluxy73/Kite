@@ -37,7 +37,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
   String _filter = 'Toutes';
   bool _showArchived = false;
 
-  static const _filters = ['Toutes', 'Non lues', 'Favoris', 'Groupes'];
+  // Dossiers (façon Telegram) : chargés depuis l'API/store, id sélectionné.
+  List<ChatFolder> _folders = [];
+  String? _activeFolderId;
 
   bool get _injected => widget.shell != null;
 
@@ -48,6 +50,22 @@ class _ChatListScreenState extends State<ChatListScreen> {
     if (!_injected) {
       _future = widget.api.fetchChats();
     }
+    _loadFolders();
+  }
+
+  Future<void> _loadFolders() async {
+    try {
+      final f = await widget.api.fetchFolders();
+      if (mounted) setState(() => _folders = f);
+    } catch (_) {
+      // dossiers indisponibles : la liste reste fonctionnelle sans
+    }
+  }
+
+  /// Recharge les dossiers après une mutation (create/rename/delete/membership).
+  Future<void> _mutateFolder(Future<void> Function() action) async {
+    await action();
+    await _loadFolders();
   }
 
   @override
@@ -75,6 +93,12 @@ class _ChatListScreenState extends State<ChatListScreen> {
     // Vue normale : masque mes conversations archivées (les discussions
     // supprimées « pour moi » sont déjà filtrées par l'API/store).
     chats = chats.where((c) => !c.archivedFor(me)).toList();
+    // Dossier actif : uniquement ses conversations (dans l'ordre du dossier).
+    final active = _folders.where((f) => f.id == _activeFolderId).toList();
+    if (active.isNotEmpty) {
+      final ids = active.first.chatIds.toSet();
+      chats = chats.where((c) => ids.contains(c.id)).toList();
+    }
     switch (_filter) {
       case 'Non lues':
         return chats.where((c) => c.unread > 0).toList();
@@ -180,36 +204,119 @@ class _ChatListScreenState extends State<ChatListScreen> {
   }
 
   Widget _filtersRow() {
+    // Rangée façon Telegram : Toutes · Non lues (compteur) · dossiers · +.
+    final chats0 = _injected ? (widget.shell?.chats ?? const <Chat>[]) : null;
+    int unreadCount = 0;
+    if (chats0 != null) {
+      final me = widget.api.meId;
+      unreadCount =
+          chats0.where((c) => !c.archivedFor(me) && c.unread > 0).length;
+    }
     return SizedBox(
       height: 44,
       child: ListView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
         children: [
-          for (final f in _filters)
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: FilterChip(
-                label: Text(f),
-                selected: _filter == f,
-                onSelected: (_) => setState(() => _filter = f),
-                showCheckmark: false,
-                backgroundColor: KiteColors.surface,
-                selectedColor: KiteColors.accent.withValues(alpha: 0.16),
-                side: BorderSide(
-                  color: _filter == f
-                      ? KiteColors.accent.withValues(alpha: 0.5)
-                      : KiteColors.border,
-                ),
-                labelStyle: TextStyle(
-                  color: _filter == f ? KiteColors.accent : KiteColors.muted,
-                ),
-              ),
+          _folderTab(
+            label: 'Toutes',
+            selected: _activeFolderId == null && _filter == 'Toutes',
+            onTap: () => setState(() {
+              _activeFolderId = null;
+              _filter = 'Toutes';
+            }),
+          ),
+          _folderTab(
+            label: 'Non lues',
+            count: unreadCount,
+            selected: _activeFolderId == null && _filter == 'Non lues',
+            onTap: () => setState(() {
+              _activeFolderId = null;
+              _filter = 'Non lues';
+            }),
+          ),
+          for (final f in _folders)
+            _folderTab(
+              label: f.name,
+              count: _folderUnread(f),
+              selected: _activeFolderId == f.id,
+              onTap: () => setState(() {
+                _activeFolderId = _activeFolderId == f.id ? null : f.id;
+              }),
+              onLongPress: () => _editFolder(f),
             ),
+          _folderTab(
+            label: '+',
+            selected: false,
+            onTap: _createFolder,
+          ),
         ],
       ),
     );
   }
+
+  Widget _folderTab({
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+    VoidCallback? onLongPress,
+    int count = 0,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: InkWell(
+        onTap: onTap,
+        onLongPress: onLongPress,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            color: selected
+                ? KiteColors.accent.withValues(alpha: 0.16)
+                : KiteColors.surface,
+            border: Border.all(
+              color: selected
+                  ? KiteColors.accent.withValues(alpha: 0.5)
+                  : KiteColors.border,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  color: selected ? KiteColors.accent : KiteColors.muted,
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                ),
+              ),
+              if (count > 0) ...[
+                const SizedBox(width: 6),
+                Text(
+                  '$count',
+                  style: const TextStyle(
+                    color: KiteColors.accent,
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  int _folderUnread(ChatFolder f) {
+    final chats0 = _injected ? (widget.shell?.chats ?? const <Chat>[]) : null;
+    if (chats0 == null) return 0;
+    final ids = f.chatIds.toSet();
+    return chats0.where((c) => ids.contains(c.id) && c.unread > 0).length;
+  }
+
+  // ---------- Gestion des dossiers ----------
 
   Widget _chatList(BuildContext context) {
     final chats0 = _injected ? (widget.shell?.chats ?? const <Chat>[]) : null;
@@ -348,6 +455,150 @@ class _ChatListScreenState extends State<ChatListScreen> {
     );
   }
 
+  /// Boîte de dialogue : ajoute/retire la discussion des dossiers existants.
+  Future<void> _chooseFolderForChat(BuildContext context, Chat chat) async {
+    if (_folders.isEmpty) {
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        const SnackBar(content: Text('Créez d’abord un dossier (onglet +)')),
+      );
+      return;
+    }
+    await showDialog<void>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: KiteColors.surface,
+        title: const Text('Dossiers', style: TextStyle(color: KiteColors.fg)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final f in _folders)
+              StatefulBuilder(
+                builder: (ctx, setLocal) {
+                  final member = f.chatIds.contains(chat.id);
+                  return CheckboxListTile(
+                    value: member,
+                    activeColor: KiteColors.accent,
+                    title: Text(f.name, style: const TextStyle(color: KiteColors.fg)),
+                    onChanged: (_) async {
+                      await _mutateFolder(() => widget.api
+                          .folderMembership(f.id, chat.id, add: !member));
+                      setLocal(() {});
+                    },
+                  );
+                },
+              ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text('Fermer'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _createFolder() async {
+    final controller = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: KiteColors.surface,
+        title: const Text('Nouveau dossier', style: TextStyle(fontSize: 17)),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLength: 40,
+          decoration:
+              const InputDecoration(hintText: 'ex. Travail, Famille, Clients'),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Annuler')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+              child: const Text('Créer')),
+        ],
+      ),
+    );
+    if (name == null || name.isEmpty) return;
+    try {
+      await _mutateFolder(() => widget.api.createFolder(name));
+      if (mounted) {
+        setState(() {
+          _activeFolderId = _folders.isNotEmpty ? _folders.last.id : null;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Impossible de créer le dossier : $e')));
+      }
+    }
+  }
+
+  Future<void> _editFolder(ChatFolder f) async {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: KiteColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetCtx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading:
+                  const Icon(Icons.edit_outlined, color: KiteColors.accent),
+              title: const Text('Renommer le dossier'),
+              onTap: () => Navigator.pop(sheetCtx, 'rename'),
+            ),
+            ListTile(
+              leading:
+                  const Icon(Icons.delete_outline, color: KiteColors.danger),
+              title: const Text('Supprimer le dossier'),
+              onTap: () => Navigator.pop(sheetCtx, 'delete'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (action == null || !mounted) return;
+    if (action == 'rename') {
+      final controller = TextEditingController(text: f.name);
+      final name = await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: KiteColors.surface,
+          title: const Text('Renommer', style: TextStyle(fontSize: 17)),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            maxLength: 40,
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Annuler')),
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+                child: const Text('Renommer')),
+          ],
+        ),
+      );
+      if (name == null || name.isEmpty || name == f.name) return;
+      await _mutateFolder(() => widget.api.renameFolder(f.id, name));
+    } else {
+      await _mutateFolder(() => widget.api.deleteFolder(f.id));
+      if (mounted && _activeFolderId == f.id) {
+        setState(() => _activeFolderId = null);
+      }
+    }
+  }
+
   void _openChat(BuildContext context, Chat chat) {
     if (widget.onChatSelected != null) {
       widget.onChatSelected!(chat);
@@ -424,6 +675,15 @@ class _ChatListScreenState extends State<ChatListScreen> {
                 muted
                     ? _unmute(context, chat)
                     : _chooseMuteDuration(context, chat);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.folder_outlined, color: KiteColors.accent),
+              title: const Text('Dossiers',
+                  style: TextStyle(color: KiteColors.fg)),
+              onTap: () {
+                Navigator.pop(sheetCtx);
+                _chooseFolderForChat(context, chat);
               },
             ),
             ListTile(

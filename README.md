@@ -60,6 +60,7 @@ Authentification mockée : paramètre `?userId=` sur chaque requête.
 | GET/POST | `/api/notif-defaults` | défauts de notification **globaux** de l'utilisateur (toutes ses conversations sans réglage propre) ; POST corps vide = remise aux défauts de l'app ; transportés par `/api/shell` (`notifDefaults`) — chaîne de résolution : conversation > global > défauts de l'app |
 | POST | `/api/typing` | diffuse l'indicateur de saisie (éphémère, event `typing`) — sauf aux membres qui ont mis la conversation en sourdine |
 | GET/POST/PATCH/DELETE | `/api/scheduled-calls` | liste / crée / bascule le rappel / supprime un appel planifié |
+| GET/POST/DELETE | `/api/folders` | dossiers de conversations **par utilisateur** (façon Telegram) — liste / crée / renomme / ajoute-retire une conversation / supprime ; isolation stricte entre utilisateurs |
 | GET | `/api/events` | temps réel **SSE** (repli) |
 | GET | `/api/ws` | temps réel **WebSocket** (primaire) |
 
@@ -84,6 +85,7 @@ Sans `KITE_API`, l'app est **autonome** — aucun serveur requis :
   déclenche une **notification locale** comme un vrai message entrant.
 - **Messages éphémères** : minuteur par conversation (24 h / 7 j / 90 j) rejoué en local — horodatage `expiresAt` à l'envoi, sweep à chaque tick, filtrage à la lecture (parité avec le serveur).
 - **Verrou de discussion** : code PIN à 4 chiffres par conversation, stocké **haché (SHA-256)** sur l'appareil (`kite-chatlock.json`) — aperçu masqué dans la liste, porte PIN à l'ouverture, re-verrouillage en quittant l'écran et au retour au premier plan (auto-lock). Réglage volontairement **hors-serveur** : il protège l'accès local à la conversation, comme les brouillons.
+- **Dossiers de conversations** : organisation Telegram-style — onglets épinglés (Toutes · Non lues · dossiers · +), appartenance multiple, miroir `LocalStore` persisté à l'identique du serveur.
 - **Notifications locales** de messages entrants : supprimées pour les
   conversations **muettes** (`mutedFor`), les messages à soi-même et les
   conversations ouvertes à l'écran — dans les deux modes (serveur et
@@ -124,6 +126,7 @@ Sans `KITE_API`, l'app est **autonome** — aucun serveur requis :
 | Flutter | `app/test/adaptive_shell_test.dart` | shell réel : onglets étroits vs **2 panneaux larges** avec conversation rendue dans le volet droit |
 | Flutter | `app/test/offline_lifecycle_test.dart` | cycle hors-ligne complet : seed → envoi → écho → réaction/édition/suppression → vote → appels → matching contacts → **persistance après redémarrage** |
 | Flutter | `app/test/call_center_test.dart` · `server_status_test.dart` | routage des signaux WebRTC / sonde de connexion et badge |
+| Flutter | `app/test/folders_test.dart` | dossiers : CRUD + appartenance multiple + filtrage, **persistance après redémarrage**, isolation |
 | Flutter | `app/test/disappearing_messages_test.dart` | messages éphémères : minuteur → horodatage → disparition au sweep → **persistance après redémarrage** → désactivation |
 | Flutter | `app/test/chat_lock_test.dart` | verrou de discussion : pose du PIN (4 chiffres) → déverrouillage → retrait → **persistance après redémarrage** → auto-lock |
 | Flutter | `app/test/new_features_test.dart` | favoris, archivage et brouillons : état + **persistance disque** (double « process ») |
