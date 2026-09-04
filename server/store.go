@@ -58,6 +58,18 @@ type ScheduledCall struct {
 	CreatedAt   int64    `json:"createdAt"`
 }
 
+// ScheduledMessage est un message qui sera délivré automatiquement dans
+// une conversation à son échéance (comportement type WhatsApp).
+type ScheduledMessage struct {
+	ID          string `json:"id"`
+	ChatID      string `json:"chatId"`
+	SenderID    string `json:"senderId"`
+	Text        string `json:"text,omitempty"`
+	ReplyTo     string `json:"replyTo,omitempty"`
+	ScheduledAt int64  `json:"scheduledAt"` // timestamp de livraison
+	CreatedAt   int64  `json:"createdAt"`
+}
+
 type Chat struct {
 	ID         string   `json:"id"`
 	Type       string   `json:"type"` // dm | group | community
@@ -107,13 +119,14 @@ type Pending struct {
 }
 
 type State struct {
-	Users          []User          `json:"users"`
-	Chats          []Chat          `json:"chats"`
-	Messages       []Message       `json:"messages"`
-	Pending        []Pending       `json:"pending"`
-	Calls          []CallLog       `json:"calls"`
-	CallRecords    []CallRecord    `json:"callRecords"`
-	ScheduledCalls []ScheduledCall `json:"scheduledCalls"`
+	Users          []User             `json:"users"`
+	Chats          []Chat             `json:"chats"`
+	Messages       []Message          `json:"messages"`
+	Pending        []Pending          `json:"pending"`
+	Calls          []CallLog          `json:"calls"`
+	CallRecords    []CallRecord       `json:"callRecords"`
+	ScheduledCalls []ScheduledCall    `json:"scheduledCalls"`
+	ScheduledMsgs  []ScheduledMessage `json:"scheduledMessages"`
 	// NotifDefaults : défauts de notification globaux par utilisateur
 	// (toutes ses conversations sans préférence propre).
 	NotifDefaults map[string]NotifPrefs `json:"notifDefaults,omitempty"`
@@ -679,6 +692,74 @@ func (s *Store) deleteScheduledCall(id string) bool {
 	return false
 }
 
+// addScheduledMessage enregistre un message programmé.
+func (s *Store) addScheduledMessage(sm ScheduledMessage) ScheduledMessage {
+	sm.ID = newID("sm")
+	sm.CreatedAt = time.Now().UnixMilli()
+	s.mu.Lock()
+	s.state.ScheduledMsgs = append(s.state.ScheduledMsgs, sm)
+	s.mu.Unlock()
+	_ = s.save()
+	return sm
+}
+
+// scheduledMessagesFor liste les messages programmés visibles par userID
+// (créateur ou membre de la conversation).
+func (s *Store) scheduledMessagesFor(userID string) []ScheduledMessage {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	// Un seul passage RLock : memberOf reprendrait le verrou (non réentrant).
+	member := map[string]bool{}
+	for i := range s.state.Chats {
+		if inSlice(s.state.Chats[i].MemberIDs, userID) {
+			member[s.state.Chats[i].ID] = true
+		}
+	}
+	out := []ScheduledMessage{}
+	for _, sm := range s.state.ScheduledMsgs {
+		if sm.SenderID == userID || member[sm.ChatID] {
+			out = append(out, sm)
+		}
+	}
+	return out
+}
+
+// deleteScheduledMessage supprime un message programmé (créateur uniquement).
+func (s *Store) deleteScheduledMessage(id, userID string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i := range s.state.ScheduledMsgs {
+		sm := &s.state.ScheduledMsgs[i]
+		if sm.ID == id && sm.SenderID == userID {
+			s.state.ScheduledMsgs = append(s.state.ScheduledMsgs[:i], s.state.ScheduledMsgs[i+1:]...)
+			_ = s.save()
+			return true
+		}
+	}
+	return false
+}
+
+// dueScheduledMessages extrait et retire tous les messages programmés
+// arrivés à échéance. Retourne aussi les IDs des conversations touchées.
+func (s *Store) dueScheduledMessages(now int64) []ScheduledMessage {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	due := []ScheduledMessage{}
+	rest := s.state.ScheduledMsgs[:0]
+	for _, sm := range s.state.ScheduledMsgs {
+		if sm.ScheduledAt <= now {
+			due = append(due, sm)
+		} else {
+			rest = append(rest, sm)
+		}
+	}
+	if len(due) > 0 {
+		s.state.ScheduledMsgs = rest
+		_ = s.save()
+	}
+	return due
+}
+
 func (s *Store) addMessage(chatID, senderID, typ, text string, media map[string]any, replyTo string) Message {
 	m := Message{
 		ID:        newID("m"),
@@ -935,6 +1016,10 @@ func seedState() State {
 		{ID: "sc-demo2", Title: "Catch-up Lucas", UserID: "u-julien", MemberIDs: []string{"u-lucas"}, ChatID: "c-lucas", ScheduledAt: hoursLater(3), Kind: "audio", Reminder: false},
 	}
 
+	scheduledMsgs := []ScheduledMessage{
+		{ID: "sm-demo1", ChatID: "c-lucas", SenderID: "u-julien", Text: "Bon anniversaire 🎂", ScheduledAt: now.Add(48 * time.Hour).UnixMilli()},
+	}
+
 	state := State{
 		Users:          users,
 		Chats:          chats,
@@ -943,6 +1028,7 @@ func seedState() State {
 		Calls:          calls,
 		SeedVersion:    seedVersion,
 		ScheduledCalls: scheduled,
+		ScheduledMsgs:  scheduledMsgs,
 	}
 	return state
 }

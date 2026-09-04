@@ -226,10 +226,91 @@ func (a *api) handleMessages(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// ---------- Messages programmés ----------
+
+func (a *api) handleScheduledMessages(w http.ResponseWriter, r *http.Request) {
+	uid, ok := a.userOrError(w, r)
+	if !ok {
+		return
+	}
+	switch r.Method {
+	case http.MethodGet:
+		wJSON(w, 200, a.store.scheduledMessagesFor(uid))
+	case http.MethodPost:
+		var body struct {
+			ChatID      string `json:"chatId"`
+			Text        string `json:"text"`
+			ReplyTo     string `json:"replyTo"`
+			ScheduledAt int64  `json:"scheduledAt"`
+		}
+		if err := readJSON(r, &body); err != nil {
+			httpError(w, 400, "corps invalide: "+err.Error())
+			return
+		}
+		if body.ChatID == "" || !a.store.memberOf(uid, body.ChatID) {
+			httpError(w, 404, "conversation introuvable")
+			return
+		}
+		if body.Text == "" {
+			httpError(w, 400, "texte requis")
+			return
+		}
+		if body.ScheduledAt <= time.Now().UnixMilli() {
+			httpError(w, 400, "date de programmation passée")
+			return
+		}
+		sm := a.store.addScheduledMessage(ScheduledMessage{
+			ChatID:      body.ChatID,
+			SenderID:    uid,
+			Text:        body.Text,
+			ReplyTo:     body.ReplyTo,
+			ScheduledAt: body.ScheduledAt,
+		})
+		wJSON(w, 201, sm)
+	case http.MethodDelete:
+		// /api/scheduled-messages/{id} — annulation par le créateur.
+		id := strings.TrimPrefix(r.URL.Path, "/api/scheduled-messages/")
+		if id == "" {
+			httpError(w, 400, "id requis")
+			return
+		}
+		if !a.store.deleteScheduledMessage(id, uid) {
+			httpError(w, 404, "message programmé introuvable")
+			return
+		}
+		wJSON(w, 200, map[string]any{"ok": true})
+	default:
+		httpError(w, 405, "méthode non supportée")
+	}
+}
+
+// dispatchScheduledMessages délivre tous les messages programmés échus :
+// création du message réel, diffusion temps réel, file d'attente hors-ligne.
+func (a *api) dispatchScheduledMessages() {
+	now := time.Now().UnixMilli()
+	due := a.store.dueScheduledMessages(now)
+	for _, sm := range due {
+		chat, ok := a.store.chatByID(sm.ChatID)
+		if !ok {
+			continue
+		}
+		m := a.store.addMessage(sm.ChatID, sm.SenderID, "text", sm.Text, nil, sm.ReplyTo)
+		a.hub.broadcastToUsers(chat.MemberIDs, Event{Type: "message", ChatID: sm.ChatID, Data: mustJSON(m)})
+		for _, mid := range chat.MemberIDs {
+			if mid == sm.SenderID || a.hub.isOnline(mid) {
+				continue
+			}
+			a.store.addPending(mid, m)
+		}
+	}
+}
+
 // ---------- App shell (Discussions + Appels) ----------
 
 // handleShell aggregates everything the app needs on load.
 func (a *api) handleShell(w http.ResponseWriter, r *http.Request) {
+	// Chaque accès shell collecte les messages programmés échus (robuste).
+	a.dispatchScheduledMessages()
 	uid, ok := a.userOrError(w, r)
 	if !ok {
 		return
@@ -239,11 +320,12 @@ func (a *api) handleShell(w http.ResponseWriter, r *http.Request) {
 		chats[i] = scopedSettings(chats[i], uid)
 	}
 	wJSON(w, 200, map[string]any{
-		"users":          a.store.state.Users,
-		"chats":          chats,
-		"calls":          a.store.state.Calls,
-		"scheduledCalls": a.store.scheduledCallsFor(uid),
-		"notifDefaults":  a.store.notifDefaultsFor(uid),
+		"users":             a.store.state.Users,
+		"chats":             chats,
+		"calls":             a.store.state.Calls,
+		"scheduledCalls":    a.store.scheduledCallsFor(uid),
+		"scheduledMessages": a.store.scheduledMessagesFor(uid),
+		"notifDefaults":     a.store.notifDefaultsFor(uid),
 	})
 }
 
