@@ -83,6 +83,7 @@ Sans `KITE_API`, l'app est **autonome** — aucun serveur requis :
   chaque envoi (marqué livré + lu) pour rendre la conversation vivante, et
   déclenche une **notification locale** comme un vrai message entrant.
 - **Messages éphémères** : minuteur par conversation (24 h / 7 j / 90 j) rejoué en local — horodatage `expiresAt` à l'envoi, sweep à chaque tick, filtrage à la lecture (parité avec le serveur).
+- **Verrou de discussion** : code PIN à 4 chiffres par conversation, stocké **haché (SHA-256)** sur l'appareil (`kite-chatlock.json`) — aperçu masqué dans la liste, porte PIN à l'ouverture, re-verrouillage en quittant l'écran et au retour au premier plan (auto-lock). Réglage volontairement **hors-serveur** : il protège l'accès local à la conversation, comme les brouillons.
 - **Notifications locales** de messages entrants : supprimées pour les
   conversations **muettes** (`mutedFor`), les messages à soi-même et les
   conversations ouvertes à l'écran — dans les deux modes (serveur et
@@ -124,6 +125,7 @@ Sans `KITE_API`, l'app est **autonome** — aucun serveur requis :
 | Flutter | `app/test/offline_lifecycle_test.dart` | cycle hors-ligne complet : seed → envoi → écho → réaction/édition/suppression → vote → appels → matching contacts → **persistance après redémarrage** |
 | Flutter | `app/test/call_center_test.dart` · `server_status_test.dart` | routage des signaux WebRTC / sonde de connexion et badge |
 | Flutter | `app/test/disappearing_messages_test.dart` | messages éphémères : minuteur → horodatage → disparition au sweep → **persistance après redémarrage** → désactivation |
+| Flutter | `app/test/chat_lock_test.dart` | verrou de discussion : pose du PIN (4 chiffres) → déverrouillage → retrait → **persistance après redémarrage** → auto-lock |
 | Flutter | `app/test/new_features_test.dart` | favoris, archivage et brouillons : état + **persistance disque** (double « process ») |
 | Serveur | — | vérifications `go vet` / `go build` + flux e2e manuels (curl / WebSocket) |
 

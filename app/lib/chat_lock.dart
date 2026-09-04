@@ -1,0 +1,382 @@
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:crypto/crypto.dart';
+import 'package:flutter/material.dart';
+
+import 'theme.dart';
+
+/// Verrouillage de discussions, persisté localement sur l'appareil (un JSON
+/// par app, chemin identique à [LocalStore]/[DraftStore]).
+///
+/// Le verrou protège l'accès à une conversation sur CET appareil (écran
+/// verrouillé, téléphone prêté, regard indiscret) : il est donc
+/// volontairement hors-serveur, comme les brouillons. Le code est stocké
+/// haché (SHA-256), jamais en clair.
+class ChatLockStore extends ChangeNotifier {
+  ChatLockStore._();
+  static final ChatLockStore instance = ChatLockStore._();
+
+  final Map<String, String> _hashes = {}; // chatId -> sha256(code)
+  File? _file;
+  bool _loaded = false;
+
+  /// Conversations déverrouillées dans cette session (jusqu'à verrouillage
+  /// manuel ou auto-lock au retour au premier plan).
+  final Set<String> _unlocked = {};
+
+  File? get _storeFile {
+    if (_file != null) return _file;
+    try {
+      final env = Platform.environment;
+      String base;
+      if (Platform.isWindows) {
+        base = env['APPDATA'] ?? env['HOME'] ?? Directory.current.path;
+      } else if (Platform.isMacOS) {
+        base =
+            '${env['HOME'] ?? Directory.current.path}/Library/Application Support';
+      } else {
+        base = env['HOME'] ?? Directory.current.path;
+      }
+      final dir = Directory('$base/kite');
+      if (!dir.existsSync()) dir.createSync(recursive: true);
+      _file = File('${dir.path}${Platform.pathSeparator}kite-chatlock.json');
+    } catch (_) {
+      return null; // persistance indisponible : mémoire seule
+    }
+    return _file;
+  }
+
+  void _ensureLoaded() {
+    if (_loaded) return;
+    _loaded = true;
+    final f = _storeFile;
+    if (f == null || !f.existsSync()) return;
+    try {
+      final raw = jsonDecode(f.readAsStringSync()) as Map<String, dynamic>;
+      raw.forEach((k, v) {
+        final h = v is Map<String, dynamic> ? v['hash'] as String? : null;
+        if (h != null && h.isNotEmpty) _hashes[k] = h;
+      });
+    } catch (_) {
+      // fichier corrompu : on repart de zéro (aucun verrou actif)
+    }
+  }
+
+  void _flush() {
+    final f = _storeFile;
+    if (f == null) return;
+    try {
+      f.writeAsStringSync(
+          jsonEncode(_hashes.map((k, v) => MapEntry(k, {'hash': v}))));
+    } catch (_) {}
+  }
+
+  static String _hash(String code) =>
+      sha256.convert(utf8.encode(code)).toString();
+
+  /// true si un verrou est posé sur cette conversation.
+  bool isLocked(String chatId) {
+    _ensureLoaded();
+    return _hashes.containsKey(chatId);
+  }
+
+  /// true si l'utilisateur peut ouvrir la conversation maintenant.
+  bool canOpen(String chatId) {
+    _ensureLoaded();
+    return !_hashes.containsKey(chatId) || _unlocked.contains(chatId);
+  }
+
+  /// Pose le verrou avec [code] (4-8 chiffres). Retourne false si un verrou
+  /// existe déjà ou si le code est invalide.
+  bool setLock(String chatId, String code) {
+    _ensureLoaded();
+    if (_hashes.containsKey(chatId) || !_valid(code)) return false;
+    _hashes[chatId] = _hash(code);
+    _unlocked.add(chatId); // posé à l'instant : pas besoin de le retaper
+    _flush();
+    return true;
+  }
+
+  /// Change le code (nécessite l'ancien).
+  bool changeCode(String chatId, String oldCode, String newCode) {
+    _ensureLoaded();
+    if (!_hashes.containsKey(chatId)) return false;
+    if (_hashes[chatId] != _hash(oldCode) || !_valid(newCode)) return false;
+    _hashes[chatId] = _hash(newCode);
+    _flush();
+    notifyListeners();
+    return true;
+  }
+
+  /// Vérifie le code et déverrouille la conversation pour la session.
+  bool unlock(String chatId, String code) {
+    _ensureLoaded();
+    if (_hashes[chatId] != _hash(code)) return false;
+    _unlocked.add(chatId);
+    notifyListeners();
+    return true;
+  }
+
+  /// Retire le verrou (nécessite le code).
+  bool removeLock(String chatId, String code) {
+    _ensureLoaded();
+    if (_hashes[chatId] != _hash(code)) return false;
+    _hashes.remove(chatId);
+    _unlocked.remove(chatId);
+    _flush();
+    notifyListeners();
+    return true;
+  }
+
+  /// Referme une conversation déverrouillée (bouton cadenas, app switcher…).
+  void lock(String chatId) {
+    if (_unlocked.remove(chatId)) notifyListeners();
+  }
+
+  /// Auto-lock : au retour au premier plan, toutes les conversations
+  /// déverrouillées se referment (comportement WhatsApp).
+  void lockAll() {
+    if (_unlocked.isEmpty) return;
+    _unlocked.clear();
+    notifyListeners();
+  }
+
+  static bool _valid(String code) {
+    if (code.length != 4) return false;
+    for (final c in code.runes) {
+      if (c < 0x30 || c > 0x39) return false; // chiffres uniquement
+    }
+    return true;
+  }
+
+  /// Test uniquement.
+  @visibleForTesting
+  void resetForTest({File? file}) {
+    _hashes.clear();
+    _unlocked.clear();
+    _file = file;
+    _loaded = false;
+  }
+}
+
+/// Porte d'entrée d'une conversation verrouillée : pad de code PIN.
+///
+/// Deux modes :
+/// - [LockGateMode.setup] : saisie puis confirmation d'un nouveau code
+///   (pose du verrou sur la conversation).
+/// - [LockGateMode.unlock] : déverrouillage d'une conversation déjà
+///   verrouillée (code unique, tentatives illimitées).
+///
+/// Le contenu de la conversation n'est JAMAIS construit sous la porte :
+/// un placeholder masqué est affiché à sa place (aucune fuite dans
+/// l'arbre de widgets, les captures d'écran ou les recettes de tests).
+class LockGate extends StatefulWidget {
+  const LockGate({
+    super.key,
+    required this.chatId,
+    required this.chatName,
+    required this.mode,
+    required this.onDone,
+  });
+
+  final String chatId;
+  final String chatName;
+  final LockGateMode mode;
+  final VoidCallback onDone;
+
+  @override
+  State<LockGate> createState() => _LockGateState();
+}
+
+enum LockGateMode { setup, unlock }
+
+class _LockGateState extends State<LockGate> {
+  String _code = '';
+  String? _firstCode; // setup : première saisie
+  String _error = '';
+
+  void _push(String digit) {
+    if (_code.length >= 4) return;
+    setState(() {
+      _code += digit;
+      _error = '';
+    });
+    if (_code.length == 4) _submit();
+  }
+
+  void _backspace() {
+    if (_code.isEmpty) return;
+    setState(() {
+      _code = _code.substring(0, _code.length - 1);
+      _error = '';
+    });
+  }
+
+  Future<void> _submit() async {
+    final store = ChatLockStore.instance;
+    if (widget.mode == LockGateMode.setup) {
+      if (_firstCode == null) {
+        // Étape 1 : mémoriser, faire confirmer.
+        setState(() {
+          _firstCode = _code;
+          _code = '';
+        });
+        return;
+      }
+      if (_code != _firstCode) {
+        // Confirmation différente : reprendre à zéro.
+        setState(() {
+          _firstCode = null;
+          _code = '';
+          _error = 'Les codes ne correspondent pas, recommencez';
+        });
+        return;
+      }
+      final ok = store.setLock(widget.chatId, _code);
+      if (!ok) {
+        setState(() {
+          _code = '';
+          _error = 'Impossible de poser le verrou';
+        });
+        return;
+      }
+      widget.onDone();
+      return;
+    }
+    // Mode unlock.
+    if (store.unlock(widget.chatId, _code)) {
+      widget.onDone();
+    } else {
+      setState(() {
+        _code = '';
+        _error = 'Code incorrect';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isSetup = widget.mode == LockGateMode.setup;
+    final title = isSetup
+        ? (_firstCode == null
+            ? 'Choisissez un code à 4 chiffres'
+            : 'Confirmez le code')
+        : 'Discussion verrouillée';
+    return Center(
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.lock_outline,
+                  size: 44, color: KiteColors.accent),
+              const SizedBox(height: 12),
+              Text(
+                widget.chatName,
+                style:
+                    const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 4),
+              Text(title,
+                  style:
+                      const TextStyle(color: KiteColors.muted, fontSize: 13)),
+              const SizedBox(height: 18),
+              // Points du code saisi.
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  for (var i = 0; i < 4; i++)
+                    Container(
+                      width: 14,
+                      height: 14,
+                      margin: const EdgeInsets.symmetric(horizontal: 7),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: i < _code.length
+                            ? KiteColors.accent
+                            : Colors.transparent,
+                        border: Border.all(color: KiteColors.muted),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                height: 18,
+                child: Text(_error,
+                    style: const TextStyle(
+                        color: Colors.redAccent, fontSize: 12.5)),
+              ),
+              _Keypad(onDigit: _push, onBackspace: _backspace),
+              if (!isSetup)
+                TextButton(
+                  onPressed: () => Navigator.of(context).maybePop(),
+                  child: const Text('Quitter la conversation'),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+typedef _KeypadCallback = void Function(String digit);
+
+class _Keypad extends StatelessWidget {
+  const _Keypad({required this.onDigit, required this.onBackspace});
+
+  final _KeypadCallback onDigit;
+  final VoidCallback onBackspace;
+
+  @override
+  Widget build(BuildContext context) {
+    const rows = [
+      ['1', '2', '3'],
+      ['4', '5', '6'],
+      ['7', '8', '9'],
+      ['', '0', 'del'],
+    ];
+    return SizedBox(
+      width: 240,
+      child: Column(
+        children: [
+          for (final row in rows)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                for (final key in row)
+                  SizedBox(
+                    width: 76,
+                    height: 62,
+                    child: key.isEmpty
+                        ? const SizedBox.expand()
+                        : Padding(
+                            padding: const EdgeInsets.all(4),
+                            child: key == 'del'
+                                ? IconButton(
+                                    icon: const Icon(Icons.backspace_outlined,
+                                        size: 20),
+                                    onPressed: onBackspace,
+                                  )
+                                : InkResponse(
+                                    onTap: () => onDigit(key),
+                                    radius: 28,
+                                    child: Center(
+                                      child: Text(key,
+                                          style: const TextStyle(
+                                              fontSize: 21,
+                                              fontWeight: FontWeight.w500)),
+                                    ),
+                                  ),
+                          ),
+                  ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+}

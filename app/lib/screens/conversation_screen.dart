@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../api.dart';
+import '../chat_lock.dart';
 import '../drafts.dart';
 import '../message_notifier.dart';
 import '../models.dart';
@@ -21,7 +22,8 @@ class ConversationScreen extends StatefulWidget {
   State<ConversationScreen> createState() => _ConversationScreenState();
 }
 
-class _ConversationScreenState extends State<ConversationScreen> {
+class _ConversationScreenState extends State<ConversationScreen>
+    with WidgetsBindingObserver {
   final TextEditingController _input = TextEditingController();
   final ScrollController _scroll = ScrollController();
 
@@ -31,6 +33,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
   Message? _replyTo;
   Message? _editing;
   DateTime? _scheduleAt; // envoi programmé armé (null = envoi immédiat)
+  bool _armingLock = false; // pose du verrou en cours (porte en mode setup)
   StreamSubscription<ServerEvent>? _sse;
 
   // Indicateur de saisie distant (« Lucas écrit… »).
@@ -52,6 +55,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
 
     _load();
     _sse = widget.api.realtime().listen(_onEvent, onError: (_) {});
@@ -97,9 +101,23 @@ class _ConversationScreenState extends State<ConversationScreen> {
     for (final p in _players.values) {
       p.dispose();
     }
+    WidgetsBinding.instance.removeObserver(this);
+    // Re-verrouillage en quittant la conversation (comportement WhatsApp) :
+    // le code sera redemandé à la prochaine ouverture.
+    ChatLockStore.instance.lock(widget.chat.id);
     _input.dispose();
     _scroll.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Retour au premier plan : toutes les conversations déverrouillées se
+    // referment (app switcher, prêt du téléphone...).
+    if (state == AppLifecycleState.resumed && mounted) {
+      ChatLockStore.instance.lockAll();
+      setState(() {});
+    }
   }
 
   Future<void> _load() async {
@@ -380,6 +398,41 @@ class _ConversationScreenState extends State<ConversationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Verrou de discussion : tant que la conversation n'est pas déverrouillée
+    // (ou pendant la pose du code), aucun contenu n'est construit.
+    final lockStore = ChatLockStore.instance;
+    final isLocked = lockStore.isLocked(widget.chat.id);
+    final needsGate =
+        isLocked ? !lockStore.canOpen(widget.chat.id) : _armingLock;
+    if (needsGate) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text(widget.chat.name),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () {
+              if (isLocked) {
+                Navigator.of(context).maybePop();
+              } else {
+                setState(() => _armingLock = false); // annule la pose
+              }
+            },
+          ),
+        ),
+        body: LockGate(
+          chatId: widget.chat.id,
+          chatName: widget.chat.name,
+          mode: isLocked ? LockGateMode.unlock : LockGateMode.setup,
+          onDone: () => setState(() {
+            if (isLocked) {
+              // déverrouillé : restore l'écran normal
+            } else {
+              _armingLock = false;
+            }
+          }),
+        ),
+      );
+    }
     return Scaffold(
       appBar: _appBar(),
       body: Column(
@@ -1071,7 +1124,6 @@ class _ConversationScreenState extends State<ConversationScreen> {
               'Médias, liens et documents',
               'Messages favoris',
               'Thème du chat',
-              'Verrouiller la discussion',
               'Bloquer',
               'Signaler'
             ])
@@ -1084,6 +1136,30 @@ class _ConversationScreenState extends State<ConversationScreen> {
                   _toast('$item — workflow simulé');
                 },
               ),
+            ListTile(
+              leading: Icon(
+                ChatLockStore.instance.isLocked(widget.chat.id)
+                    ? Icons.lock
+                    : Icons.lock_outline,
+                color: ChatLockStore.instance.isLocked(widget.chat.id)
+                    ? KiteColors.accent
+                    : KiteColors.muted,
+              ),
+              title: Text(
+                ChatLockStore.instance.isLocked(widget.chat.id)
+                    ? 'Retirer le verrou de la discussion'
+                    : 'Verrouiller la discussion',
+                style: const TextStyle(fontSize: 14.5),
+              ),
+              onTap: () {
+                Navigator.pop(sheetCtx);
+                if (ChatLockStore.instance.isLocked(widget.chat.id)) {
+                  _removeChatLock();
+                } else {
+                  setState(() => _armingLock = true);
+                }
+              },
+            ),
             ListTile(
               leading: Icon(Icons.timer_outlined,
                   color: widget.chat.disappearing > 0
@@ -1114,6 +1190,45 @@ class _ConversationScreenState extends State<ConversationScreen> {
       ),
     );
   }
+
+  // ---------- Verrou de discussion ----------
+
+  Future<void> _removeChatLock() async {
+    final controller = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: KiteColors.surface,
+        title: const Text('Retirer le verrou', style: TextStyle(fontSize: 17)),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          obscureText: true,
+          keyboardType: TextInputType.number,
+          maxLength: 4,
+          decoration: const InputDecoration(hintText: 'Code à 4 chiffres'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Retirer'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    if (ChatLockStore.instance.removeLock(widget.chat.id, controller.text)) {
+      if (mounted) _toast('Verrou retiré');
+    } else {
+      if (mounted) _toast('Code incorrect — verrou toujours actif');
+    }
+  }
+
+  // ---------- Verrou de discussion ----------
 
   // ---------- Messages éphémères (minuteur de conversation) ----------
 

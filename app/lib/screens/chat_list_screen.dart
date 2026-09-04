@@ -5,6 +5,7 @@ import '../models.dart';
 import '../theme.dart';
 import 'conversation_screen.dart';
 import 'global_search_screen.dart';
+import '../chat_lock.dart';
 import 'notif_defaults_screen.dart';
 
 /// Écran principal : liste des discussions (miroir de screens/chat-list.html).
@@ -43,9 +44,16 @@ class _ChatListScreenState extends State<ChatListScreen> {
   @override
   void initState() {
     super.initState();
+    ChatLockStore.instance.addListener(_refresh);
     if (!_injected) {
       _future = widget.api.fetchChats();
     }
+  }
+
+  @override
+  void dispose() {
+    ChatLockStore.instance.removeListener(_refresh);
+    super.dispose();
   }
 
   void _refresh() {
@@ -74,15 +82,16 @@ class _ChatListScreenState extends State<ChatListScreen> {
         return chats.where((c) => c.isGroup).toList();
       default:
         // Épinglées d'abord, puis par dernier message (comportement WhatsApp).
-        return chats..sort((a, b) {
-          final pa = a.pinnedFor(me) ? 0 : 1;
-          final pb = b.pinnedFor(me) ? 0 : 1;
-          if (pa != pb) return pa - pb;
-          final ta = a.lastMessage?.createdAt ?? 0;
-          final tb = b.lastMessage?.createdAt ?? 0;
-          if (ta != tb) return tb - ta;
-          return a.name.compareTo(b.name);
-        });
+        return chats
+          ..sort((a, b) {
+            final pa = a.pinnedFor(me) ? 0 : 1;
+            final pb = b.pinnedFor(me) ? 0 : 1;
+            if (pa != pb) return pa - pb;
+            final ta = a.lastMessage?.createdAt ?? 0;
+            final tb = b.lastMessage?.createdAt ?? 0;
+            if (ta != tb) return tb - ta;
+            return a.name.compareTo(b.name);
+          });
     }
   }
 
@@ -113,10 +122,13 @@ class _ChatListScreenState extends State<ChatListScreen> {
                 color: KiteColors.surface2,
                 child: ListTile(
                   dense: true,
-                  leading: const Icon(Icons.inventory_2, size: 18, color: KiteColors.tint2),
-                  title: const Text('Archivées', style: TextStyle(fontSize: 13, color: KiteColors.fg)),
+                  leading: const Icon(Icons.inventory_2,
+                      size: 18, color: KiteColors.tint2),
+                  title: const Text('Archivées',
+                      style: TextStyle(fontSize: 13, color: KiteColors.fg)),
                   trailing: IconButton(
-                    icon: const Icon(Icons.close, size: 18, color: KiteColors.muted),
+                    icon: const Icon(Icons.close,
+                        size: 18, color: KiteColors.muted),
                     onPressed: () => setState(() => _showArchived = false),
                   ),
                 ),
@@ -200,9 +212,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
   }
 
   Widget _chatList(BuildContext context) {
-    final chats0 = _injected
-        ? (widget.shell?.chats ?? const <Chat>[])
-        : null;
+    final chats0 = _injected ? (widget.shell?.chats ?? const <Chat>[]) : null;
     if (chats0 != null) {
       final chats = _applyFilter(chats0);
       if (chats.isEmpty) {
@@ -219,6 +229,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
             chat: chats[i],
             pinned: chats[i].pinnedFor(widget.api.meId),
             muted: chats[i].mutedFor(widget.api.meId),
+            locked: ChatLockStore.instance.isLocked(chats[i].id),
             onTap: () => _openChat(context, chats[i]),
             onLongPress: () => _showChatMenu(context, chats[i]),
           ),
@@ -251,7 +262,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
             itemBuilder: (context, i) => _ChatRow(
               chat: chats[i],
               pinned: chats[i].pinnedFor(widget.api.meId),
-            muted: chats[i].mutedFor(widget.api.meId),
+              muted: chats[i].mutedFor(widget.api.meId),
+              locked: ChatLockStore.instance.isLocked(chats[i].id),
               onTap: () => _openChat(context, chats[i]),
               onLongPress: () => _showChatMenu(context, chats[i]),
             ),
@@ -264,7 +276,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
   void _openSearch(BuildContext context) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => GlobalSearchScreen(api: widget.api, shell: widget.shell),
+        builder: (_) =>
+            GlobalSearchScreen(api: widget.api, shell: widget.shell),
       ),
     );
   }
@@ -281,22 +294,27 @@ class _ChatListScreenState extends State<ChatListScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.edit_outlined, color: KiteColors.accent),
-              title: const Text('Nouvelle discussion', style: TextStyle(color: KiteColors.fg)),
+              leading:
+                  const Icon(Icons.edit_outlined, color: KiteColors.accent),
+              title: const Text('Nouvelle discussion',
+                  style: TextStyle(color: KiteColors.fg)),
               onTap: () {
                 Navigator.pop(sheetCtx);
                 _newChat(context);
               },
             ),
             ListTile(
-              leading: const Icon(Icons.notifications_outlined, color: KiteColors.accent),
-              title: const Text('Notifications', style: TextStyle(color: KiteColors.fg)),
+              leading: const Icon(Icons.notifications_outlined,
+                  color: KiteColors.accent),
+              title: const Text('Notifications',
+                  style: TextStyle(color: KiteColors.fg)),
               subtitle: const Text('Défauts pour toutes les conversations',
                   style: TextStyle(fontSize: 12, color: KiteColors.muted)),
               onTap: () {
                 Navigator.pop(sheetCtx);
                 Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => NotifDefaultsScreen(api: widget.api)),
+                  MaterialPageRoute(
+                      builder: (_) => NotifDefaultsScreen(api: widget.api)),
                 );
               },
             ),
@@ -316,11 +334,12 @@ class _ChatListScreenState extends State<ChatListScreen> {
             ),
             ListTile(
               leading: const Icon(Icons.lock_outline, color: KiteColors.danger),
-              title: const Text('Verrouiller l’application', style: TextStyle(color: KiteColors.fg)),
+              title: const Text('Verrouiller l’application',
+                  style: TextStyle(color: KiteColors.fg)),
               onTap: () {
                 Navigator.pop(sheetCtx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Verrouillage bientôt disponible')));
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                    content: Text('Verrouillage bientôt disponible')));
               },
             ),
           ],
@@ -343,6 +362,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
       ),
     );
   }
+
   void _showChatMenu(BuildContext context, Chat chat) {
     final me = widget.api.meId;
     final archived = chat.archivedFor(me);
@@ -365,8 +385,12 @@ class _ChatListScreenState extends State<ChatListScreen> {
               ),
               title: Text(
                 pinned
-                    ? (chat.isGroup ? 'Détacher le groupe' : 'Détacher la discussion')
-                    : (chat.isGroup ? 'Épingler le groupe' : 'Épingler la discussion'),
+                    ? (chat.isGroup
+                        ? 'Détacher le groupe'
+                        : 'Détacher la discussion')
+                    : (chat.isGroup
+                        ? 'Épingler le groupe'
+                        : 'Épingler la discussion'),
                 style: const TextStyle(color: KiteColors.fg),
               ),
               onTap: () {
@@ -375,7 +399,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.inventory_2_outlined, color: KiteColors.accent),
+              leading: const Icon(Icons.inventory_2_outlined,
+                  color: KiteColors.accent),
               title: Text(archived ? 'Désarchiver' : 'Archiver',
                   style: const TextStyle(color: KiteColors.fg)),
               onTap: () {
@@ -385,7 +410,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
             ),
             ListTile(
               leading: Icon(
-                muted ? Icons.notifications_active_outlined : Icons.notifications_off_outlined,
+                muted
+                    ? Icons.notifications_active_outlined
+                    : Icons.notifications_off_outlined,
                 color: KiteColors.accent,
               ),
               title: Text(
@@ -394,12 +421,16 @@ class _ChatListScreenState extends State<ChatListScreen> {
               ),
               onTap: () {
                 Navigator.pop(sheetCtx);
-                muted ? _unmute(context, chat) : _chooseMuteDuration(context, chat);
+                muted
+                    ? _unmute(context, chat)
+                    : _chooseMuteDuration(context, chat);
               },
             ),
             ListTile(
-              leading: const Icon(Icons.delete_outline, color: KiteColors.danger),
-              title: const Text('Supprimer la discussion', style: TextStyle(color: KiteColors.danger)),
+              leading:
+                  const Icon(Icons.delete_outline, color: KiteColors.danger),
+              title: const Text('Supprimer la discussion',
+                  style: TextStyle(color: KiteColors.danger)),
               onTap: () {
                 Navigator.pop(sheetCtx);
                 _confirmDelete(context, chat);
@@ -429,8 +460,10 @@ class _ChatListScreenState extends State<ChatListScreen> {
               ('always', 'Toujours'),
             ])
               ListTile(
-                leading: const Icon(Icons.notifications_off_outlined, color: KiteColors.accent),
-                title: Text(label, style: const TextStyle(color: KiteColors.fg)),
+                leading: const Icon(Icons.notifications_off_outlined,
+                    color: KiteColors.accent),
+                title:
+                    Text(label, style: const TextStyle(color: KiteColors.fg)),
                 onTap: () => Navigator.pop(sheetCtx, value),
               ),
           ],
@@ -508,8 +541,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
       await widget.api.deleteChat(chat.id);
     } catch (_) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('Suppression impossible')));
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Suppression impossible')));
       }
       return;
     }
@@ -535,21 +568,27 @@ class _ChatListScreenState extends State<ChatListScreen> {
             const Padding(
               padding: EdgeInsets.fromLTRB(20, 16, 20, 8),
               child: Text('Nouvelle discussion',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: KiteColors.fg)),
+                  style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: KiteColors.fg)),
             ),
             if (contacts.isEmpty)
               const Padding(
                 padding: EdgeInsets.all(20),
-                child: Text('Aucun contact disponible', style: TextStyle(color: KiteColors.muted)),
+                child: Text('Aucun contact disponible',
+                    style: TextStyle(color: KiteColors.muted)),
               ),
             for (final u in contacts)
               ListTile(
                 leading: CircleAvatar(
                   backgroundColor: KiteColors.surface2,
                   child: Text(u.name.isNotEmpty ? u.name[0] : '?',
-                      style: const TextStyle(fontSize: 13, color: KiteColors.fg)),
+                      style:
+                          const TextStyle(fontSize: 13, color: KiteColors.fg)),
                 ),
-                title: Text(u.name, style: const TextStyle(color: KiteColors.fg)),
+                title:
+                    Text(u.name, style: const TextStyle(color: KiteColors.fg)),
                 onTap: () async {
                   Navigator.pop(sheetCtx);
                   // DM existante avec ce contact ? On l'ouvre simplement.
@@ -563,7 +602,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
                     return;
                   }
                   try {
-                    final chat = await widget.api.createChat('dm', u.name, [u.id]);
+                    final chat =
+                        await widget.api.createChat('dm', u.name, [u.id]);
                     _refresh();
                     if (context.mounted) _openChat(context, chat);
                   } catch (_) {
@@ -588,6 +628,7 @@ class _ChatRow extends StatelessWidget {
     required this.onLongPress,
     this.pinned = false,
     this.muted = false,
+    this.locked = false,
   });
 
   final Chat chat;
@@ -595,6 +636,7 @@ class _ChatRow extends StatelessWidget {
   final VoidCallback onLongPress;
   final bool pinned;
   final bool muted;
+  final bool locked;
 
   @override
   Widget build(BuildContext context) {
@@ -604,8 +646,14 @@ class _ChatRow extends StatelessWidget {
         .take(2)
         .map((w) => w[0].toUpperCase())
         .join();
-    final preview = chat.lastMessage?.preview() ?? 'Nouvelle discussion';
-    final time = chat.lastMessage == null ? '' : _timeOf(chat.lastMessage!.createdAt);
+    // Verrouillée : l'aperçu ne divulgue rien (masqué, même si la
+    // conversation est déverrouillée dans une autre vue).
+    final lockedNow = locked || ChatLockStore.instance.isLocked(chat.id);
+    final preview = lockedNow
+        ? 'Discussion verrouillée · touchez pour ouvrir'
+        : (chat.lastMessage?.preview() ?? 'Nouvelle discussion');
+    final time =
+        chat.lastMessage == null ? '' : _timeOf(chat.lastMessage!.createdAt);
     return InkWell(
       onTap: onTap,
       onLongPress: onLongPress,
@@ -622,7 +670,13 @@ class _ChatRow extends StatelessWidget {
                   Row(
                     children: [
                       if (pinned) ...[
-                        const Icon(Icons.push_pin, size: 13, color: KiteColors.muted),
+                        const Icon(Icons.push_pin,
+                            size: 13, color: KiteColors.muted),
+                        const SizedBox(width: 4),
+                      ],
+                      if (lockedNow) ...[
+                        const Icon(Icons.lock,
+                            size: 13, color: KiteColors.muted),
                         const SizedBox(width: 4),
                       ],
                       Expanded(
@@ -633,7 +687,9 @@ class _ChatRow extends StatelessWidget {
                           style: const TextStyle(fontWeight: FontWeight.w600),
                         ),
                       ),
-                      Text(time, style: const TextStyle(color: KiteColors.muted, fontSize: 11)),
+                      Text(time,
+                          style: const TextStyle(
+                              color: KiteColors.muted, fontSize: 11)),
                     ],
                   ),
                   const SizedBox(height: 2),
@@ -641,14 +697,16 @@ class _ChatRow extends StatelessWidget {
                     preview,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: KiteColors.muted, fontSize: 14),
+                    style:
+                        const TextStyle(color: KiteColors.muted, fontSize: 14),
                   ),
                 ],
               ),
             ),
             if (muted) ...[
               const SizedBox(width: 6),
-              const Icon(Icons.notifications_off, size: 14, color: KiteColors.muted),
+              const Icon(Icons.notifications_off,
+                  size: 14, color: KiteColors.muted),
             ],
             if (chat.unread > 0) ...[
               const SizedBox(width: 8),
@@ -660,7 +718,10 @@ class _ChatRow extends StatelessWidget {
                 ),
                 child: Text(
                   '${chat.unread}',
-                  style: TextStyle(color: muted ? KiteColors.bg : KiteColors.accentInk, fontSize: 11, fontWeight: FontWeight.w700),
+                  style: TextStyle(
+                      color: muted ? KiteColors.bg : KiteColors.accentInk,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700),
                 ),
               ),
             ],
@@ -741,7 +802,9 @@ class _ErrorState extends StatelessWidget {
           children: [
             const Icon(Icons.cloud_off, size: 44, color: KiteColors.danger),
             const SizedBox(height: 10),
-            Text(message, textAlign: TextAlign.center, style: const TextStyle(color: KiteColors.muted)),
+            Text(message,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: KiteColors.muted)),
             const SizedBox(height: 14),
             FilledButton.icon(
               onPressed: onRetry,
