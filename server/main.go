@@ -36,6 +36,8 @@ func main() {
 	mux.HandleFunc("/api/calls/respond", cors(a.handleCallRespond))
 	mux.HandleFunc("/api/typing", cors(a.handleTyping))
 	mux.HandleFunc("/api/notif-defaults", cors(a.handleNotifDefaults))
+	mux.HandleFunc("/api/folders", cors(a.handleFolders))
+	mux.HandleFunc("/api/folders/", cors(a.handleFolders))
 	mux.HandleFunc("/api/scheduled-messages", cors(a.handleScheduledMessages))
 	mux.HandleFunc("/api/scheduled-messages/", cors(a.handleScheduledMessages))
 	mux.HandleFunc("/api/scheduled-calls", cors(a.handleScheduledCalls))

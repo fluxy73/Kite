@@ -169,6 +169,25 @@ class OfflineApi {
     _events.add(ServerEvent('shell', {'userId': meId}));
   }
 
+  // ---------- Dossiers (façon Telegram) ----------
+
+  /// Dossiers de l'utilisateur courant.
+  Future<List<ChatFolder>> fetchFolders() async => _s.folders;
+
+  Future<ChatFolder> createFolder(String name) async {
+    _s.createFolder(name);
+    return _s.folders.last;
+  }
+
+  Future<void> renameFolder(String folderId, String name) async =>
+      _s.renameFolder(folderId, name);
+
+  Future<void> deleteFolder(String folderId) async => _s.deleteFolder(folderId);
+
+  Future<void> folderMembership(String folderId, String chatId,
+          {required bool add}) async =>
+      _s.folderMembership(folderId, chatId, add: add);
+
   Future<void> setNotifDefaults({NotifPrefs? prefs}) async {
     _s.setNotifDefaults(meId, prefs);
   }

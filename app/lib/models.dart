@@ -155,6 +155,7 @@ class AppShell {
     this.scheduledCalls = const [],
     this.scheduledMessages = const [],
     this.notifDefaults = const NotifPrefs(),
+    this.folders = const [],
   });
 
   final List<User> users;
@@ -166,6 +167,9 @@ class AppShell {
   /// Défauts de notification globaux de l'utilisateur (pour toutes les
   /// conversations sans préférence propre).
   final NotifPrefs notifDefaults;
+
+  /// Dossiers de conversations de l'utilisateur (façon Telegram).
+  final List<ChatFolder> folders;
 
   factory AppShell.fromJson(Map<String, dynamic> json) => AppShell(
         users: (json['users'] as List? ?? [])
@@ -187,6 +191,9 @@ class AppShell {
             ? const NotifPrefs()
             : NotifPrefs.fromJson(
                 json['notifDefaults'] as Map<String, dynamic>),
+        folders: (json['folders'] as List? ?? [])
+            .map((e) => ChatFolder.fromJson(e as Map<String, dynamic>))
+            .toList(),
       );
 }
 
@@ -532,4 +539,36 @@ extension MessageCopyWith on Message {
         starredBy: starredBy ?? this.starredBy,
         expiresAt: expiresAt ?? this.expiresAt,
       );
+}
+
+/// Dossier de conversations (façon Telegram) : un nom et une liste de
+/// conversations, par utilisateur. Persisté côté serveur et en local.
+class ChatFolder {
+  const ChatFolder({
+    required this.id,
+    required this.name,
+    this.chatIds = const [],
+  });
+
+  final String id;
+  final String name;
+  final List<String> chatIds; // ordre d'ajout
+
+  ChatFolder copyWith({String? name, List<String>? chatIds}) => ChatFolder(
+        id: id,
+        name: name ?? this.name,
+        chatIds: chatIds ?? this.chatIds,
+      );
+
+  factory ChatFolder.fromJson(Map<String, dynamic> json) => ChatFolder(
+        id: json['id'] as String,
+        name: json['name'] as String,
+        chatIds: (json['chatIds'] as List? ?? []).cast<String>(),
+      );
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'chatIds': chatIds,
+      };
 }
