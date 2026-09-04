@@ -53,6 +53,45 @@ class MessageNotifier {
   StreamSubscription<ServerEvent>? _sub;
   final Set<String> _openChats = {};
   final Map<String, String> _userNames = {};
+  Timer? _schedTimer;
+  final Set<String> _schedNotified = {};
+
+  /// Un message programmé part dans moins de 60 s : notification locale.
+  Future<void> _checkScheduled() async {
+    final api = _api;
+    if (api == null) return;
+    try {
+      final list = await api.fetchScheduledMessages() as List<ScheduledMessage>;
+      final now = DateTime.now().millisecondsSinceEpoch;
+      for (final sm in list) {
+        if (sm.senderId != _meId || _schedNotified.contains(sm.id)) continue;
+        final delta = sm.scheduledAt - now;
+        if (delta > 0 && delta <= 60 * 1000) {
+          _schedNotified.add(sm.id);
+          final chat = await _chat(sm.chatId);
+          final chatName = (chat?.name.isNotEmpty ?? false)
+              ? chat!.name
+              : _otherName(chat ??
+                  Chat(id: sm.chatId, type: 'dm', name: '', memberIds: const [], adminIds: const []));
+          last.value = MessageNotification(
+            chatId: sm.chatId,
+            message: Message(
+              id: 'sched-${sm.id}',
+              chatId: sm.chatId,
+              senderId: sm.senderId,
+              type: 'system',
+              text: 'Envoi programmé dans moins d\'une minute : « ${sm.text} »',
+              createdAt: now,
+            ),
+            chatName: chatName,
+            senderName: '',
+          );
+        }
+      }
+    } catch (_) {
+      // Pas grave : le rappel ratera, la livraison reste assurée.
+    }
+  }
   String? _meId;
   dynamic _api;
 
@@ -72,6 +111,9 @@ class MessageNotifier {
     _meId = meId;
     _sub = api.realtime().listen(handleEvent, onError: (_) {});
     _loadUsers(api);
+    // Rappel « envoi imminent » à T-60 s pour les messages programmés.
+    _schedTimer ??=
+        Timer.periodic(const Duration(seconds: 20), (_) => _checkScheduled());
   }
 
   Future<void> _loadUsers(dynamic api) async {
@@ -91,6 +133,8 @@ class MessageNotifier {
   void stop() {
     _sub?.cancel();
     _sub = null;
+    _schedTimer?.cancel();
+    _schedTimer = null;
     last.value = null;
   }
 

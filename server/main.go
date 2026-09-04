@@ -36,8 +36,17 @@ func main() {
 	mux.HandleFunc("/api/calls/respond", cors(a.handleCallRespond))
 	mux.HandleFunc("/api/typing", cors(a.handleTyping))
 	mux.HandleFunc("/api/notif-defaults", cors(a.handleNotifDefaults))
+	mux.HandleFunc("/api/scheduled-messages", cors(a.handleScheduledMessages))
+	mux.HandleFunc("/api/scheduled-messages/", cors(a.handleScheduledMessages))
 	mux.HandleFunc("/api/scheduled-calls", cors(a.handleScheduledCalls))
 	mux.HandleFunc("/api/scheduled-calls/", cors(a.handleScheduledCalls))
+
+	// Dispatch automatique des messages programmés, toutes les 15 s.
+	go func() {
+		for range time.Tick(15 * time.Second) {
+			a.dispatchScheduledMessages()
+		}
+	}()
 
 	srv := &http.Server{
 		Addr:              addr,

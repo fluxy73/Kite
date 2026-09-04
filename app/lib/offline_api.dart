@@ -22,6 +22,7 @@ class OfflineApi {
   Future<void> _init() async {
     final store = await LocalStore.instance();
     _store = store;
+    _dueTimer = Timer.periodic(_dueTick, (_) => _dispatchDue());
     store.changes.listen((_) {
       shellRevision.value++;
       _events.add(ServerEvent('shell', {'userId': meId}));
@@ -38,6 +39,10 @@ class OfflineApi {
       StreamController<ServerEvent>.broadcast();
 
   bool get ready => _store != null;
+
+  /// Livraison périodique des messages programmés échus.
+  static const _dueTick = Duration(seconds: 5);
+  Timer? _dueTimer;
 
   LocalStore get _s {
     final s = _store;
@@ -235,6 +240,28 @@ class OfflineApi {
     _s.deleteScheduledCall(id);
   }
 
+  // ---------- Messages programmés ----------
+
+  Future<List<ScheduledMessage>> fetchScheduledMessages() async =>
+      _s.scheduledMessagesFor(meId);
+
+  Future<ScheduledMessage> scheduleMessage(
+    String chatId, {
+    required String text,
+    required int scheduledAt,
+    String? replyTo,
+  }) =>
+      Future.value(_s.addScheduledMessage(
+        chatId: chatId,
+        senderId: meId,
+        text: text,
+        scheduledAt: scheduledAt,
+        replyTo: replyTo ?? '',
+      ));
+
+  Future<void> deleteScheduledMessage(String id) async =>
+      _s.deleteScheduledMessage(id, meId);
+
   // ---------- Temps réel (flux local) ----------
 
   /// Flux d'événements locaux : réagit aux mutations de la base (et échos
@@ -276,7 +303,18 @@ class OfflineApi {
     });
   }
 
+  /// Livraison automatique des messages programmés échus, même hors ligne :
+  /// le message devient un vrai message de la conversation (persisté) et un
+  /// event "message" est émis pour l'UI et les notifications.
+  void _dispatchDue() {
+    if (_store == null) return;
+    for (final m in _s.dispatchDueScheduledMessages()) {
+      _events.add(ServerEvent('message', _s.messageToJson(m)));
+    }
+  }
+
   void dispose() {
+    _dueTimer?.cancel();
     _echoTimer?.cancel();
     _events.close();
   }

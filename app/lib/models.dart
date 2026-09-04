@@ -112,6 +112,39 @@ class ScheduledCall {
       );
 }
 
+/// Message programmé : sera délivré automatiquement dans la conversation
+/// à l'échéance (serveur : boucle de dispatch ; hors-ligne : simulation).
+class ScheduledMessage {
+  const ScheduledMessage({
+    required this.id,
+    required this.chatId,
+    required this.senderId,
+    required this.scheduledAt,
+    this.text = '',
+    this.replyTo = '',
+    this.createdAt = 0,
+  });
+
+  final String id;
+  final String chatId;
+  final String senderId;
+  final String text;
+  final String replyTo;
+  final int scheduledAt; // timestamp de livraison
+  final int createdAt;
+
+  factory ScheduledMessage.fromJson(Map<String, dynamic> json) =>
+      ScheduledMessage(
+        id: json['id'] as String,
+        chatId: json['chatId'] as String? ?? '',
+        senderId: json['senderId'] as String? ?? '',
+        text: json['text'] as String? ?? '',
+        replyTo: json['replyTo'] as String? ?? '',
+        scheduledAt: json['scheduledAt'] as int? ?? 0,
+        createdAt: json['createdAt'] as int? ?? 0,
+      );
+}
+
 /// Payload agrégé de l'écran principal (get /api/shell).
 class AppShell {
   const AppShell({
@@ -119,6 +152,7 @@ class AppShell {
     this.chats = const [],
     this.calls = const [],
     this.scheduledCalls = const [],
+    this.scheduledMessages = const [],
     this.notifDefaults = const NotifPrefs(),
   });
 
@@ -126,6 +160,7 @@ class AppShell {
   final List<Chat> chats;
   final List<CallLog> calls;
   final List<ScheduledCall> scheduledCalls;
+  final List<ScheduledMessage> scheduledMessages;
 
   /// Défauts de notification globaux de l'utilisateur (pour toutes les
   /// conversations sans préférence propre).
@@ -143,6 +178,9 @@ class AppShell {
             .toList(),
         scheduledCalls: (json['scheduledCalls'] as List? ?? [])
             .map((e) => ScheduledCall.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        scheduledMessages: (json['scheduledMessages'] as List? ?? [])
+            .map((e) => ScheduledMessage.fromJson(e as Map<String, dynamic>))
             .toList(),
         notifDefaults: json['notifDefaults'] == null
             ? const NotifPrefs()

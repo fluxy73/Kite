@@ -262,6 +262,39 @@ class KiteApi {
     await _send('DELETE', '/api/scheduled-calls/$id', query: {'userId': meId});
   }
 
+  // ---------- Messages programmés ----------
+
+  /// Liste les messages programmés de l'utilisateur.
+  Future<List<ScheduledMessage>> fetchScheduledMessages() async {
+    final raw = await _send('GET', '/api/scheduled-messages', query: {'userId': meId});
+    return (raw as List)
+        .map((e) => ScheduledMessage.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Programme l'envoi d'un message pour une date/heure future.
+  Future<ScheduledMessage> scheduleMessage(
+    String chatId, {
+    required String text,
+    required int scheduledAt,
+    String? replyTo,
+  }) async {
+    final raw = await _send('POST', '/api/scheduled-messages',
+        query: {'userId': meId},
+        body: {
+          'chatId': chatId,
+          'text': text,
+          'replyTo': replyTo,
+          'scheduledAt': scheduledAt,
+        });
+    return ScheduledMessage.fromJson(raw as Map<String, dynamic>);
+  }
+
+  /// Annule un message programmé.
+  Future<void> deleteScheduledMessage(String id) async {
+    await _send('DELETE', '/api/scheduled-messages/$id', query: {'userId': meId});
+  }
+
   // ---------- Temps réel (WebSocket, repli SSE) ----------
 
   String _wsUrl(String path, [Map<String, String>? query]) {

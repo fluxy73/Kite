@@ -69,6 +69,7 @@ class LocalStore {
   final Map<String, List<Message>> _messagesByChat = {};
   List<CallLog> calls = [];
   List<ScheduledCall> scheduledCalls = [];
+  List<ScheduledMessage> scheduledMessages = [];
 
   /// Défauts de notification globaux par utilisateur (toutes ses
   /// conversations sans préférence propre).
@@ -112,6 +113,9 @@ class LocalStore {
                 NotifPrefs.fromJson(v as Map<String, dynamic>))));
         scheduledCalls = (decoded['scheduledCalls'] as List? ?? [])
             .map((e) => ScheduledCall.fromJson(e as Map<String, dynamic>))
+            .toList();
+        scheduledMessages = (decoded['scheduledMessages'] as List? ?? [])
+            .map((e) => ScheduledMessage.fromJson(e as Map<String, dynamic>))
             .toList();
         final msgs = decoded['messages'] as Map<String, dynamic>? ?? {};
         msgs.forEach((chatId, list) {
@@ -163,6 +167,17 @@ class LocalStore {
         if (notifDefaults.isNotEmpty)
           'notifDefaults': notifDefaults
               .map((k, v) => MapEntry(k, v.toJson())),
+        'scheduledMessages': scheduledMessages
+            .map((m) => {
+                  'id': m.id,
+                  'chatId': m.chatId,
+                  'senderId': m.senderId,
+                  'text': m.text,
+                  if (m.replyTo.isNotEmpty) 'replyTo': m.replyTo,
+                  'scheduledAt': m.scheduledAt,
+                  'createdAt': m.createdAt,
+                })
+            .toList(),
         'scheduledCalls': scheduledCalls
             .map((s) => {
                   'id': s.id,
@@ -369,6 +384,16 @@ class LocalStore {
           reminder: true,
           createdAt: now),
     ];
+
+    scheduledMessages = [
+      ScheduledMessage(
+          id: 'sm-1',
+          chatId: 'c-lucas',
+          senderId: 'u-julien',
+          text: 'Bon anniversaire 🎂',
+          scheduledAt: now + 48 * 3600 * 1000,
+          createdAt: now),
+    ];
   }
 
   // ---------- Lectures ----------
@@ -388,6 +413,7 @@ class LocalStore {
       scheduledCalls: scheduledCalls
           .where((s) => s.userId == meId || s.memberIds.contains(meId))
           .toList(),
+      scheduledMessages: scheduledMessagesFor(meId),
     );
   }
 
@@ -736,6 +762,66 @@ class LocalStore {
       _changes.add(null);
     }
     return removed;
+  }
+
+  // ---------- Messages programmés ----------
+
+  List<ScheduledMessage> scheduledMessagesFor(String meId) {
+    final member = chats.where((c) => c.memberIds.contains(meId)).map((c) => c.id).toSet();
+    return scheduledMessages
+        .where((m) => m.senderId == meId || member.contains(m.chatId))
+        .toList();
+  }
+
+  ScheduledMessage addScheduledMessage({
+    required String chatId,
+    required String senderId,
+    required String text,
+    required int scheduledAt,
+    String replyTo = '',
+  }) {
+    final sm = ScheduledMessage(
+      id: 'sm-${DateTime.now().microsecondsSinceEpoch}',
+      chatId: chatId,
+      senderId: senderId,
+      text: text,
+      replyTo: replyTo,
+      scheduledAt: scheduledAt,
+      createdAt: DateTime.now().millisecondsSinceEpoch,
+    );
+    scheduledMessages.add(sm);
+    _persist();
+    _changes.add(null);
+    return sm;
+  }
+
+  bool deleteScheduledMessage(String id, String meId) {
+    final n0 = scheduledMessages.length;
+    scheduledMessages.removeWhere((m) => m.id == id && m.senderId == meId);
+    final removed = scheduledMessages.length != n0;
+    if (removed) {
+      _persist();
+      _changes.add(null);
+    }
+    return removed;
+  }
+
+  /// Extrait les messages échus (les retire de la liste) et les délivre
+  /// comme messages réels. Retourne les messages délivrés.
+  List<Message> dispatchDueScheduledMessages() {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final due = scheduledMessages.where((m) => m.scheduledAt <= now).toList();
+    if (due.isEmpty) return const [];
+    scheduledMessages.removeWhere((m) => m.scheduledAt <= now);
+    final out = <Message>[];
+    for (final sm in due) {
+      final m = addMessage(sm.chatId, sm.senderId, 'text', sm.text,
+          replyTo: sm.replyTo);
+      out.add(m);
+    }
+    _persist();
+    _changes.add(null);
+    return out;
   }
 
   // ---------- Utilisateurs ----------

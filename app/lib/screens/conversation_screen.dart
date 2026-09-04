@@ -30,6 +30,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
   String? _error;
   Message? _replyTo;
   Message? _editing;
+  DateTime? _scheduleAt; // envoi programmé armé (null = envoi immédiat)
   StreamSubscription<ServerEvent>? _sse;
 
   // Indicateur de saisie distant (« Lucas écrit… »).
@@ -230,6 +231,26 @@ class _ConversationScreenState extends State<ConversationScreen> {
         });
       } catch (e) {
         _toast('Échec de la modification : $e');
+      }
+      return;
+    }
+    final scheduleAt = _scheduleAt;
+    if (scheduleAt != null) {
+      try {
+        await widget.api.scheduleMessage(
+          widget.chat.id,
+          text: text,
+          scheduledAt: scheduleAt.millisecondsSinceEpoch,
+          replyTo: _replyTo?.id,
+        );
+        setState(() {
+          _input.clear();
+          _replyTo = null;
+          _scheduleAt = null;
+        });
+        _toast('Message programmé pour le ${_fmtSchedule(scheduleAt)}');
+      } catch (e) {
+        _toast('Échec de la programmation : $e');
       }
       return;
     }
@@ -516,6 +537,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
               child: Text('✍ $_remoteTyping écrit…',
                   style: const TextStyle(color: KiteColors.tint2, fontSize: 12)),
             ),
+          if (_scheduleAt != null) _scheduleBar(),
           if (_replyTo != null) _replyBar(_replyTo!),
           if (_editing != null) _editBar(_editing!),
           if (_recording)
@@ -549,8 +571,12 @@ class _ConversationScreenState extends State<ConversationScreen> {
                 const SizedBox(width: 8),
                 if (canSend)
                   _RoundBtn(
-                    icon: Icons.send,
-                    tooltip: 'Envoyer',
+                    icon: _scheduleAt != null
+                        ? Icons.schedule_send
+                        : Icons.send,
+                    tooltip: _scheduleAt != null
+                        ? 'Programmer l\'envoi'
+                        : 'Envoyer',
                     accent: true,
                     onTap: _send,
                   )
@@ -566,6 +592,57 @@ class _ConversationScreenState extends State<ConversationScreen> {
       ),
     );
   }
+
+  /// Barre au-dessus du composer quand un envoi est programmé.
+  Widget _scheduleBar() {
+    final dt = _scheduleAt!;
+    return _quoteBar(
+      icon: Icons.schedule_send_outlined,
+      title: 'Envoi programmé · ${_fmtSchedule(dt)}',
+      preview: 'Le message partira automatiquement à cette date.',
+      onClose: () => setState(() => _scheduleAt = null),
+    );
+  }
+
+  String _fmtSchedule(DateTime dt) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final day = DateTime(dt.year, dt.month, dt.day);
+    const days = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'];
+    String two(int n) => n.toString().padLeft(2, '0');
+    final hhmm = '${two(dt.hour)}:${two(dt.minute)}';
+    if (day == today) return 'aujourd\'hui à $hhmm';
+    if (day == today.add(const Duration(days: 1))) {
+      return 'demain à $hhmm';
+    }
+    return '${days[dt.weekday - 1]} ${two(dt.day)}/${two(dt.month)} à $hhmm';
+  }
+
+  /// Sélecteur date + heure natif pour programmer l'envoi.
+  Future<void> _pickSchedule() async {
+    final now = DateTime.now();
+    final date = await showDatePicker(
+      context: context,
+      initialDate: now.add(const Duration(hours: 1)),
+      firstDate: now,
+      lastDate: now.add(const Duration(days: 365)),
+      helpText: 'Date d\'envoi',
+    );
+    if (!mounted || date == null) return;
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(now.add(const Duration(hours: 1))),
+      helpText: 'Heure d\'envoi',
+    );
+    if (time == null) return;
+    final dt = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+    if (!dt.isAfter(DateTime.now())) {
+      _toast('Choisis une date/heure future.');
+      return;
+    }
+    setState(() => _scheduleAt = dt);
+  }
+
 
   Widget _replyBar(Message m) {
     return _quoteBar(
@@ -1001,6 +1078,11 @@ class _ConversationScreenState extends State<ConversationScreen> {
                 _attachItem(sheetCtx, Icons.person_outline, 'Contact', () => _mockContact(sheetCtx)),
                 _attachItem(sheetCtx, Icons.poll_outlined, 'Sondage', () => _mockPoll(sheetCtx)),
                 _attachItem(sheetCtx, Icons.event_outlined, 'Événement', () => _mockEvent(sheetCtx)),
+                _attachItem(sheetCtx, Icons.schedule_send_outlined, 'Programmer',
+                    () {
+                  Navigator.pop(sheetCtx);
+                  _pickSchedule();
+                }),
               ],
             ),
           ],
