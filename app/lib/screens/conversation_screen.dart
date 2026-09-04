@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../api.dart';
+import '../translation.dart';
 import '../chat_lock.dart';
 import '../drafts.dart';
 import '../message_notifier.dart';
@@ -13,7 +14,11 @@ import 'notif_defaults_screen.dart';
 /// Conversation temps réel : tous les types de messages, réactions,
 /// réponse, édition, suppression, pièces jointes (workflows simulés).
 class ConversationScreen extends StatefulWidget {
-  const ConversationScreen({super.key, required this.api, required this.chat});
+  const ConversationScreen(
+      {super.key, required this.api, required this.chat, this.translator});
+
+  /// Injectable pour les tests ; [TranslationService] par défaut.
+  final TranslationService? translator;
 
   final KiteApi api;
   final Chat chat;
@@ -35,6 +40,9 @@ class _ConversationScreenState extends State<ConversationScreen>
   DateTime? _scheduleAt; // envoi programmé armé (null = envoi immédiat)
   bool _armingLock = false; // pose du verrou en cours (porte en mode setup)
   bool _lockBioAvailable = false; // capacité biométrique de l'appareil (option du réglage verrou)
+  late final TranslationService _translator =
+      widget.translator ?? TranslationService();
+  final Map<String, String> _translations = {}; // messageId -> texte traduit
   StreamSubscription<ServerEvent>? _sse;
 
   // Indicateur de saisie distant (« Lucas écrit… »).
@@ -548,6 +556,7 @@ class _ConversationScreenState extends State<ConversationScreen>
         onOpenMedia: () => _toast('Visionneuse média — workflow simulé'),
         rsvpYes: _rsvpYes.contains(visible[i].id),
         rsvpMaybe: _rsvpMaybe.contains(visible[i].id),
+        translation: _translations[visible[i].id],
       ),
     );
   }
@@ -877,9 +886,11 @@ class _ConversationScreenState extends State<ConversationScreen>
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (sheetCtx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+        // Scrollable : le menu reste accessible même sur petit écran.
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 12),
               child: Row(
@@ -918,6 +929,8 @@ class _ConversationScreenState extends State<ConversationScreen>
                   : 'Ajouter aux favoris',
               () => _toggleStar(m),
             ),
+            _menuItem(sheetCtx, Icons.translate, 'Traduire',
+                () => _translateMessage(m)),
             _menuItem(sheetCtx, Icons.info_outline, 'Informations',
                 () => _showInfo(context, m)),
             _menuItem(
@@ -926,7 +939,8 @@ class _ConversationScreenState extends State<ConversationScreen>
               mine ? 'Supprimer pour tout le monde' : 'Supprimer pour moi',
               () => _confirmDelete(sheetCtx, m, mine ? 'all' : 'me'),
             ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -950,6 +964,29 @@ class _ConversationScreenState extends State<ConversationScreen>
       _toast(nowStarred ? 'Ajouté aux favoris ⭐' : 'Retiré des favoris');
     } catch (_) {
       _toast('Action indisponible');
+    }
+  }
+
+  /// Traduit un message (appui long -> Traduire) vers la langue de l'app
+  /// (français). Le résultat s'affiche sous la bulle avec son texte d'origine.
+  Future<void> _translateMessage(Message m) async {
+    if (m.text.isEmpty) {
+      _toast('Traduction possible pour les messages texte uniquement');
+      return;
+    }
+    if (_translations.containsKey(m.id)) {
+      setState(() => _translations.remove(m.id));
+      return;
+    }
+    setState(() => _translations[m.id] = '…');
+    try {
+      final translated = await _translator.translate(m.text, 'fr');
+      if (!mounted) return;
+      setState(() => _translations[m.id] = translated);
+    } on TranslationException catch (e) {
+      if (!mounted) return;
+      setState(() => _translations.remove(m.id));
+      _toast('Traduction impossible : ${e.message}');
     }
   }
 
@@ -1743,6 +1780,7 @@ class _MessageBubble extends StatelessWidget {
     required this.onOpenMedia,
     required this.rsvpYes,
     required this.rsvpMaybe,
+    this.translation,
   });
 
   final Message message;
@@ -1762,6 +1800,9 @@ class _MessageBubble extends StatelessWidget {
   final VoidCallback onOpenMedia;
   final bool rsvpYes;
   final bool rsvpMaybe;
+
+  /// Traduction affichée sous la bulle (null = aucune, '…' = en cours).
+  final String? translation;
 
   @override
   Widget build(BuildContext context) {
@@ -1859,6 +1900,40 @@ class _MessageBubble extends StatelessWidget {
               ),
               child: _content(context, m),
             ),
+            if (translation != null)
+              Padding(
+                padding: EdgeInsets.only(
+                    left: mine ? 0 : 8, right: mine ? 8 : 0, top: 3),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: KiteColors.tint2.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                        color: KiteColors.tint2.withValues(alpha: 0.3)),
+                  ),
+                  child: translation == '…'
+                      ? const Row(mainAxisSize: MainAxisSize.min, children: [
+                          SizedBox(
+                              width: 10,
+                              height: 10,
+                              child:
+                                  CircularProgressIndicator(strokeWidth: 1.6)),
+                          SizedBox(width: 8),
+                          Text('Traduction…',
+                              style: TextStyle(
+                                  color: KiteColors.muted, fontSize: 12)),
+                        ])
+                      : Text(translation!,
+                          style: const TextStyle(
+                              color: KiteColors.fg,
+                              fontSize: 13,
+                              height: 1.35,
+                              fontStyle: FontStyle.italic)),
+                ),
+              ),
             if (m.reactions.isNotEmpty)
               Padding(
                 padding: EdgeInsets.only(
