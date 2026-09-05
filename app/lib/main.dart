@@ -44,6 +44,7 @@ class _KiteAppState extends State<KiteApp> with WidgetsBindingObserver {
   /// retour au premier plan, réglage en cours).
   bool _appLocked = false;
   DateTime _lastUnlock = DateTime.fromMillisecondsSinceEpoch(0);
+  DateTime? _pausedAt;
 
   @override
   void initState() {
@@ -86,11 +87,19 @@ class _KiteAppState extends State<KiteApp> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.paused) {
+      _pausedAt = DateTime.now();
+    }
     if (state == AppLifecycleState.resumed) {
-      // Auto-lock d'app au retour au premier plan (comportement bancaire) ;
-      // anti-rebond : pas de re-verrouillage juste après un déverrouillage.
+      // Auto-lock d'app au retour au premier plan, selon le délai de grâce
+      // choisi (immédiat / 30 s / 1 min). Pause inconnue = verrou.
+      final pausedFor = _pausedAt == null
+          ? const Duration(days: 1)
+          : DateTime.now().difference(_pausedAt!);
+      final unlockedAgo = DateTime.now().difference(_lastUnlock);
       if (ChatLockStore.instance.appLockEnabled &&
-          DateTime.now().difference(_lastUnlock).inSeconds > 2) {
+          ChatLockStore.instance
+              .shouldRelockApp(pausedFor: pausedFor, unlockedAgo: unlockedAgo)) {
         setState(() => _appLocked = true);
       }
       // Auto-lock des conversations déverrouillées (comportement WhatsApp).

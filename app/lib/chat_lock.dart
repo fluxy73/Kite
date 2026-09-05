@@ -72,9 +72,11 @@ class ChatLockStore extends ChangeNotifier {
 
   final Map<String, String> _hashes = {}; // chatId -> sha256(code)
 
-  /// Verrou d'app : code haché (null = désactivé) + biométrie autorisée.
+  /// Verrou d'app : code haché (null = désactivé) + biométrie autorisée
+  /// + délai de grâce avant re-verrouillage au retour au premier plan.
   String? _appHash;
   bool _appBio = false;
+  int _appGrace = 0;
 
   /// Conversations dont la porte accepte la biométrie (préférence par
   /// conversation, persistée ; la capacité réelle est vérifiée via
@@ -122,6 +124,7 @@ class ChatLockStore extends ChangeNotifier {
           if (v is Map<String, dynamic>) {
             _appHash = v['hash'] as String?;
             _appBio = v['bio'] == true;
+            _appGrace = (v['grace'] as num?)?.toInt() ?? 0;
           }
           return;
         }
@@ -151,7 +154,7 @@ class ChatLockStore extends ChangeNotifier {
             if (_biometricChats.contains(k)) 'bio': true,
           }));
       if (_appHash != null) {
-        data[_appLockKey] = {'hash': _appHash, 'bio': _appBio};
+        data[_appLockKey] = {'hash': _appHash, 'bio': _appBio, 'grace': _appGrace};
       }
       f.writeAsStringSync(jsonEncode(data));
     } catch (_) {}
@@ -281,6 +284,35 @@ class ChatLockStore extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Délai de grâce avant re-verrouillage au retour au premier plan,
+  /// en secondes (0 = immédiat). Persisté avec le verrou d'app.
+  int get appLockGrace {
+    _ensureLoaded();
+    return _appGrace;
+  }
+
+  /// Définit le délai de grâce (0, 30 ou 60 s). Sans effet si la valeur
+  /// n'est pas autorisée.
+  void setAppLockGrace(int seconds) {
+    _ensureLoaded();
+    if (seconds != 0 && seconds != 30 && seconds != 60) return;
+    if (_appGrace == seconds) return;
+    _appGrace = seconds;
+    _flush();
+    notifyListeners();
+  }
+
+  /// true si l'app doit se re-verrouiller après une pause de [pausedFor]
+  /// alors qu'elle a été déverrouillée il y a [unlockedAgo]. Le délai de
+  /// grâce remplace l'ancien anti-rebond fixe de 2 s.
+  bool shouldRelockApp({required Duration pausedFor, required Duration unlockedAgo}) {
+    final grace = Duration(seconds: _appGrace);
+    if (pausedFor >= grace) return true;
+    // Pause plus courte que la grâce : on ne re-verrouille que si le
+    // déverrouillage lui-même est plus ancien que la grâce (anti-abus).
+    return unlockedAgo >= grace;
+  }
+
   /// Déverrouille l'app avec le code. false si incorrect.
   bool unlockApp(String code) {
     _ensureLoaded();
@@ -304,6 +336,7 @@ class ChatLockStore extends ChangeNotifier {
     if (_appHash == null || _appHash != _hash(code)) return false;
     _appHash = null;
     _appBio = false;
+    _appGrace = 0;
     _flush();
     notifyListeners();
     return true;

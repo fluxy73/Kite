@@ -199,4 +199,89 @@ void main() {
     await tester.pump();
     expect(done, isTrue);
   });
+
+  test('grace : valeurs autorisées (0/30/60), rejet des autres', () {
+    final store = ChatLockStore.instance;
+    store.setAppLock('1111');
+    expect(store.appLockGrace, 0); // défaut : immédiat
+    store.setAppLockGrace(45); // valeur non autorisée
+    expect(store.appLockGrace, 0);
+    store.setAppLockGrace(30);
+    expect(store.appLockGrace, 30);
+    store.setAppLockGrace(60);
+    expect(store.appLockGrace, 60);
+    store.setAppLockGrace(0);
+    expect(store.appLockGrace, 0);
+  });
+
+  test('grace : persistée avec le verrou, réinitialisée au retrait', () {
+    final store = ChatLockStore.instance;
+    store.setAppLock('2222');
+    store.setAppLockGrace(30);
+
+    // Redémarrage simulé : même fichier.
+    store.resetForTest(file: lockFile);
+    expect(ChatLockStore.instance.appLockGrace, 30);
+
+    // Retrait : grâce repart à 0 (comme la biométrie).
+    expect(ChatLockStore.instance.removeAppLock('2222'), isTrue);
+    expect(ChatLockStore.instance.appLockGrace, 0);
+  });
+
+  test('shouldRelockApp : immédiat = toujours re-verrouiller', () {
+    final store = ChatLockStore.instance;
+    store.setAppLock('3333');
+    expect(store.appLockGrace, 0);
+    expect(
+        store.shouldRelockApp(
+            pausedFor: const Duration(milliseconds: 200),
+            unlockedAgo: const Duration(seconds: 1)),
+        isTrue);
+  });
+
+  test('shouldRelockApp : grace 30 s — courte pause récente tolérée', () {
+    final store = ChatLockStore.instance;
+    store.setAppLock('4444');
+    store.setAppLockGrace(30);
+    // Pause de 5 s, déverrouillé il y a 10 s : dans la fenêtre de grâce.
+    expect(
+        store.shouldRelockApp(
+            pausedFor: const Duration(seconds: 5),
+            unlockedAgo: const Duration(seconds: 10)),
+        isFalse);
+    // Pause de 45 s : au-delà de la grâce -> verrou.
+    expect(
+        store.shouldRelockApp(
+            pausedFor: const Duration(seconds: 45),
+            unlockedAgo: const Duration(seconds: 50)),
+        isTrue);
+  });
+
+  test('shouldRelockApp : grace 30 s — anti-abus (déverrouillage ancien)', () {
+    final store = ChatLockStore.instance;
+    store.setAppLock('5555');
+    store.setAppLockGrace(30);
+    // Pause de 3 s mais déverrouillé il y a 2 min : re-verrouille quand même.
+    expect(
+        store.shouldRelockApp(
+            pausedFor: const Duration(seconds: 3),
+            unlockedAgo: const Duration(minutes: 2)),
+        isTrue);
+  });
+
+  test('shouldRelockApp : grace 1 min — fenêtre complète', () {
+    final store = ChatLockStore.instance;
+    store.setAppLock('6666');
+    store.setAppLockGrace(60);
+    expect(
+        store.shouldRelockApp(
+            pausedFor: const Duration(seconds: 59),
+            unlockedAgo: const Duration(seconds: 30)),
+        isFalse);
+    expect(
+        store.shouldRelockApp(
+            pausedFor: const Duration(seconds: 61),
+            unlockedAgo: const Duration(seconds: 5)),
+        isTrue);
+  });
 }
