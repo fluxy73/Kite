@@ -188,6 +188,18 @@ class OfflineApi {
           {required bool add}) async =>
       _s.folderMembership(folderId, chatId, add: add);
 
+  Future<void> setChatWallpaper(String chatId, String key) async =>
+      _s.setWallpaper(chatId, key);
+
+  Future<bool> isBlocked(String chatId) async => _s.blockedFor(chatId, meId);
+
+  Future<void> setBlocked(String chatId, {required bool blocked}) async =>
+      _s.setBlocked(chatId, meId, value: blocked);
+
+  Future<void> reportChat(String chatId,
+          {required String reason, String details = ''}) async =>
+      _s.addReport(chatId, reason, details, meId);
+
   Future<void> setNotifDefaults({NotifPrefs? prefs}) async {
     _s.setNotifDefaults(meId, prefs);
   }

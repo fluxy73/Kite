@@ -271,6 +271,7 @@ class Chat {
     this.mutes = const {},
     this.notifs = const {},
     this.disappearing = 0,
+    this.wallpaper = '',
   });
 
   final String id;
@@ -292,6 +293,7 @@ class Chat {
   /// Minuteur de messages éphémères de la conversation (epoch ms — les
   /// messages envoyés disparaissent après cette durée ; 0 = désactivé).
   final int disappearing;
+  final String wallpaper; // thème du chat (clé de palette)
 
   bool get isGroup => type == 'group';
 
@@ -322,6 +324,7 @@ class Chat {
     Map<String, int>? mutes,
     Map<String, NotifPrefs>? notifs,
     int? disappearing,
+    String? wallpaper,
   }) =>
       Chat(
         id: id,
@@ -338,6 +341,7 @@ class Chat {
         mutes: mutes ?? this.mutes,
         notifs: notifs ?? this.notifs,
         disappearing: disappearing ?? this.disappearing,
+        wallpaper: wallpaper ?? this.wallpaper,
       );
 
   factory Chat.fromJson(Map<String, dynamic> json) => Chat(
@@ -354,6 +358,7 @@ class Chat {
         notifs: (json['notifs'] as Map? ?? {}).map((k, v) => MapEntry(
             k as String, NotifPrefs.fromJson(v as Map<String, dynamic>))),
         disappearing: json['disappearing'] as int? ?? 0,
+        wallpaper: json['wallpaper'] as String? ?? '',
         lastMessage: json['lastMessage'] == null
             ? null
             : Message.fromJson(json['lastMessage'] as Map<String, dynamic>),
