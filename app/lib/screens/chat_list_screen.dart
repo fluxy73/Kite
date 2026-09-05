@@ -6,6 +6,7 @@ import '../theme.dart';
 import 'conversation_screen.dart';
 import 'global_search_screen.dart';
 import '../chat_lock.dart';
+import 'app_lock_screen.dart';
 import 'notif_defaults_screen.dart';
 
 /// Écran principal : liste des discussions (miroir de screens/chat-list.html).
@@ -411,6 +412,21 @@ class _ChatListScreenState extends State<ChatListScreen> {
               },
             ),
             ListTile(
+              leading: const Icon(Icons.shield_outlined,
+                  color: KiteColors.accent),
+              title: const Text("Verrouillage de l'app",
+                  style: TextStyle(color: KiteColors.fg)),
+              subtitle: Text(
+                  ChatLockStore.instance.appLockEnabled
+                      ? 'Activé — biométrie : ${ChatLockStore.instance.appBiometricsEnabled ? "oui" : "non"}'
+                      : 'Désactivé',
+                  style: const TextStyle(fontSize: 12, color: KiteColors.muted)),
+              onTap: () {
+                Navigator.pop(sheetCtx);
+                _openAppLockSettings(context);
+              },
+            ),
+            ListTile(
               leading: const Icon(Icons.notifications_outlined,
                   color: KiteColors.accent),
               title: const Text('Notifications',
@@ -810,6 +826,40 @@ class _ChatListScreenState extends State<ChatListScreen> {
   }
 
   /// Nouvelle discussion : choisit un contact et crée (ou réutilise) la DM.
+  Future<void> _openAppLockSettings(BuildContext context) async {
+    if (ChatLockStore.instance.appLockEnabled) {
+      // Verrou actif : confirmer le retrait exige le code.
+      final removed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: KiteColors.surface,
+          title: const Text("Verrouillage de l'app",
+              style: TextStyle(color: KiteColors.fg)),
+          content: const Text(
+              'Le verrou est actif. Pour modifier le réglage, il faut le retirer (code requis).',
+              style: TextStyle(color: KiteColors.muted)),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Annuler')),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Retirer le verrou'),
+            ),
+          ],
+        ),
+      );
+      if (removed == true && context.mounted) {
+        await AppLockScreen.confirmRemoval(context);
+      }
+      return;
+    }
+    if (context.mounted) {
+      Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => const AppLockScreen()));
+    }
+  }
+
   void _newChat(BuildContext context) {
     final shell = widget.shell;
     final contacts = shell == null
