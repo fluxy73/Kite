@@ -418,7 +418,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                   style: TextStyle(color: KiteColors.fg)),
               subtitle: Text(
                   ChatLockStore.instance.appLockEnabled
-                      ? 'Activé — biométrie : ${ChatLockStore.instance.appBiometricsEnabled ? "oui" : "non"}'
+                      ? 'Activé — biométrie : ${ChatLockStore.instance.appBiometricsEnabled ? "oui" : "non"} · rappel : ${_graceLabel(ChatLockStore.instance.appLockGrace)}'
                       : 'Désactivé',
                   style: const TextStyle(fontSize: 12, color: KiteColors.muted)),
               onTap: () {
@@ -826,31 +826,60 @@ class _ChatListScreenState extends State<ChatListScreen> {
   }
 
   /// Nouvelle discussion : choisit un contact et crée (ou réutilise) la DM.
+  static String _graceLabel(int seconds) =>
+      seconds == 0 ? 'immédiat' : seconds == 30 ? '30 s' : '1 min';
+
   Future<void> _openAppLockSettings(BuildContext context) async {
     if (ChatLockStore.instance.appLockEnabled) {
-      // Verrou actif : confirmer le retrait exige le code.
-      final removed = await showDialog<bool>(
+      // Verrou actif : réglage du délai de grâce + retrait (code requis).
+      final store = ChatLockStore.instance;
+      final current = store.appLockGrace;
+      final choice = await showDialog<String>(
         context: context,
-        builder: (ctx) => AlertDialog(
+        builder: (ctx) => SimpleDialog(
           backgroundColor: KiteColors.surface,
           title: const Text("Verrouillage de l'app",
               style: TextStyle(color: KiteColors.fg)),
-          content: const Text(
-              'Le verrou est actif. Pour modifier le réglage, il faut le retirer (code requis).',
-              style: TextStyle(color: KiteColors.muted)),
-          actions: [
-            TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Annuler')),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Retirer le verrou'),
+          children: [
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 24),
+              child: Text('Re-verrouillage au retour au premier plan :',
+                  style: TextStyle(color: KiteColors.muted, fontSize: 13)),
+            ),
+            for (final g in const [0, 30, 60])
+              SimpleDialogOption(
+                onPressed: () => Navigator.pop(ctx, 'grace:$g'),
+                child: Row(
+                  children: [
+                    Icon(
+                      g == current
+                          ? Icons.radio_button_checked
+                          : Icons.radio_button_unchecked,
+                      size: 20,
+                      color: KiteColors.accent,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(_graceLabel(g),
+                        style: const TextStyle(color: KiteColors.fg)),
+                  ],
+                ),
+              ),
+            const Divider(),
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(ctx, 'remove'),
+              child: const Text('Retirer le verrou (code requis)',
+                  style: TextStyle(color: Colors.redAccent)),
             ),
           ],
         ),
       );
-      if (removed == true && context.mounted) {
+      if (choice == null || !context.mounted) return;
+      if (choice == 'remove') {
         await AppLockScreen.confirmRemoval(context);
+        return;
+      }
+      if (choice.startsWith('grace:')) {
+        store.setAppLockGrace(int.parse(choice.substring(6)));
       }
       return;
     }
