@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' show AppLifecycleState, WidgetsBinding;
 
+import 'api.dart';
 import 'models.dart';
 
 export 'models.dart' show NotifPriority, NotifPrefs;
@@ -105,7 +106,7 @@ class MessageNotifier {
   /// l'app.
   NotifPrefs globalDefaults = const NotifPrefs();
 
-  void start(dynamic api, {String? meId}) {
+  void start(KiteApi api, {String? meId}) {
     if (_sub != null) return; // déjà démarré
     _api = api;
     _meId = meId;
@@ -116,9 +117,9 @@ class MessageNotifier {
         Timer.periodic(const Duration(seconds: 20), (_) => _checkScheduled());
   }
 
-  Future<void> _loadUsers(dynamic api) async {
+  Future<void> _loadUsers(KiteApi api) async {
     try {
-      final shell = await api.fetchAppShell() as AppShell;
+      final shell = await api.fetchAppShell();
       for (final u in shell.users) {
         _userNames[u.id] = u.name;
       }
@@ -201,7 +202,7 @@ class MessageNotifier {
 
   Future<Chat?> _chat(String chatId) async {
     try {
-      final chats = await _api.fetchChats() as List<Chat>;
+      final chats = await _api.fetchChats();
       for (final c in chats) {
         if (c.id == chatId) return c;
       }

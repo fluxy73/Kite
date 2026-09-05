@@ -22,12 +22,14 @@ class ServerStatus {
   bool offlineMode = false;
 
   Timer? _timer;
-  dynamic _api;
+  KiteApi? _api;
 
   /// Démarre la sonde. Avec une API hors-ligne, aucun probing n'a lieu.
-  void start(dynamic api) {
+  void start(KiteApi api, {bool serverBacked = false}) {
     _api = api;
-    offlineMode = api is! KiteApi;
+    // Mode serveur uniquement si l'app a été lancée avec KITE_API : en
+    // hors-ligne, même typée KiteApi, l'API locale n'a rien à sonder.
+    offlineMode = !serverBacked;
     _timer?.cancel();
     if (offlineMode) {
       state.value = ServerConn.offline;
@@ -45,7 +47,7 @@ class ServerStatus {
       state.value = ServerConn.connecting;
     }
     try {
-      await (_api as KiteApi).pingHealth();
+      await _api!.pingHealth();
       state.value = ServerConn.online;
     } catch (_) {
       state.value = ServerConn.offline;
