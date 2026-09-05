@@ -240,6 +240,32 @@ class KiteApi {
         query: {'userId': meId}, body: {'disappearing': ms});
   }
 
+  /// Thème du chat (clé de palette, '' = défaut). Partagé par les membres.
+  Future<void> setChatWallpaper(String chatId, String key) async {
+    await _send('POST', '/api/chats/$chatId/wallpaper',
+        query: {'userId': meId}, body: {'wallpaper': key});
+  }
+
+  /// true si [chatId] (DM) est bloqué par moi.
+  Future<bool> isBlocked(String chatId) async {
+    final raw =
+        await _send('GET', '/api/chats/$chatId/block', query: {'userId': meId});
+    return (raw as Map)['blocked'] == true;
+  }
+
+  /// Bloque/débloque le contact d'un DM.
+  Future<void> setBlocked(String chatId, {required bool blocked}) async {
+    await _send('POST', '/api/chats/$chatId/block',
+        query: {'userId': meId}, body: {'blocked': blocked});
+  }
+
+  /// Signale la conversation (motif + détails optionnels).
+  Future<void> reportChat(String chatId,
+      {required String reason, String details = ''}) async {
+    await _send('POST', '/api/chats/$chatId/report',
+        query: {'userId': meId}, body: {'reason': reason, 'details': details});
+  }
+
   // ---------- Dossiers (façon Telegram) ----------
 
   /// Dossiers de l'utilisateur courant.

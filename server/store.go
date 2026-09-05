@@ -1,7 +1,6 @@
 package main
 
 import (
-	"strings"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -9,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 )
@@ -90,6 +90,8 @@ type Chat struct {
 	// Les messages envoyés pendant que le minuteur est actif portent un
 	// ExpiresAt = createdAt + Disappearing.
 	Disappearing int64 `json:"disappearing,omitempty"`
+	// Wallpaper : thème du chat (clé de palette), partagé par les membres.
+	Wallpaper string `json:"wallpaper,omitempty"`
 }
 
 // NotifPrefs : préférences de notification par conversation et par
@@ -131,6 +133,16 @@ type Folder struct {
 	ChatIDs []string `json:"chatIds"`
 }
 
+// Report : signalement d'une conversation (modération).
+type Report struct {
+	ID        string `json:"id"`
+	Reporter  string `json:"reporter"`
+	ChatID    string `json:"chatId"`
+	Reason    string `json:"reason"`
+	Details   string `json:"details,omitempty"`
+	CreatedAt int64  `json:"createdAt"`
+}
+
 type State struct {
 	Users          []User             `json:"users"`
 	Chats          []Chat             `json:"chats"`
@@ -144,13 +156,17 @@ type State struct {
 	// (toutes ses conversations sans préférence propre).
 	NotifDefaults map[string]NotifPrefs `json:"notifDefaults,omitempty"`
 	// Folders : dossiers de conversations par utilisateur (façon Telegram).
-	Folders      map[string][]Folder `json:"folders,omitempty"`
-	SeedVersion  int                 `json:"seedVersion"`
+	Folders map[string][]Folder `json:"folders,omitempty"`
+	// Blocked : utilisateurs bloqués par utilisateur (DMs).
+	Blocked map[string][]string `json:"blocked,omitempty"`
+	// Reports : signalements (modération).
+	Reports     []Report `json:"reports,omitempty"`
+	SeedVersion int      `json:"seedVersion"`
 }
 
 // seedVersion is bumped whenever the shape of seedState() changes, so an
 // existing data file is regenerated on the next start.
-const seedVersion = 6
+const seedVersion = 7
 
 // ---------- Store ----------
 
@@ -752,6 +768,106 @@ func (s *Store) SetNotifs(chatID, userID string, prefs NotifPrefs) bool {
 		return true
 	}
 	return false
+}
+
+// wallpaperFor lit le thème d'un chat.
+func (s *Store) wallpaperFor(chatID string) string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for i := range s.state.Chats {
+		if s.state.Chats[i].ID == chatID {
+			return s.state.Chats[i].Wallpaper
+		}
+	}
+	return ""
+}
+
+// setWallpaper pose le thème d'un chat (partagé par les membres).
+func (s *Store) setWallpaper(chatID, key string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i := range s.state.Chats {
+		if s.state.Chats[i].ID == chatID {
+			s.state.Chats[i].Wallpaper = key
+			_ = s.save()
+			return true
+		}
+	}
+	return false
+}
+
+// isBlocked indique si a a bloqué b.
+func (s *Store) isBlocked(a, b string) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, id := range s.state.Blocked[a] {
+		if id == b {
+			return true
+		}
+	}
+	return false
+}
+
+// toggleBlock bloque/débloque target pour uid.
+func (s *Store) toggleBlock(uid, target string, blocked bool) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.state.Blocked == nil {
+		s.state.Blocked = map[string][]string{}
+	}
+	list := s.state.Blocked[uid]
+	has := false
+	for _, x := range list {
+		if x == target {
+			has = true
+			break
+		}
+	}
+	if blocked && !has {
+		s.state.Blocked[uid] = append(list, target)
+	} else if !blocked && has {
+		out := make([]string, 0, len(list))
+		for _, x := range list {
+			if x != target {
+				out = append(out, x)
+			}
+		}
+		s.state.Blocked[uid] = out
+	}
+	_ = s.save()
+	return true
+}
+
+// addReport enregistre un signalement (le rapporteur doit être membre).
+func (s *Store) addReport(reporter, chatID, reason, details string) (Report, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	chatOK := false
+	for i := range s.state.Chats {
+		if s.state.Chats[i].ID == chatID {
+			for _, mid := range s.state.Chats[i].MemberIDs {
+				if mid == reporter {
+					chatOK = true
+					break
+				}
+			}
+			break
+		}
+	}
+	if !chatOK {
+		return Report{}, false
+	}
+	r := Report{
+		ID:        newID("rep"),
+		Reporter:  reporter,
+		ChatID:    chatID,
+		Reason:    reason,
+		Details:   details,
+		CreatedAt: time.Now().UnixMilli(),
+	}
+	s.state.Reports = append(s.state.Reports, r)
+	_ = s.save()
+	return r, true
 }
 
 // mutedUntil retourne l'échéance de sourdine active de userID (> 0), 0 sinon.
