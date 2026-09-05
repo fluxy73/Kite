@@ -2,6 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Kite uses Face ID to unlock the app and locked conversations.</string>
 	<key>NSContactsUsageDescription</key>
 	<string>Kite reads your device contacts to find colleagues who use Kite for in-app calls.</string>
 	<key>NSCameraUsageDescription</key>
