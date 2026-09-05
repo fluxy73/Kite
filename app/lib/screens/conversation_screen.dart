@@ -1,9 +1,12 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 
 import '../api.dart';
 import '../translation.dart';
+import '../voice.dart';
+import 'package:just_audio/just_audio.dart';
 import '../chat_lock.dart';
 import '../drafts.dart';
 import '../message_notifier.dart';
@@ -42,6 +45,8 @@ class _ConversationScreenState extends State<ConversationScreen>
   bool _lockBioAvailable = false; // capacité biométrique de l'appareil (option du réglage verrou)
   late final TranslationService _translator =
       widget.translator ?? TranslationService();
+  final VoiceRecorder _voiceRecorder = VoiceRecorder();
+  bool _micAvailable = true; // micro indisponible (desktop) -> envoi simulé
   final Map<String, String> _translations = {}; // messageId -> texte traduit
   StreamSubscription<ServerEvent>? _sse;
 
@@ -65,6 +70,7 @@ class _ConversationScreenState extends State<ConversationScreen>
   void initState() {
     super.initState();
     _probeLockBiometrics();
+    _probeMic();
     WidgetsBinding.instance.addObserver(this);
 
     _load();
@@ -108,6 +114,14 @@ class _ConversationScreenState extends State<ConversationScreen>
       setState(() => _lockBioAvailable = ok);
     }
   }
+  /// Vérifie une seule fois la disponibilité du micro (desktop sans micro).
+  Future<void> _probeMic() async {
+    final ok = await _voiceRecorder.hasPermission();
+    if (mounted && ok != _micAvailable) {
+      setState(() => _micAvailable = ok);
+    }
+  }
+
   @override
   void dispose() {
     DraftStore.instance.flushIfNeeded(); // brouillon écrit sur disque
@@ -119,6 +133,7 @@ class _ConversationScreenState extends State<ConversationScreen>
     for (final p in _players.values) {
       p.dispose();
     }
+    _voiceRecorder.dispose();
     WidgetsBinding.instance.removeObserver(this);
     // Re-verrouillage en quittant la conversation (comportement WhatsApp) :
     // le code sera redemandé à la prochaine ouverture.
@@ -349,10 +364,16 @@ class _ConversationScreenState extends State<ConversationScreen>
 
   // ---------- Vocal (enregistrement simulé) ----------
 
-  void _toggleRecording() {
+  Future<void> _toggleRecording() async {
     if (_recording) {
       _stopRecording();
       return;
+    }
+    if (_micAvailable) {
+      final ok = await _voiceRecorder.startWithStamp();
+      if (!ok) {
+        _toast('Micro indisponible — envoi simulé');
+      }
     }
     setState(() {
       _recording = true;
@@ -375,11 +396,21 @@ class _ConversationScreenState extends State<ConversationScreen>
   Future<void> _sendVoice() async {
     final dur = _recSec;
     _stopRecording();
+    String? path;
+    if (_micAvailable) {
+      final rec = await _voiceRecorder.stop();
+      if (rec != null) {
+        (path, _) = rec;
+      }
+    }
     try {
       await widget.api.sendMessage(
         widget.chat.id,
         type: 'voice',
-        media: {'duration': dur},
+        media: {
+          'duration': dur,
+          if (path != null) 'path': path,
+        },
       );
     } catch (e) {
       _toast('Vocal non envoyé : $e');
@@ -545,6 +576,7 @@ class _ConversationScreenState extends State<ConversationScreen>
             ? null
             : _messages.where((m) => m.id == visible[i].replyTo).firstOrNull,
         isPlaying: _players[visible[i].id]?.playing.value ?? false,
+        voiceProgress: _players[visible[i].id]?.progress.value ?? 0,
         onLongPress: () => _showMessageMenu(context, visible[i]),
         onReact: (e) => _react(visible[i], e),
         onReply: () => _startReply(visible[i]),
@@ -567,7 +599,10 @@ class _ConversationScreenState extends State<ConversationScreen>
       if (p.playing.value) {
         p.pause();
       } else {
-        p.play(durationSec: (m.media?['duration'] as num?)?.toInt() ?? 10);
+        p.play(
+          durationSec: (m.media?['duration'] as num?)?.toInt() ?? 10,
+          path: m.media?['path'] as String?,
+        );
       }
     });
   }
@@ -1604,18 +1639,28 @@ class _ConversationScreenState extends State<ConversationScreen>
 
 // ═══════════════════════ Widgets de support ═══════════════════════
 
-/// Lecteur vocal simulé : un timer fait progresser la timeline.
+/// Lecteur vocal : lecture réelle du fichier (.m4a via just_audio) quand un
+/// chemin existe (enregistrement réel), sinon timeline simulée (vocals des
+/// données de seed). Position exposée pour la barre de progression.
 class _VoicePlayer {
   final ValueNotifier<double> progress = ValueNotifier(0);
   final ValueNotifier<bool> playing = ValueNotifier(false);
   Timer? _t;
   int _total = 0;
   int _elapsed = 0;
+  final AudioPlayer _audio = AudioPlayer();
+  StreamSubscription<Duration>? _posSub;
+  String? _loadedPath;
 
   bool get isPlaying => playing.value;
 
-  void play({required int durationSec}) {
+  void play({required int durationSec, String? path}) {
     _total = durationSec;
+    if (path != null && path.isNotEmpty && File(path).existsSync()) {
+      _playFile(path);
+      return;
+    }
+    // Fallback : timeline simulée (seed / vocal sans fichier).
     _elapsed = 0;
     playing.value = true;
     progress.value = 0;
@@ -1630,13 +1675,51 @@ class _VoicePlayer {
     });
   }
 
+  Future<void> _playFile(String path) async {
+    try {
+      if (_loadedPath != path) {
+        await _audio.setFilePath(path);
+        _loadedPath = path;
+      }
+      _posSub?.cancel();
+      _posSub = _audio.positionStream.listen((p) {
+        final d = _audio.duration;
+        if (d != null && d.inMilliseconds > 0) {
+          progress.value = p.inMilliseconds / d.inMilliseconds;
+        }
+      });
+      _audio.playerStateStream.listen((s) {
+        playing.value = s.playing;
+        if (s.processingState == ProcessingState.completed) {
+          playing.value = false;
+          progress.value = 0;
+          _audio.seek(Duration.zero);
+          _audio.pause();
+        }
+      });
+      await _audio.play();
+    } catch (_) {
+      // Fichier illisible/effacé : repli timeline.
+      playing.value = false;
+      play(durationSec: _total);
+    }
+  }
+
   void pause() {
     _t?.cancel();
-    playing.value = false;
+    if (_loadedPath != null) {
+      _audio.pause();
+    } else {
+      playing.value = false;
+    }
   }
+
+  Future<void> setSpeed(double s) => _audio.setSpeed(s);
 
   void dispose() {
     _t?.cancel();
+    _posSub?.cancel();
+    _audio.dispose();
     progress.dispose();
     playing.dispose();
   }
@@ -1769,6 +1852,7 @@ class _MessageBubble extends StatelessWidget {
     required this.senderName,
     required this.replyPreview,
     required this.isPlaying,
+    this.voiceProgress = 0,
     required this.onLongPress,
     required this.onReact,
     required this.onReply,
@@ -1789,6 +1873,9 @@ class _MessageBubble extends StatelessWidget {
   final String senderName;
   final Message? replyPreview;
   final bool isPlaying;
+
+  /// Progression de lecture du vocal (0..1) — position réelle du fichier.
+  final double voiceProgress;
   final VoidCallback onLongPress;
   final void Function(String emoji) onReact;
   final VoidCallback onReply;
@@ -2045,7 +2132,8 @@ class _MessageBubble extends StatelessWidget {
                     height: (8 + (i * 7919) % 16).toDouble(),
                     margin: const EdgeInsets.symmetric(horizontal: 1),
                     decoration: BoxDecoration(
-                      color: KiteColors.accent.withValues(alpha: 0.55),
+                      color: KiteColors.accent.withValues(
+                          alpha: i / 22 < voiceProgress ? 1.0 : 0.4),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),

@@ -222,7 +222,7 @@ Fonctionnalités prévues (non implémentées aujourd'hui) :
 - Sauvegarde/export de l'historique.
 - Livré en v0.1.5 : messages programmés, messages éphémères, verrou de discussion, dossiers de conversations.
 - Livré en v0.1.6/v0.1.7 : déverrouillage biométrique du verrou (global puis choix par conversation), traduction des messages.
-- Enregistrement vocal et vidéo réels, statuts de lecture précis.
+- Enregistrement vocal réel livré (micro + lecture dans la bulle, fichier .m4a, parité offline/serveur) ; vidéo réelle et statuts de lecture précis à venir.
 - Sondages avancés, réactions multiples.
 
 **Appels**
