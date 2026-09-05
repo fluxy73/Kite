@@ -202,6 +202,7 @@ Détails du protocole (formats JSON, événements, codes HTTP) : voir `PROTOCOL.
 | [v0.1.5](https://github.com/fluxy73/Kite/releases/tag/v0.1.5) | Messages programmés (date/heure dans le composer, dispatch serveur automatique, livraison simulée hors-ligne, rappel local) ; messages éphémères (minuteur 24 h / 7 j / 90 j par conversation, sweep serveur, parité offline) ; verrou de discussion (code PIN 4 chiffres haché SHA-256 sur l'appareil, porte à l'ouverture, auto-lock au premier plan, aperçu masqué dans la liste) ; dossiers de conversations façon Telegram (onglets épinglés Toutes · Non lues · dossiers · +, persistés par utilisateur, appartenance multiple) | #24, #25, #26, #27 |
 | [v0.1.6](https://github.com/fluxy73/Kite/releases/tag/v0.1.6) | Déverrouillage biométrique du verrou de discussion : invite automatique à l'ouverture (local_auth, BiometricPrompt), repli code PIN, proposition à la pose du verrou, réglage dans la fiche info, préférence persistée sur l'appareil | #28 |
 | [v0.1.7](https://github.com/fluxy73/Kite/releases/tag/v0.1.7) | Biométrie du verrou **par conversation** (choix par discussion, migration transparente du réglage global) ; traduction de messages par appui long (service MyMemory sans clé API, résultat sous la bulle, bascule afficher/masquer) + fix overflow du menu contextuel sur petit écran | #31, #30 |
+| [v0.1.8](https://github.com/fluxy73/Kite/releases/tag/v0.1.8) | Fiche info réelle : galerie « Médias, liens et documents » avec visionneuse plein écran, écran des messages favoris, fond de chat au choix (6 palettes, persisté côté serveur), blocage réel du contact (bannière + envois refusés côté serveur) et signalement avec motif persisté ; messages vocaux réels (enregistrement micro AAC .m4a, lecture dans la bulle avec waveform suivant la position réelle, fichier persisté, parité offline/serveur) ; verrouillage de l'app entière (porte au démarrage et au retour au premier plan, code + biométrie, retrait exigeant le code) | #33, #34, #35 |
 
 ## Roadmap / Fonctionnalités à venir
 
@@ -222,7 +223,7 @@ Fonctionnalités prévues (non implémentées aujourd'hui) :
 - Sauvegarde/export de l'historique.
 - Livré en v0.1.5 : messages programmés, messages éphémères, verrou de discussion, dossiers de conversations.
 - Livré en v0.1.6/v0.1.7 : déverrouillage biométrique du verrou (global puis choix par conversation), traduction des messages.
-- Enregistrement vocal réel livré (micro + lecture dans la bulle, fichier .m4a, parité offline/serveur) ; vidéo réelle et statuts de lecture précis à venir.
+- Livré en v0.1.8 : enregistrement vocal réel (micro + lecture dans la bulle, fichier .m4a, parité offline/serveur) ; vidéo réelle et statuts de lecture précis à venir.
 - Sondages avancés, réactions multiples.
 
 **Appels**
@@ -230,7 +231,7 @@ Fonctionnalités prévues (non implémentées aujourd'hui) :
 - Rappels récurrents pour les appels planifiés.
 
 **Sécurité**
-- Verrouillage biométrique de l'app entière (au lancement), en plus du verrou par conversation.
+- Livré en v0.1.8 : verrouillage biométrique de l'app entière (démarrage + retour au premier plan), en plus du verrou par conversation.
 
 **Plateformes & distribution**
 - Synchronisation multi-appareils : fusion de l'état hors-ligne local avec le
