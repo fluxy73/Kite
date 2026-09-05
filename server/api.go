@@ -205,6 +205,16 @@ func (a *api) handleMessages(w http.ResponseWriter, r *http.Request) {
 			httpError(w, 403, "senderId != userId")
 			return
 		}
+		// Enforcement du blocage : un utilisateur bloqué ne peut plus
+		// envoyer de messages à celui qui l'a bloqué.
+		if chat, ok := a.store.chatByID(chatID); ok && chat.Type == "dm" {
+			for _, mid := range chat.MemberIDs {
+				if mid != uid && a.store.isBlocked(mid, uid) {
+					httpError(w, 403, "impossible d'envoyer : utilisateur bloqué")
+					return
+				}
+			}
+		}
 		if body.Type == "" {
 			body.Type = "text"
 		}
@@ -286,10 +296,11 @@ func (a *api) handleScheduledMessages(w http.ResponseWriter, r *http.Request) {
 
 // handleFolders gère /api/folders : CRUD des dossiers de conversations
 // (façon Telegram), persistance par utilisateur.
-//   GET    /api/folders                  -> liste des dossiers
-//   POST   /api/folders                  {name}            -> crée
-//   POST   /api/folders/{id}             {name|chatId|op}  -> renomme ou ajoute/retire ('op':'add'|'remove')
-//   DELETE /api/folders/{id}                               -> supprime
+//
+//	GET    /api/folders                  -> liste des dossiers
+//	POST   /api/folders                  {name}            -> crée
+//	POST   /api/folders/{id}             {name|chatId|op}  -> renomme ou ajoute/retire ('op':'add'|'remove')
+//	DELETE /api/folders/{id}                               -> supprime
 func (a *api) handleFolders(w http.ResponseWriter, r *http.Request) {
 	uid, ok := a.userOrError(w, r)
 	if !ok {
@@ -317,9 +328,9 @@ func (a *api) handleFolders(w http.ResponseWriter, r *http.Request) {
 		}
 		folderID := strings.TrimPrefix(r.URL.Path, "/api/folders/")
 		var body struct {
-			Name  string `json:"name"`
+			Name   string `json:"name"`
 			ChatID string `json:"chatId"`
-			Op    string `json:"op"`
+			Op     string `json:"op"`
 		}
 		if err := readJSON(r, &body); err != nil {
 			httpError(w, 400, "corps invalide: "+err.Error())
@@ -976,15 +987,20 @@ func (a *api) handleChatAction(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Archived      bool   `json:"archived"`
 		Pinned        bool   `json:"pinned"`
-		Until         int64  `json:"until"`    // mute : expiration (epoch ms)
-		Duration      string `json:"duration"` // mute : 8h | 1w | always
-		NotifPriority string `json:"priority"` // notifs : low | default | high
-		NotifSound    *bool  `json:"sound"`    // notifs : son on/off
-		NotifPreview  *bool  `json:"preview"`  // notifs : aperçu on/off
+		Until         int64  `json:"until"`        // mute : expiration (epoch ms)
+		Duration      string `json:"duration"`     // mute : 8h | 1w | always
+		NotifPriority string `json:"priority"`     // notifs : low | default | high
+		NotifSound    *bool  `json:"sound"`        // notifs : son on/off
+		NotifPreview  *bool  `json:"preview"`      // notifs : aperçu on/off
 		Disappearing  int64  `json:"disappearing"` // éphémère : durée en ms (0 = off)
+		Wallpaper     string `json:"wallpaper"`    // thème du chat (clé de palette)
+		Blocked       bool   `json:"blocked"`      // block : true = bloquer, false = débloquer
+		Reason        string `json:"reason"`       // report : motif
+		Details       string `json:"details"`      // report : détails optionnels
 	}
 	// delete n'a pas de corps : tout ce qui compte est l'utilisateur.
-	if action != "delete" {
+	// GET block (état du blocage) et delete n'ont pas de corps.
+	if action != "delete" && !(action == "block" && r.Method == http.MethodGet) {
 		if err := readJSON(r, &body); err != nil {
 			httpError(w, 400, "corps invalide: "+err.Error())
 			return
@@ -1028,6 +1044,64 @@ func (a *api) handleChatAction(w http.ResponseWriter, r *http.Request) {
 		chat, _ := a.store.chatByID(chatID)
 		a.hub.broadcastToUsers(chat.MemberIDs, Event{Type: "message", ChatID: chatID, Data: mustJSON(sys)})
 		wJSON(w, 200, map[string]any{"id": chatID, "disappearing": body.Disappearing})
+	case "wallpaper":
+		// Thème du chat : clé de palette ('' = défaut). Partagé par les membres.
+		valid := map[string]bool{"": true, "midnight": true, "forest": true, "sunset": true, "ocean": true, "rose": true}
+		if !valid[body.Wallpaper] {
+			httpError(w, 400, "thème inconnu")
+			return
+		}
+		if !a.store.setWallpaper(chatID, body.Wallpaper) {
+			httpError(w, 404, "conversation introuvable")
+			return
+		}
+		wJSON(w, 200, map[string]any{"id": chatID, "wallpaper": body.Wallpaper})
+	case "block":
+		// Blocage d'un contact (DM uniquement) : enforcement à l'envoi.
+		if r.Method == http.MethodGet {
+			chat, ok := a.store.chatByID(chatID)
+			if !ok || chat.Type != "dm" {
+				httpError(w, 400, "blocage possible en DM uniquement")
+				return
+			}
+			target := ""
+			for _, mid := range chat.MemberIDs {
+				if mid != uid {
+					target = mid
+				}
+			}
+			wJSON(w, 200, map[string]any{"id": chatID, "blocked": a.store.isBlocked(uid, target), "target": target})
+			return
+		}
+		chat, ok := a.store.chatByID(chatID)
+		if !ok || chat.Type != "dm" {
+			httpError(w, 400, "blocage possible en DM uniquement")
+			return
+		}
+		target := ""
+		for _, mid := range chat.MemberIDs {
+			if mid != uid {
+				target = mid
+			}
+		}
+		if target == "" {
+			httpError(w, 400, "destinataire introuvable")
+			return
+		}
+		a.store.toggleBlock(uid, target, body.Blocked)
+		wJSON(w, 200, map[string]any{"id": chatID, "blocked": body.Blocked, "target": target})
+	case "report":
+		// Signalement : motif requis, détails optionnels.
+		if body.Reason == "" {
+			httpError(w, 400, "motif requis")
+			return
+		}
+		rep, ok := a.store.addReport(uid, chatID, body.Reason, body.Details)
+		if !ok {
+			httpError(w, 404, "conversation introuvable")
+			return
+		}
+		wJSON(w, 201, rep)
 	case "mute":
 		// Sourdine personnelle avec expiration. Accepte soit une durée
 		// symbolique (8h | 1w | always), soit un epoch ms direct (`until`).

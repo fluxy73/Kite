@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../api.dart';
 import '../translation.dart';
 import '../chat_lock.dart';
+import 'chat_extras.dart';
 import '../drafts.dart';
 import '../message_notifier.dart';
 import '../models.dart';
@@ -40,6 +41,8 @@ class _ConversationScreenState extends State<ConversationScreen>
   DateTime? _scheduleAt; // envoi programmé armé (null = envoi immédiat)
   bool _armingLock = false; // pose du verrou en cours (porte en mode setup)
   bool _lockBioAvailable = false; // capacité biométrique de l'appareil (option du réglage verrou)
+  bool _isBlocked = false; // contact bloqué (DM)
+  String _wallpaper = ''; // thème du chat (clé de palette)
   late final TranslationService _translator =
       widget.translator ?? TranslationService();
   final Map<String, String> _translations = {}; // messageId -> texte traduit
@@ -65,6 +68,7 @@ class _ConversationScreenState extends State<ConversationScreen>
   void initState() {
     super.initState();
     _probeLockBiometrics();
+    _loadChatExtras();
     WidgetsBinding.instance.addObserver(this);
 
     _load();
@@ -108,6 +112,47 @@ class _ConversationScreenState extends State<ConversationScreen>
       setState(() => _lockBioAvailable = ok);
     }
   }
+  /// Charge l'état « extras » de la fiche info : blocage (DM) et thème.
+  Future<void> _loadChatExtras() async {
+    try {
+      final blocked = await widget.api.isBlocked(widget.chat.id);
+      if (mounted && blocked != _isBlocked) {
+        setState(() => _isBlocked = blocked);
+      }
+    } catch (_) {}
+    if (mounted && widget.chat.wallpaper != _wallpaper) {
+      setState(() => _wallpaper = widget.chat.wallpaper);
+    }
+  }
+
+  /// Bascule le blocage du contact (DM) via l'API réelle.
+  Future<void> _toggleBlock() async {
+    try {
+      await widget.api.setBlocked(widget.chat.id, blocked: !_isBlocked);
+      if (!mounted) return;
+      setState(() => _isBlocked = !_isBlocked);
+      _toast(_isBlocked
+          ? 'Contact bloqué — il ne peut plus vous écrire'
+          : 'Contact débloqué');
+    } catch (_) {
+      _toast('Impossible de modifier le blocage');
+    }
+  }
+
+  /// Applique le thème choisi (persisté, partagé par les membres).
+  Future<void> _pickWallpaper() async {
+    final key = await showWallpaperPicker(context, _wallpaper);
+    if (key == null || !mounted) return;
+    try {
+      await widget.api.setChatWallpaper(widget.chat.id, key);
+      if (!mounted) return;
+      setState(() => _wallpaper = key);
+      _toast(key.isEmpty ? 'Thème par défaut restauré' : 'Thème appliqué 🎨');
+    } catch (_) {
+      _toast("Impossible d'appliquer le thème");
+    }
+  }
+
   @override
   void dispose() {
     DraftStore.instance.flushIfNeeded(); // brouillon écrit sur disque
@@ -453,11 +498,46 @@ class _ConversationScreenState extends State<ConversationScreen>
     }
     return Scaffold(
       appBar: _appBar(),
-      body: Column(
-        children: [
-          Expanded(child: _messageList()),
-          _composerZone(),
-        ],
+      body: Container(
+        decoration: _wallpaper.isEmpty
+            ? null
+            : BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    kWallpapers[_wallpaper]!.start,
+                    kWallpapers[_wallpaper]!.end,
+                  ],
+                ),
+              ),
+        child: Column(
+          children: [
+            if (_isBlocked)
+              Material(
+                color: Colors.redAccent.withValues(alpha: 0.15),
+                child: InkWell(
+                  onTap: _toggleBlock,
+                  child: const ListTile(
+                    dense: true,
+                    leading: Icon(Icons.block, color: Colors.redAccent, size: 20),
+                    title: Text('Contact bloqué — appuyez pour débloquer',
+                        style: TextStyle(fontSize: 13, color: Colors.redAccent)),
+                  ),
+                ),
+              ),
+            Expanded(child: _messageList()),
+            if (_isBlocked)
+              const Padding(
+                padding: EdgeInsets.all(10),
+                child: Text(
+                    'Vous avez bloqué ce contact. Débloquez-le pour lui écrire.',
+                    style: TextStyle(color: KiteColors.muted, fontSize: 12.5)),
+              )
+            else
+              _composerZone(),
+          ],
+        ),
       ),
     );
   }
@@ -990,6 +1070,50 @@ class _ConversationScreenState extends State<ConversationScreen>
     }
   }
 
+  /// Confirmation puis bascule du blocage.
+  Future<void> _confirmBlock() async {
+    if (_isBlocked) {
+      await _toggleBlock();
+      return;
+    }
+    final go = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: KiteColors.surface,
+        title: const Text('Bloquer ce contact ?',
+            style: TextStyle(color: KiteColors.fg)),
+        content: const Text(
+            'Il ne pourra plus vous envoyer de messages. Vous pourrez le débloquer à tout moment.',
+            style: TextStyle(color: KiteColors.muted)),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Annuler')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
+            child: const Text('Bloquer'),
+          ),
+        ],
+      ),
+    );
+    if (go == true && mounted) await _toggleBlock();
+  }
+
+  /// Dialogue de signalement puis envoi réel (serveur ou store local).
+  Future<void> _reportChat() async {
+    final result = await showReportDialog(context);
+    if (result == null || !mounted) return;
+    final (reason, details) = result;
+    try {
+      await widget.api.reportChat(widget.chat.id,
+          reason: reason, details: details);
+      _toast('Signalement envoyé — merci');
+    } catch (_) {
+      _toast("Impossible d'envoyer le signalement");
+    }
+  }
+
   Widget _menuItem(
       BuildContext ctx, IconData icon, String label, VoidCallback onTap) {
     return ListTile(
@@ -1167,22 +1291,77 @@ class _ConversationScreenState extends State<ConversationScreen>
                               TextStyle(color: KiteColors.accent, fontSize: 11))
                       : null,
                 ),
-            for (final item in const [
-              'Médias, liens et documents',
-              'Messages favoris',
-              'Thème du chat',
-              'Bloquer',
-              'Signaler'
-            ])
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined,
+                  color: KiteColors.muted),
+              title: const Text('Médias, liens et documents',
+                  style: TextStyle(fontSize: 14.5)),
+              onTap: () {
+                Navigator.pop(sheetCtx);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => MediaGalleryScreen(
+                      messages: _messages,
+                      isMine: (m) => m.isMine(widget.api.meId),
+                      onOpen: (ctx, m) => Navigator.push(
+                        ctx,
+                        MaterialPageRoute(
+                            builder: (_) => MediaViewerScreen(message: m)),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+            ListTile(
+              leading:
+                  const Icon(Icons.star_border, color: KiteColors.muted),
+              title: const Text('Messages favoris',
+                  style: TextStyle(fontSize: 14.5)),
+              onTap: () {
+                Navigator.pop(sheetCtx);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => MediaGalleryScreen(
+                      messages: _messages,
+                      isMine: (m) => m.isMine(widget.api.meId),
+                    ),
+                  ),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.palette_outlined,
+                  color: KiteColors.muted),
+              title: const Text('Thème du chat',
+                  style: TextStyle(fontSize: 14.5)),
+              onTap: () {
+                Navigator.pop(sheetCtx);
+                _pickWallpaper();
+              },
+            ),
+            if (!widget.chat.isGroup)
               ListTile(
-                leading:
-                    const Icon(Icons.chevron_right, color: KiteColors.muted),
-                title: Text(item, style: const TextStyle(fontSize: 14.5)),
+                leading: Icon(
+                    _isBlocked ? Icons.lock_person : Icons.block,
+                    color: _isBlocked ? Colors.redAccent : KiteColors.muted),
+                title: Text(_isBlocked ? 'Débloquer le contact' : 'Bloquer',
+                    style: const TextStyle(fontSize: 14.5)),
                 onTap: () {
                   Navigator.pop(sheetCtx);
-                  _toast('$item — workflow simulé');
+                  _confirmBlock();
                 },
               ),
+            ListTile(
+              leading: const Icon(Icons.flag_outlined, color: KiteColors.muted),
+              title: const Text('Signaler', style: TextStyle(fontSize: 14.5)),
+              onTap: () {
+                Navigator.pop(sheetCtx);
+                _reportChat();
+              },
+            ),
             ListTile(
               leading: Icon(
                 ChatLockStore.instance.isLocked(widget.chat.id)

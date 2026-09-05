@@ -76,6 +76,12 @@ class LocalStore {
   /// conversations sans préférence propre).
   final Map<String, NotifPrefs> notifDefaults = {};
 
+  /// Utilisateurs bloqués par utilisateur (DMs) — miroir du serveur.
+  final Map<String, Set<String>> blocked = {};
+
+  /// Signalements envoyés depuis ce mode (pas de serveur pour les recevoir).
+  final List<Map<String, String>> reports = [];
+
   /// Diffusé à chaque mutation (même sémantique que l'event "shell" serveur).
   final StreamController<void> _changes = StreamController<void>.broadcast();
   Stream<void> get changes => _changes.stream;
@@ -121,6 +127,10 @@ class LocalStore {
             .toList();
         folders.addAll((decoded['folders'] as List? ?? [])
             .map((e) => ChatFolder.fromJson(e as Map<String, dynamic>)));
+        blocked.addAll((decoded['blocked'] as Map? ?? {}).map((k, v) =>
+            MapEntry(k as String, (v as List).cast<String>().toSet())));
+        reports.addAll((decoded['reports'] as List? ?? [])
+            .map((e) => Map<String, String>.from(e as Map)));
         final msgs = decoded['messages'] as Map<String, dynamic>? ?? {};
         msgs.forEach((chatId, list) {
           _messagesByChat[chatId] = (list as List)
@@ -174,6 +184,9 @@ class LocalStore {
           'notifDefaults': notifDefaults.map((k, v) => MapEntry(k, v.toJson())),
         if (folders.isNotEmpty)
           'folders': folders.map((f) => f.toJson()).toList(),
+        if (blocked.isNotEmpty)
+          'blocked': blocked.map((k, v) => MapEntry(k, v.toList())),
+        if (reports.isNotEmpty) 'reports': reports,
         'scheduledMessages': scheduledMessages
             .map((m) => {
                   'id': m.id,
@@ -681,6 +694,50 @@ class LocalStore {
 
   void deleteFolder(String folderId) {
     folders.removeWhere((f) => f.id == folderId);
+    _persist();
+    _changes.add(null);
+  }
+
+  // ---------- Thème, blocage, signalements ----------
+
+  void setWallpaper(String chatId, String key) {
+    final i = chats.indexWhere((c) => c.id == chatId);
+    if (i < 0) return;
+    chats[i] = chats[i].copyWith(wallpaper: key);
+    _persist();
+    _changes.add(null);
+  }
+
+  /// true si le contact de ce DM est bloqué par l'utilisateur courant.
+  bool blockedFor(String chatId, String meId) {
+    final i = chats.indexWhere((c) => c.id == chatId);
+    if (i < 0 || chats[i].type != 'dm') return false;
+    final other =
+        chats[i].memberIds.firstWhere((m) => m != meId, orElse: () => '');
+    if (other.isEmpty) return false;
+    return blocked[meId]?.contains(other) ?? false;
+  }
+
+  void setBlocked(String chatId, String meId, {required bool value}) {
+    final i = chats.indexWhere((c) => c.id == chatId);
+    if (i < 0 || chats[i].type != 'dm') return;
+    final other =
+        chats[i].memberIds.firstWhere((m) => m != meId, orElse: () => '');
+    if (other.isEmpty) return;
+    final set = blocked.putIfAbsent(meId, () => <String>{});
+    value ? set.add(other) : set.remove(other);
+    _persist();
+    _changes.add(null);
+  }
+
+  void addReport(String chatId, String reason, String details, String meId) {
+    reports.add({
+      'chatId': chatId,
+      'reason': reason,
+      'details': details,
+      'reporter': meId,
+      'createdAt': DateTime.now().millisecondsSinceEpoch.toString(),
+    });
     _persist();
     _changes.add(null);
   }
