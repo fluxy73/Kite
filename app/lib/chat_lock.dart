@@ -62,11 +62,19 @@ class LocalAuthAuthenticator implements BiometricAuthenticator {
 /// migrée vers la préférence par conversation au chargement.
 const String _legacyBioKey = '_biometrics';
 
+/// Clé méta du verrou d'app (code + préférence biométrique) dans
+/// kite-chatlock.json.
+const String _appLockKey = '_appLock';
+
 class ChatLockStore extends ChangeNotifier {
   ChatLockStore._();
   static final ChatLockStore instance = ChatLockStore._();
 
   final Map<String, String> _hashes = {}; // chatId -> sha256(code)
+
+  /// Verrou d'app : code haché (null = désactivé) + biométrie autorisée.
+  String? _appHash;
+  bool _appBio = false;
 
   /// Conversations dont la porte accepte la biométrie (préférence par
   /// conversation, persistée ; la capacité réelle est vérifiée via
@@ -110,6 +118,13 @@ class ChatLockStore extends ChangeNotifier {
       final raw = jsonDecode(f.readAsStringSync()) as Map<String, dynamic>;
       var legacyBio = false;
       raw.forEach((k, v) {
+        if (k == _appLockKey) {
+          if (v is Map<String, dynamic>) {
+            _appHash = v['hash'] as String?;
+            _appBio = v['bio'] == true;
+          }
+          return;
+        }
         if (k == _legacyBioKey) {
           legacyBio = v == true; // ancien réglage global
           return;
@@ -131,10 +146,13 @@ class ChatLockStore extends ChangeNotifier {
     final f = _storeFile;
     if (f == null) return;
     try {
-      final data = _hashes.map((k, v) => MapEntry(k, <String, Object>{
+      final data = _hashes.map((k, v) => MapEntry(k, <String, Object?>{
             'hash': v,
             if (_biometricChats.contains(k)) 'bio': true,
           }));
+      if (_appHash != null) {
+        data[_appLockKey] = {'hash': _appHash, 'bio': _appBio};
+      }
       f.writeAsStringSync(jsonEncode(data));
     } catch (_) {}
   }
@@ -229,6 +247,68 @@ class ChatLockStore extends ChangeNotifier {
     notifyListeners();
   }
 
+  // ---------- Verrou d'app (écran entier) ----------
+
+  /// true si un verrou d'app est posé.
+  bool get appLockEnabled {
+    _ensureLoaded();
+    return _appHash != null;
+  }
+
+  /// true si la porte d'app accepte la biométrie (persisté).
+  bool get appBiometricsEnabled {
+    _ensureLoaded();
+    return _appBio;
+  }
+
+  /// Pose le verrou d'app avec un code à 4 chiffres. false si déjà posé
+  /// ou code invalide.
+  bool setAppLock(String code) {
+    _ensureLoaded();
+    if (_appHash != null || !_valid(code)) return false;
+    _appHash = _hash(code);
+    _flush();
+    notifyListeners();
+    return true;
+  }
+
+  /// Autorise la biométrie sur la porte d'app (après pose du verrou).
+  void setAppBiometrics(bool enabled) {
+    _ensureLoaded();
+    if (_appHash == null || _appBio == enabled) return;
+    _appBio = enabled;
+    _flush();
+    notifyListeners();
+  }
+
+  /// Déverrouille l'app avec le code. false si incorrect.
+  bool unlockApp(String code) {
+    _ensureLoaded();
+    if (_appHash == null) return true;
+    if (_appHash != _hash(code)) return false;
+    notifyListeners();
+    return true;
+  }
+
+  /// Marque l'app déverrouillée après succès biométrique (vérifié par la
+  /// porte : préférence active + capacité de l'appareil).
+  void unlockAppBiometric() {
+    _ensureLoaded();
+    if (!_appBio || _appHash == null) return;
+    notifyListeners();
+  }
+
+  /// Retire le verrou d'app (nécessite le code).
+  bool removeAppLock(String code) {
+    _ensureLoaded();
+    if (_appHash == null || _appHash != _hash(code)) return false;
+    _appHash = null;
+    _appBio = false;
+    _flush();
+    notifyListeners();
+    return true;
+  }
+
   /// Referme une conversation déverrouillée (bouton cadenas, app switcher…).
   void lock(String chatId) {
     if (_unlocked.remove(chatId)) notifyListeners();
@@ -256,6 +336,8 @@ class ChatLockStore extends ChangeNotifier {
     _hashes.clear();
     _biometricChats.clear();
     _unlocked.clear();
+    _appHash = null;
+    _appBio = false;
     _file = file;
     _loaded = false;
   }
@@ -563,6 +645,235 @@ class _Keypad extends StatelessWidget {
               ],
             ),
         ],
+      ),
+    );
+  }
+}
+
+/// Porte d'entrée de l'app entière : pad de code PIN (avec biométrie
+/// optionnelle). Posée au démarrage et à chaque retour au premier plan
+/// tant que le verrou d'app est actif.
+///
+/// Deux modes :
+/// - [AppLockGateMode.setup] : saisie puis confirmation du code, proposition
+///   biométrique si l'appareil le permet.
+/// - [AppLockGateMode.unlock] : déverrouillage (code ou biométrie).
+class AppLockGate extends StatefulWidget {
+  const AppLockGate({
+    super.key,
+    required this.mode,
+    required this.onDone,
+    this.authenticator,
+  });
+
+  final AppLockGateMode mode;
+  final VoidCallback onDone;
+
+  /// Injecté par les tests ; [LocalAuthAuthenticator] en production.
+  final BiometricAuthenticator? authenticator;
+
+  @override
+  State<AppLockGate> createState() => _AppLockGateState();
+}
+
+enum AppLockGateMode { setup, unlock }
+
+class _AppLockGateState extends State<AppLockGate> {
+  String _code = '';
+  String? _firstCode; // setup : première saisie
+  String _error = '';
+
+  late final BiometricAuthenticator _bio;
+  bool _bioAvailable = false;
+  bool _bioPromptOpen = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _bio = widget.authenticator ?? LocalAuthAuthenticator();
+    _initBiometrics();
+  }
+
+  Future<void> _initBiometrics() async {
+    final store = ChatLockStore.instance;
+    final wanted =
+        store.appBiometricsEnabled || widget.mode == AppLockGateMode.setup;
+    if (!wanted) return;
+    final ok = await _bio.isAvailable();
+    if (!mounted) return;
+    setState(() => _bioAvailable = ok);
+    if (ok &&
+        store.appBiometricsEnabled &&
+        widget.mode == AppLockGateMode.unlock) {
+      await _authenticate();
+    }
+  }
+
+  Future<void> _authenticate() async {
+    if (_bioPromptOpen) return;
+    _bioPromptOpen = true;
+    try {
+      final ok =
+          await _bio.authenticate('Déverrouillez Kite avec la biométrie');
+      if (!mounted) return;
+      if (ok) {
+        ChatLockStore.instance.unlockAppBiometric();
+        widget.onDone();
+      } else {
+        setState(() => _error = 'Biométrie non reconnue — utilisez le code');
+      }
+    } finally {
+      _bioPromptOpen = false;
+    }
+  }
+
+  void _push(String digit) {
+    if (_code.length >= 4) return;
+    setState(() {
+      _code += digit;
+      _error = '';
+    });
+    if (_code.length == 4) _submit();
+  }
+
+  void _backspace() {
+    if (_code.isEmpty) return;
+    setState(() {
+      _code = _code.substring(0, _code.length - 1);
+      _error = '';
+    });
+  }
+
+  Future<void> _submit() async {
+    final store = ChatLockStore.instance;
+    if (widget.mode == AppLockGateMode.setup) {
+      if (_firstCode == null) {
+        setState(() {
+          _firstCode = _code;
+          _code = '';
+        });
+        return;
+      }
+      if (_code != _firstCode) {
+        setState(() {
+          _firstCode = null;
+          _code = '';
+          _error = 'Les codes ne correspondent pas, recommencez';
+        });
+        return;
+      }
+      final ok = store.setAppLock(_code);
+      if (!ok) {
+        setState(() {
+          _code = '';
+          _error = 'Impossible de poser le verrou';
+        });
+        return;
+      }
+      if (_bioAvailable && !store.appBiometricsEnabled) {
+        final useBio = await showDialog<bool>(
+          context: context,
+          builder: (dialogCtx) => AlertDialog(
+            backgroundColor: KiteColors.surface,
+            title: const Text('Déverrouillage biométrique',
+                style: TextStyle(color: KiteColors.fg)),
+            content: const Text(
+                "Utiliser l'empreinte ou le visage pour ouvrir Kite ? "
+                'Le code reste la solution de secours.',
+                style: TextStyle(color: KiteColors.muted)),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogCtx, false),
+                child: const Text('Plus tard'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(dialogCtx, true),
+                child: const Text('Activer'),
+              ),
+            ],
+          ),
+        );
+        if (useBio == true) store.setAppBiometrics(true);
+      }
+      if (mounted) widget.onDone();
+      return;
+    }
+    // Mode unlock.
+    if (store.unlockApp(_code)) {
+      widget.onDone();
+    } else {
+      setState(() {
+        _code = '';
+        _error = 'Code incorrect';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isSetup = widget.mode == AppLockGateMode.setup;
+    final title = isSetup
+        ? (_firstCode == null
+            ? 'Choisissez un code à 4 chiffres'
+            : 'Confirmez le code')
+        : 'Kite verrouillé';
+    return Center(
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.shield_outlined,
+                  size: 44, color: KiteColors.accent),
+              const SizedBox(height: 12),
+              const Text('Kite',
+                  style: TextStyle(
+                      fontSize: 20, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 4),
+              Text(title,
+                  style:
+                      const TextStyle(color: KiteColors.muted, fontSize: 13)),
+              const SizedBox(height: 18),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  for (var i = 0; i < 4; i++)
+                    Container(
+                      width: 14,
+                      height: 14,
+                      margin: const EdgeInsets.symmetric(horizontal: 7),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: i < _code.length
+                            ? KiteColors.accent
+                            : Colors.transparent,
+                        border: Border.all(color: KiteColors.muted),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                height: 18,
+                child: Text(_error,
+                    style: const TextStyle(
+                        color: Colors.redAccent, fontSize: 12.5)),
+              ),
+              _Keypad(onDigit: _push, onBackspace: _backspace),
+              if (!isSetup &&
+                  _bioAvailable &&
+                  ChatLockStore.instance.appBiometricsEnabled)
+                TextButton.icon(
+                  onPressed: _bioPromptOpen ? null : _authenticate,
+                  icon: const Icon(Icons.fingerprint,
+                      size: 26, color: KiteColors.accent),
+                  label: const Text('Utiliser la biométrie',
+                      style: TextStyle(color: KiteColors.accent)),
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }

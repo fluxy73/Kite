@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'api.dart';
 import 'call_center.dart';
+import 'chat_lock.dart';
 import 'message_notifier.dart';
 import 'models.dart';
 import 'offline_api.dart';
@@ -35,13 +36,21 @@ class KiteApp extends StatefulWidget {
   State<KiteApp> createState() => _KiteAppState();
 }
 
-class _KiteAppState extends State<KiteApp> {
+class _KiteAppState extends State<KiteApp> with WidgetsBindingObserver {
   final GlobalKey<NavigatorState> _nav = GlobalKey<NavigatorState>();
   bool _pushed = false;
+
+  /// Verrou d'app : true tant que la porte doit être affichée (démarrage,
+  /// retour au premier plan, réglage en cours).
+  bool _appLocked = false;
+  DateTime _lastUnlock = DateTime.fromMillisecondsSinceEpoch(0);
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // Porte d'app au démarrage si un verrou est posé.
+    _appLocked = ChatLockStore.instance.appLockEnabled;
     // Sonde de connectivité : l'indicateur En ligne / Hors ligne (barre
     // d'onglets) reflète l'état réel du serveur Go.
     ServerStatus.instance.start(widget.api);
@@ -75,7 +84,23 @@ class _KiteAppState extends State<KiteApp> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      // Auto-lock d'app au retour au premier plan (comportement bancaire) ;
+      // anti-rebond : pas de re-verrouillage juste après un déverrouillage.
+      if (ChatLockStore.instance.appLockEnabled &&
+          DateTime.now().difference(_lastUnlock).inSeconds > 2) {
+        setState(() => _appLocked = true);
+      }
+      // Auto-lock des conversations déverrouillées (comportement WhatsApp).
+      ChatLockStore.instance.lockAll();
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     ServerStatus.instance.stop();
     CallCenter.instance.current.removeListener(_onIncomingCall);
     ScheduledReminderCenter.instance.next.removeListener(_onScheduledReminder);
@@ -188,6 +213,8 @@ class _KiteAppState extends State<KiteApp> {
 
   @override
   Widget build(BuildContext context) {
+    final lockOn = ChatLockStore.instance.appLockEnabled;
+    final gating = lockOn && _appLocked;
     return MaterialApp(
       navigatorKey: _nav,
       title: 'Kite',
@@ -195,7 +222,22 @@ class _KiteAppState extends State<KiteApp> {
       theme: kiteDarkTheme(),
       darkTheme: kiteDarkTheme(),
       themeMode: ThemeMode.dark,
-      home: HomeShell(api: widget.api),
+      home: gating
+          ? Scaffold(
+              backgroundColor: KiteColors.bg,
+              body: AppLockGate(
+                mode: AppLockGateMode.unlock,
+                authenticator: _appAuthenticator,
+                onDone: () {
+                  _lastUnlock = DateTime.now();
+                  setState(() => _appLocked = false);
+                },
+              ),
+            )
+          : HomeShell(api: widget.api),
     );
   }
+
+  /// Injecté par les tests ; production = local_auth.
+  BiometricAuthenticator? _appAuthenticator;
 }
