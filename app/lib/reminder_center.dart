@@ -22,7 +22,7 @@ class ScheduledReminderCenter {
   static const _tick = Duration(seconds: 30);
   static const _window = Duration(hours: 1);
 
-  void start(dynamic api) {
+  void start(KiteApi api) {
     _api = api;
     _timer ??= Timer.periodic(_tick, (_) => _check());
     _check();
