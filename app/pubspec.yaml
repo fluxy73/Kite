@@ -16,7 +16,7 @@ dependencies:
   flutter_webrtc: ^0.12.4
   just_audio: ^0.10.0
   path_provider: ^2.1.4
-  record: ^5.2.0
+  record: ^7.1.1
   local_auth: ^3.0.2
   local_auth_android: ^2.0.10
 
