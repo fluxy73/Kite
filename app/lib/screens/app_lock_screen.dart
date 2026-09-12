@@ -38,12 +38,12 @@ class AppLockScreen extends StatelessWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: KiteColors.surface,
-        title: const Text('Retirer le verrou de l\'app',
+        title:  Text('Retirer le verrou de l\'app',
             style: TextStyle(color: KiteColors.fg)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('Saisissez le code pour confirmer.',
+             Text('Saisissez le code pour confirmer.',
                 style: TextStyle(color: KiteColors.muted)),
             const SizedBox(height: 12),
             TextField(
@@ -52,7 +52,7 @@ class AppLockScreen extends StatelessWidget {
               obscureText: true,
               keyboardType: TextInputType.number,
               maxLength: 4,
-              style: const TextStyle(color: KiteColors.fg, letterSpacing: 8),
+              style: TextStyle(color: KiteColors.fg, letterSpacing: 8),
               decoration: const InputDecoration(
                   counterText: '', hintText: '••••'),
             ),

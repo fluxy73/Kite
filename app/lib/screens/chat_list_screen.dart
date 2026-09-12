@@ -148,12 +148,12 @@ class _ChatListScreenState extends State<ChatListScreen> {
                 color: KiteColors.surface2,
                 child: ListTile(
                   dense: true,
-                  leading: const Icon(Icons.inventory_2,
+                  leading:  Icon(Icons.inventory_2,
                       size: 18, color: KiteColors.tint2),
-                  title: const Text('Archivées',
+                  title:  Text('Archivées',
                       style: TextStyle(fontSize: 13, color: KiteColors.fg)),
                   trailing: IconButton(
-                    icon: const Icon(Icons.close,
+                    icon:  Icon(Icons.close,
                         size: 18, color: KiteColors.muted),
                     onPressed: () => setState(() => _showArchived = false),
                   ),
@@ -302,7 +302,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                 const SizedBox(width: 6),
                 Text(
                   '$count',
-                  style: const TextStyle(
+                  style:  TextStyle(
                     color: KiteColors.accent,
                     fontSize: 11.5,
                     fontWeight: FontWeight.w600,
@@ -338,7 +338,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
           physics: const AlwaysScrollableScrollPhysics(),
           itemCount: chats.length,
           separatorBuilder: (_, __) =>
-              const Divider(height: 1, color: KiteColors.border),
+              Divider(height: 1, color: KiteColors.border),
           itemBuilder: (context, i) => _ChatRow(
             chat: chats[i],
             pinned: chats[i].pinnedFor(widget.api.meId),
@@ -372,7 +372,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
             physics: const AlwaysScrollableScrollPhysics(),
             itemCount: chats.length,
             separatorBuilder: (_, __) =>
-                const Divider(height: 1, color: KiteColors.border),
+                Divider(height: 1, color: KiteColors.border),
             itemBuilder: (context, i) => _ChatRow(
               chat: chats[i],
               pinned: chats[i].pinnedFor(widget.api.meId),
@@ -396,6 +396,49 @@ class _ChatListScreenState extends State<ChatListScreen> {
     );
   }
 
+  String _themeLabel() => switch (ThemePrefs.mode) {
+        'light' => 'Clair',
+        'system' => 'Système',
+        _ => 'Sombre',
+      };
+
+  /// Radio picker dark / light / system — la palette persistée est
+  /// appliquée immédiatement (KiteColors.applyMode) et l'app rebuild.
+  Future<void> _pickTheme(BuildContext context) async {
+    final picked = await showDialog<String>(
+      context: context,
+      builder: (dialogCtx) => SimpleDialog(
+        backgroundColor: KiteColors.surface,
+        title: Text('Thème', style: TextStyle(color: KiteColors.fg)),
+        children: [
+          RadioGroup<String>(
+            groupValue: ThemePrefs.mode,
+            onChanged: (v) => Navigator.pop(dialogCtx, v),
+            child: Column(
+              children: [
+                for (final entry in const [
+                  ('dark', 'Sombre', 'Palette ardoise chaude'),
+                  ('light', 'Clair', 'Palette lin / albâtre'),
+                  ('system', 'Système', 'Suit le réglage de l’appareil'),
+                ])
+                  RadioListTile<String>(
+                    value: entry.$1,
+                    title: Text(entry.$2, style: TextStyle(color: KiteColors.fg)),
+                    subtitle:
+                        Text(entry.$3, style: TextStyle(color: KiteColors.muted)),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+    if (picked == null || picked == ThemePrefs.mode) return;
+    ThemePrefs.set(picked);
+    KiteColors.applyMode();
+    if (mounted) setState(() {});
+  }
+
   void _showOptions(BuildContext context) {
     showModalBottomSheet<void>(
       context: context,
@@ -409,8 +452,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
           children: [
             ListTile(
               leading:
-                  const Icon(Icons.edit_outlined, color: KiteColors.accent),
-              title: const Text('Nouvelle discussion',
+                  Icon(Icons.edit_outlined, color: KiteColors.accent),
+              title:  Text('Nouvelle discussion',
                   style: TextStyle(color: KiteColors.fg)),
               onTap: () {
                 Navigator.pop(sheetCtx);
@@ -418,26 +461,26 @@ class _ChatListScreenState extends State<ChatListScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.shield_outlined,
+              leading:  Icon(Icons.shield_outlined,
                   color: KiteColors.accent),
-              title: const Text("Verrouillage de l'app",
+              title:  Text("Verrouillage de l'app",
                   style: TextStyle(color: KiteColors.fg)),
               subtitle: Text(
                   ChatLockStore.instance.appLockEnabled
                       ? 'Activé — biométrie : ${ChatLockStore.instance.appBiometricsEnabled ? "oui" : "non"}'
                       : 'Désactivé',
-                  style: const TextStyle(fontSize: 12, color: KiteColors.muted)),
+                  style: TextStyle(fontSize: 12, color: KiteColors.muted)),
               onTap: () {
                 Navigator.pop(sheetCtx);
                 _openAppLockSettings(context);
               },
             ),
             ListTile(
-              leading: const Icon(Icons.notifications_outlined,
+              leading:  Icon(Icons.notifications_outlined,
                   color: KiteColors.accent),
-              title: const Text('Notifications',
+              title:  Text('Notifications',
                   style: TextStyle(color: KiteColors.fg)),
-              subtitle: const Text('Défauts pour toutes les conversations',
+              subtitle:  Text('Défauts pour toutes les conversations',
                   style: TextStyle(fontSize: 12, color: KiteColors.muted)),
               onTap: () {
                 Navigator.pop(sheetCtx);
@@ -448,13 +491,24 @@ class _ChatListScreenState extends State<ChatListScreen> {
               },
             ),
             ListTile(
+              leading: Icon(Icons.brightness_6_outlined,
+                  color: KiteColors.accent),
+              title: Text('Thème', style: TextStyle(color: KiteColors.fg)),
+              subtitle: Text(_themeLabel(),
+                  style: TextStyle(fontSize: 12, color: KiteColors.muted)),
+              onTap: () {
+                Navigator.pop(sheetCtx);
+                _pickTheme(context);
+              },
+            ),
+            ListTile(
               leading: Icon(
                 Icons.inventory_2_outlined,
                 color: _showArchived ? KiteColors.tint2 : KiteColors.accent,
               ),
               title: Text(
                 _showArchived ? 'Retour aux discussions' : 'Archivées',
-                style: const TextStyle(color: KiteColors.fg),
+                style: TextStyle(color: KiteColors.fg),
               ),
               onTap: () {
                 Navigator.pop(sheetCtx);
@@ -462,8 +516,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.lock_outline, color: KiteColors.danger),
-              title: const Text('Verrouiller l’application',
+              leading: Icon(Icons.lock_outline, color: KiteColors.danger),
+              title:  Text('Verrouiller l’application',
                   style: TextStyle(color: KiteColors.fg)),
               onTap: () {
                 Navigator.pop(sheetCtx);
@@ -489,7 +543,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
       context: context,
       builder: (dialogCtx) => AlertDialog(
         backgroundColor: KiteColors.surface,
-        title: const Text('Dossiers', style: TextStyle(color: KiteColors.fg)),
+        title: Text('Dossiers', style: TextStyle(color: KiteColors.fg)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -500,7 +554,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                   return CheckboxListTile(
                     value: member,
                     activeColor: KiteColors.accent,
-                    title: Text(f.name, style: const TextStyle(color: KiteColors.fg)),
+                    title: Text(f.name, style: TextStyle(color: KiteColors.fg)),
                     onChanged: (_) async {
                       await _mutateFolder(() => widget.api
                           .folderMembership(f.id, chat.id, add: !member));
@@ -574,13 +628,13 @@ class _ChatListScreenState extends State<ChatListScreen> {
           children: [
             ListTile(
               leading:
-                  const Icon(Icons.edit_outlined, color: KiteColors.accent),
+                  Icon(Icons.edit_outlined, color: KiteColors.accent),
               title: const Text('Renommer le dossier'),
               onTap: () => Navigator.pop(sheetCtx, 'rename'),
             ),
             ListTile(
               leading:
-                  const Icon(Icons.delete_outline, color: KiteColors.danger),
+                  Icon(Icons.delete_outline, color: KiteColors.danger),
               title: const Text('Supprimer le dossier'),
               onTap: () => Navigator.pop(sheetCtx, 'delete'),
             ),
@@ -664,7 +718,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                     : (chat.isGroup
                         ? 'Épingler le groupe'
                         : 'Épingler la discussion'),
-                style: const TextStyle(color: KiteColors.fg),
+                style: TextStyle(color: KiteColors.fg),
               ),
               onTap: () {
                 Navigator.pop(sheetCtx);
@@ -672,10 +726,10 @@ class _ChatListScreenState extends State<ChatListScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.inventory_2_outlined,
+              leading:  Icon(Icons.inventory_2_outlined,
                   color: KiteColors.accent),
               title: Text(archived ? 'Désarchiver' : 'Archiver',
-                  style: const TextStyle(color: KiteColors.fg)),
+                  style: TextStyle(color: KiteColors.fg)),
               onTap: () {
                 Navigator.pop(sheetCtx);
                 _toggleArchive(context, chat);
@@ -690,7 +744,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
               ),
               title: Text(
                 muted ? 'Réactiver les notifications' : 'Mettre en sourdine',
-                style: const TextStyle(color: KiteColors.fg),
+                style: TextStyle(color: KiteColors.fg),
               ),
               onTap: () {
                 Navigator.pop(sheetCtx);
@@ -700,8 +754,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.folder_outlined, color: KiteColors.accent),
-              title: const Text('Dossiers',
+              leading: Icon(Icons.folder_outlined, color: KiteColors.accent),
+              title:  Text('Dossiers',
                   style: TextStyle(color: KiteColors.fg)),
               onTap: () {
                 Navigator.pop(sheetCtx);
@@ -710,8 +764,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
             ),
             ListTile(
               leading:
-                  const Icon(Icons.delete_outline, color: KiteColors.danger),
-              title: const Text('Supprimer la discussion',
+                  Icon(Icons.delete_outline, color: KiteColors.danger),
+              title:  Text('Supprimer la discussion',
                   style: TextStyle(color: KiteColors.danger)),
               onTap: () {
                 Navigator.pop(sheetCtx);
@@ -742,10 +796,10 @@ class _ChatListScreenState extends State<ChatListScreen> {
               ('always', 'Toujours'),
             ])
               ListTile(
-                leading: const Icon(Icons.notifications_off_outlined,
+                leading:  Icon(Icons.notifications_off_outlined,
                     color: KiteColors.accent),
                 title:
-                    Text(label, style: const TextStyle(color: KiteColors.fg)),
+                    Text(label, style: TextStyle(color: KiteColors.fg)),
                 onTap: () => Navigator.pop(sheetCtx, value),
               ),
           ],
@@ -812,7 +866,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(dlgCtx, true),
-            child: const Text('Supprimer',
+            child:  Text('Supprimer',
                 style: TextStyle(color: KiteColors.danger)),
           ),
         ],
@@ -839,9 +893,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
         context: context,
         builder: (ctx) => AlertDialog(
           backgroundColor: KiteColors.surface,
-          title: const Text("Verrouillage de l'app",
+          title:  Text("Verrouillage de l'app",
               style: TextStyle(color: KiteColors.fg)),
-          content: const Text(
+          content:  Text(
               'Le verrou est actif. Pour modifier le réglage, il faut le retirer (code requis).',
               style: TextStyle(color: KiteColors.muted)),
           actions: [
@@ -911,8 +965,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
         child: ListView(
           shrinkWrap: true,
           children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(20, 16, 20, 8),
+             Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
               child: Text('Nouvelle discussion',
                   style: TextStyle(
                       fontSize: 18,
@@ -920,8 +974,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
                       color: KiteColors.fg)),
             ),
             if (contacts.isEmpty)
-              const Padding(
-                padding: EdgeInsets.all(20),
+               Padding(
+                padding: const EdgeInsets.all(20),
                 child: Text('Aucun contact disponible',
                     style: TextStyle(color: KiteColors.muted)),
               ),
@@ -931,10 +985,10 @@ class _ChatListScreenState extends State<ChatListScreen> {
                   backgroundColor: KiteColors.surface2,
                   child: Text(u.name.isNotEmpty ? u.name[0] : '?',
                       style:
-                          const TextStyle(fontSize: 13, color: KiteColors.fg)),
+                          TextStyle(fontSize: 13, color: KiteColors.fg)),
                 ),
                 title:
-                    Text(u.name, style: const TextStyle(color: KiteColors.fg)),
+                    Text(u.name, style: TextStyle(color: KiteColors.fg)),
                 onTap: () async {
                   Navigator.pop(sheetCtx);
                   // DM existante avec ce contact ? On l'ouvre simplement.
@@ -1016,12 +1070,12 @@ class _ChatRow extends StatelessWidget {
                   Row(
                     children: [
                       if (pinned) ...[
-                        const Icon(Icons.push_pin,
+                         Icon(Icons.push_pin,
                             size: 13, color: KiteColors.muted),
                         const SizedBox(width: 4),
                       ],
                       if (lockedNow) ...[
-                        const Icon(Icons.lock,
+                         Icon(Icons.lock,
                             size: 13, color: KiteColors.muted),
                         const SizedBox(width: 4),
                       ],
@@ -1034,7 +1088,7 @@ class _ChatRow extends StatelessWidget {
                         ),
                       ),
                       Text(time,
-                          style: const TextStyle(
+                          style:  TextStyle(
                               color: KiteColors.muted, fontSize: 11)),
                     ],
                   ),
@@ -1044,14 +1098,14 @@ class _ChatRow extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style:
-                        const TextStyle(color: KiteColors.muted, fontSize: 14),
+                        TextStyle(color: KiteColors.muted, fontSize: 14),
                   ),
                 ],
               ),
             ),
             if (muted) ...[
               const SizedBox(width: 6),
-              const Icon(Icons.notifications_off,
+               Icon(Icons.notifications_off,
                   size: 14, color: KiteColors.muted),
             ],
             if (chat.unread > 0) ...[
@@ -1119,12 +1173,12 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
+    return  Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(Icons.forum_outlined, size: 44, color: KiteColors.muted),
-          SizedBox(height: 10),
+          const SizedBox(height: 10),
           Text('Aucune discussion', style: TextStyle(color: KiteColors.muted)),
         ],
       ),
@@ -1146,11 +1200,11 @@ class _ErrorState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.cloud_off, size: 44, color: KiteColors.danger),
+            Icon(Icons.cloud_off, size: 44, color: KiteColors.danger),
             const SizedBox(height: 10),
             Text(message,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: KiteColors.muted)),
+                style: TextStyle(color: KiteColors.muted)),
             const SizedBox(height: 14),
             FilledButton.icon(
               onPressed: onRetry,

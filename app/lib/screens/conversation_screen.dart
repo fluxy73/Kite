@@ -626,8 +626,8 @@ class _ConversationScreenState extends State<ConversationScreen>
               ),
             Expanded(child: _messageList()),
             if (_isBlocked)
-              const Padding(
-                padding: EdgeInsets.all(10),
+               Padding(
+                padding: const EdgeInsets.all(10),
                 child: Text(
                     'Vous avez bloqué ce contact. Débloquez-le pour lui écrire.',
                     style: TextStyle(color: KiteColors.muted, fontSize: 12.5)),
@@ -666,7 +666,7 @@ class _ConversationScreenState extends State<ConversationScreen>
                   widget.chat.isGroup
                       ? '${widget.chat.memberIds.length} membres'
                       : (widget.chat.online > 0 ? 'en ligne' : 'vu il y a peu'),
-                  style: const TextStyle(color: KiteColors.muted, fontSize: 12),
+                  style: TextStyle(color: KiteColors.muted, fontSize: 12),
                 ),
               ],
             ),
@@ -806,7 +806,7 @@ class _ConversationScreenState extends State<ConversationScreen>
   Widget _composerZone() {
     final canSend = _input.text.trim().isNotEmpty || _recording;
     return Container(
-      decoration: const BoxDecoration(
+      decoration:  BoxDecoration(
         border: Border(top: BorderSide(color: KiteColors.border)),
         color: KiteColors.bg,
       ),
@@ -824,7 +824,7 @@ class _ConversationScreenState extends State<ConversationScreen>
               padding: const EdgeInsets.only(left: 20, bottom: 4),
               child: Text('✍ $_remoteTyping écrit…',
                   style:
-                      const TextStyle(color: KiteColors.tint2, fontSize: 12)),
+                      TextStyle(color: KiteColors.tint2, fontSize: 12)),
             ),
           if (_scheduleAt != null) _scheduleBar(),
           if (_replyTo != null) _replyBar(_replyTo!),
@@ -859,13 +859,13 @@ class _ConversationScreenState extends State<ConversationScreen>
                               maxLines: 5,
                               onChanged: _onInputChanged,
                               onSubmitted: (_) => _send(),
-                              style: const TextStyle(
+                              style:  TextStyle(
                                   color: KiteColors.fg, height: 1.45),
                               decoration: InputDecoration(
                                 hintText: _editing != null
                                     ? 'Modifier le message…'
                                     : 'Message…',
-                                hintStyle: const TextStyle(
+                                hintStyle:  TextStyle(
                                     color: KiteColors.muted),
                                 isDense: true,
                                 filled: false,
@@ -1002,7 +1002,7 @@ class _ConversationScreenState extends State<ConversationScreen>
         color: KiteColors.surface,
         borderRadius: BorderRadius.circular(14),
         border:
-            const Border(left: BorderSide(color: KiteColors.accent, width: 3)),
+            Border(left: BorderSide(color: KiteColors.accent, width: 3)),
       ),
       child: Row(
         children: [
@@ -1015,20 +1015,20 @@ class _ConversationScreenState extends State<ConversationScreen>
                 Text(title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style:  TextStyle(
                         color: KiteColors.accent,
                         fontWeight: FontWeight.w600,
                         fontSize: 12.5)),
                 Text(preview,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style:  TextStyle(
                         color: KiteColors.muted, fontSize: 12.5)),
               ],
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.close, size: 18, color: KiteColors.muted),
+            icon: Icon(Icons.close, size: 18, color: KiteColors.muted),
             onPressed: onClose,
           ),
         ],
@@ -1062,13 +1062,13 @@ class _ConversationScreenState extends State<ConversationScreen>
                   duration: const Duration(milliseconds: 90),
                   width: 8 + _liveAmp * 5,
                   height: 8 + _liveAmp * 5,
-                  decoration: const BoxDecoration(
+                  decoration:  BoxDecoration(
                       color: KiteColors.ephemeral, shape: BoxShape.circle),
                 ),
                 const SizedBox(width: 10),
                 Text('$mm:$ss',
-                    style: const TextStyle(
-                        fontFamilyFallback: ['monospace'],
+                    style:  TextStyle(
+                        fontFamilyFallback: const ['monospace'],
                         color: KiteColors.fg)),
                 const SizedBox(width: 12),
                 Expanded(
@@ -1123,7 +1123,7 @@ class _ConversationScreenState extends State<ConversationScreen>
                 },
               ),
             ),
-            const Divider(height: 1, color: KiteColors.border),
+            Divider(height: 1, color: KiteColors.border),
             _menuItem(sheetCtx, Icons.reply, 'Répondre', () => _startReply(m)),
             if (copyable)
               _menuItem(sheetCtx, Icons.copy_outlined, 'Copier',
@@ -1212,9 +1212,9 @@ class _ConversationScreenState extends State<ConversationScreen>
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: KiteColors.surface,
-        title: const Text('Bloquer ce contact ?',
+        title:  Text('Bloquer ce contact ?',
             style: TextStyle(color: KiteColors.fg)),
-        content: const Text(
+        content:  Text(
             'Il ne pourra plus vous envoyer de messages. Vous pourrez le débloquer à tout moment.',
             style: TextStyle(color: KiteColors.muted)),
         actions: [
@@ -1282,7 +1282,7 @@ class _ConversationScreenState extends State<ConversationScreen>
         title: Text(mode == 'all'
             ? 'Supprimer pour tout le monde ?'
             : 'Supprimer pour moi ?'),
-        content: const Text(
+        content:  Text(
           'Cette action supprime le message du chat (simulation locale).',
           style: TextStyle(color: KiteColors.muted),
         ),
@@ -1292,7 +1292,7 @@ class _ConversationScreenState extends State<ConversationScreen>
               child: const Text('Annuler')),
           TextButton(
             onPressed: () => Navigator.pop(dialogCtx, 'ok'),
-            child: const Text('Supprimer',
+            child:  Text('Supprimer',
                 style: TextStyle(color: KiteColors.danger)),
           ),
         ],
@@ -1327,7 +1327,7 @@ class _ConversationScreenState extends State<ConversationScreen>
               ],
               if (widget.chat.isGroup) ...[
                 const SizedBox(height: 8),
-                const Text('Lu par',
+                 Text('Lu par',
                     style: TextStyle(color: KiteColors.muted, fontSize: 12.5)),
                 for (final id in m.readBy.where((x) => x != m.senderId))
                   Padding(
@@ -1336,7 +1336,7 @@ class _ConversationScreenState extends State<ConversationScreen>
                         style: const TextStyle(fontSize: 14)),
                   ),
                 const SizedBox(height: 8),
-                const Text('Distribué à',
+                 Text('Distribué à',
                     style: TextStyle(color: KiteColors.muted, fontSize: 12.5)),
                 for (final id in m.deliveredTo)
                   Padding(
@@ -1349,7 +1349,7 @@ class _ConversationScreenState extends State<ConversationScreen>
               Text(
                   'Réactions : ${m.reactions.entries.map((e) => '${e.key} ${e.value.length}').join(' · ')}',
                   style:
-                      const TextStyle(color: KiteColors.muted, fontSize: 12.5)),
+                      TextStyle(color: KiteColors.muted, fontSize: 12.5)),
             ],
           ),
         ),
@@ -1363,7 +1363,7 @@ class _ConversationScreenState extends State<ConversationScreen>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(color: KiteColors.muted)),
+          Text(label, style: TextStyle(color: KiteColors.muted)),
           Text(value,
               style: const TextStyle(fontFamilyFallback: ['monospace'])),
         ],
@@ -1405,12 +1405,12 @@ class _ConversationScreenState extends State<ConversationScreen>
                     widget.chat.isGroup
                         ? '${widget.chat.memberIds.length} membres'
                         : 'en ligne',
-                    style: const TextStyle(color: KiteColors.muted),
+                    style: TextStyle(color: KiteColors.muted),
                   ),
                 ],
               ),
             ),
-            const Divider(height: 1, color: KiteColors.border),
+            Divider(height: 1, color: KiteColors.border),
             if (widget.chat.isGroup)
               for (final id in widget.chat.memberIds)
                 ListTile(
@@ -1418,13 +1418,13 @@ class _ConversationScreenState extends State<ConversationScreen>
                   leading: _MiniAvatar(name: _senderName(id), group: false),
                   title: Text(_senderName(id)),
                   subtitle: widget.chat.adminIds.contains(id)
-                      ? const Text('Admin',
+                      ?  Text('Admin',
                           style:
                               TextStyle(color: KiteColors.accent, fontSize: 11))
                       : null,
                 ),
             ListTile(
-              leading: const Icon(Icons.photo_library_outlined,
+              leading:  Icon(Icons.photo_library_outlined,
                   color: KiteColors.muted),
               title: const Text('Médias, liens et documents',
                   style: TextStyle(fontSize: 14.5)),
@@ -1448,7 +1448,7 @@ class _ConversationScreenState extends State<ConversationScreen>
             ),
             ListTile(
               leading:
-                  const Icon(Icons.star_border, color: KiteColors.muted),
+                  Icon(Icons.star_border, color: KiteColors.muted),
               title: const Text('Messages favoris',
                   style: TextStyle(fontSize: 14.5)),
               onTap: () {
@@ -1465,7 +1465,7 @@ class _ConversationScreenState extends State<ConversationScreen>
               },
             ),
             ListTile(
-              leading: const Icon(Icons.palette_outlined,
+              leading:  Icon(Icons.palette_outlined,
                   color: KiteColors.muted),
               title: const Text('Thème du chat',
                   style: TextStyle(fontSize: 14.5)),
@@ -1487,7 +1487,7 @@ class _ConversationScreenState extends State<ConversationScreen>
                 },
               ),
             ListTile(
-              leading: const Icon(Icons.flag_outlined, color: KiteColors.muted),
+              leading: Icon(Icons.flag_outlined, color: KiteColors.muted),
               title: const Text('Signaler', style: TextStyle(fontSize: 14.5)),
               onTap: () {
                 Navigator.pop(sheetCtx);
@@ -1557,7 +1557,7 @@ class _ConversationScreenState extends State<ConversationScreen>
               },
             ),
             ListTile(
-              leading: const Icon(Icons.chevron_right, color: KiteColors.muted),
+              leading: Icon(Icons.chevron_right, color: KiteColors.muted),
               title:
                   const Text('Notifications', style: TextStyle(fontSize: 14.5)),
               onTap: () {
@@ -1649,7 +1649,7 @@ class _ConversationScreenState extends State<ConversationScreen>
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
+             Text(
               'Les nouveaux messages de cette conversation disparaissent après la durée choisie.',
               style: TextStyle(color: KiteColors.muted, fontSize: 12.5),
             ),
@@ -1818,7 +1818,7 @@ class _ConversationScreenState extends State<ConversationScreen>
           ),
           const SizedBox(height: 6),
           Text(label,
-              style: const TextStyle(color: KiteColors.muted, fontSize: 10.5)),
+              style: TextStyle(color: KiteColors.muted, fontSize: 10.5)),
         ],
       ),
     );
@@ -2254,11 +2254,11 @@ class _ListError extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.cloud_off, size: 44, color: KiteColors.danger),
+            Icon(Icons.cloud_off, size: 44, color: KiteColors.danger),
             const SizedBox(height: 10),
             Text(message,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: KiteColors.muted)),
+                style: TextStyle(color: KiteColors.muted)),
             const SizedBox(height: 14),
             FilledButton.icon(
               onPressed: onRetry,
@@ -2291,18 +2291,18 @@ class _NoMessages extends StatelessWidget {
                 border: Border.all(color: KiteColors.border),
                 boxShadow: KiteColors.softShadow(),
               ),
-              child: const Icon(Icons.forum_outlined,
+              child:  Icon(Icons.forum_outlined,
                   size: 30, color: KiteColors.accent),
             ),
             const SizedBox(height: 14),
-            const Text('Cette conversation est privée.',
+             Text('Cette conversation est privée.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                     color: KiteColors.fg,
                     fontSize: 14.5,
                     fontWeight: FontWeight.w600)),
             const SizedBox(height: 6),
-            const Text(
+             Text(
                 'Écrivez le premier mot — tout reste entre vous.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
@@ -2315,11 +2315,11 @@ class _NoMessages extends StatelessWidget {
             Theme(
               data: Theme.of(context)
                   .copyWith(dividerColor: Colors.transparent),
-              child: const ExpansionTile(
+              child:  ExpansionTile(
                 tilePadding:
-                    EdgeInsets.symmetric(horizontal: 12),
+                    const EdgeInsets.symmetric(horizontal: 12),
                 childrenPadding:
-                    EdgeInsets.fromLTRB(12, 0, 12, 10),
+                    const EdgeInsets.fromLTRB(12, 0, 12, 10),
                 backgroundColor: Colors.transparent,
                 collapsedBackgroundColor: Colors.transparent,
                 iconColor: KiteColors.muted,
@@ -2414,7 +2414,7 @@ class _MessageBubble extends StatelessWidget {
             child: Text(m.text,
                 textAlign: TextAlign.center,
                 style:
-                    const TextStyle(color: KiteColors.muted, fontSize: 11.5)),
+                    TextStyle(color: KiteColors.muted, fontSize: 11.5)),
           ),
         ),
       );
@@ -2436,7 +2436,7 @@ class _MessageBubble extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(left: 14, bottom: 2),
                 child: Text(senderName,
-                    style: const TextStyle(
+                    style:  TextStyle(
                         color: KiteColors.tint2,
                         fontSize: 12,
                         fontWeight: FontWeight.w600)),
@@ -2450,7 +2450,7 @@ class _MessageBubble extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
                   decoration: BoxDecoration(
-                    border: const Border(
+                    border:  Border(
                         left: BorderSide(color: KiteColors.accent, width: 2.5)),
                     color: KiteColors.fg.withValues(alpha: 0.05),
                     borderRadius: BorderRadius.circular(8),
@@ -2459,14 +2459,14 @@ class _MessageBubble extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(_name(replyPreview!.senderId),
-                          style: const TextStyle(
+                          style:  TextStyle(
                               color: KiteColors.accent,
                               fontWeight: FontWeight.w600,
                               fontSize: 12.5)),
                       Text(replyPreview!.preview(),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style:  TextStyle(
                               color: KiteColors.muted, fontSize: 12.5)),
                     ],
                   ),
@@ -2508,19 +2508,19 @@ class _MessageBubble extends StatelessWidget {
                         color: KiteColors.tint2.withValues(alpha: 0.3)),
                   ),
                   child: translation == '…'
-                      ? const Row(mainAxisSize: MainAxisSize.min, children: [
-                          SizedBox(
+                      ?  Row(mainAxisSize: MainAxisSize.min, children: [
+                          const SizedBox(
                               width: 10,
                               height: 10,
                               child:
                                   CircularProgressIndicator(strokeWidth: 1.6)),
-                          SizedBox(width: 8),
+                          const SizedBox(width: 8),
                           Text('Traduction…',
                               style: TextStyle(
                                   color: KiteColors.muted, fontSize: 12)),
                         ])
                       : Text(translation!,
-                          style: const TextStyle(
+                          style:  TextStyle(
                               color: KiteColors.fg,
                               fontSize: 13,
                               height: 1.35,
@@ -2551,14 +2551,14 @@ class _MessageBubble extends StatelessWidget {
                 children: [
                   Text(
                     '${_time(m.createdAt)}${m.edited ? ' · modifié' : ''}',
-                    style: const TextStyle(
+                    style:  TextStyle(
                         color: KiteColors.muted,
                         fontSize: 10,
-                        fontFamilyFallback: ['monospace']),
+                        fontFamilyFallback: const ['monospace']),
                   ),
                   if (m.expiresAt != null) ...[
                     const SizedBox(width: 3),
-                    const Icon(Icons.timer_outlined,
+                     Icon(Icons.timer_outlined,
                         size: 11, color: KiteColors.muted),
                   ],
                 ],
@@ -2619,7 +2619,7 @@ class _MessageBubble extends StatelessWidget {
           child: Container(
             width: 34,
             height: 34,
-            decoration: const BoxDecoration(
+            decoration:  BoxDecoration(
                 color: KiteColors.accent, shape: BoxShape.circle),
             child: Icon(isPlaying ? Icons.pause : Icons.play_arrow,
                 size: 17, color: KiteColors.accentInk),
@@ -2649,10 +2649,10 @@ class _MessageBubble extends StatelessWidget {
         ),
         const SizedBox(width: 8),
         Text('$mm:$ss',
-            style: const TextStyle(
+            style:  TextStyle(
                 color: KiteColors.muted,
                 fontSize: 11,
-                fontFamilyFallback: ['monospace'])),
+                fontFamilyFallback: const ['monospace'])),
         const SizedBox(width: 6),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
@@ -2660,7 +2660,7 @@ class _MessageBubble extends StatelessWidget {
             border: Border.all(color: KiteColors.border),
             borderRadius: BorderRadius.circular(6),
           ),
-          child: const Text('1×',
+          child:  Text('1×',
               style: TextStyle(color: KiteColors.muted, fontSize: 10.5)),
         ),
       ],
@@ -2702,7 +2702,7 @@ class _MessageBubble extends StatelessWidget {
             Icon(icon, size: 32, color: KiteColors.fg.withValues(alpha: 0.8)),
             const SizedBox(height: 6),
             Text(label,
-                style: const TextStyle(fontSize: 12, color: KiteColors.muted)),
+                style: TextStyle(fontSize: 12, color: KiteColors.muted)),
           ],
         ),
       ),
@@ -2730,7 +2730,7 @@ class _MessageBubble extends StatelessWidget {
                 ),
                 alignment: Alignment.center,
                 child: Text(ext,
-                    style: const TextStyle(
+                    style:  TextStyle(
                         color: KiteColors.accent,
                         fontSize: 9,
                         fontWeight: FontWeight.w700)),
@@ -2746,10 +2746,10 @@ class _MessageBubble extends StatelessWidget {
                         style: const TextStyle(
                             fontWeight: FontWeight.w600, fontSize: 13.5)),
                     Text(meta,
-                        style: const TextStyle(
+                        style:  TextStyle(
                             color: KiteColors.muted,
                             fontSize: 11,
-                            fontFamilyFallback: ['monospace'])),
+                            fontFamilyFallback: const ['monospace'])),
                   ],
                 ),
               ),
@@ -2758,7 +2758,7 @@ class _MessageBubble extends StatelessWidget {
           const SizedBox(height: 8),
           InkWell(
             onTap: onOpenMedia,
-            child: const Text('Télécharger / Ouvrir',
+            child:  Text('Télécharger / Ouvrir',
                 style: TextStyle(
                     color: KiteColors.accent,
                     fontSize: 12.5,
@@ -2821,10 +2821,10 @@ class _MessageBubble extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     Text('${(rawVotes[i] as num).toInt()}',
-                        style: const TextStyle(
+                        style:  TextStyle(
                             color: KiteColors.muted,
                             fontSize: 11,
-                            fontFamilyFallback: ['monospace'])),
+                            fontFamilyFallback: const ['monospace'])),
                   ],
                 ),
               ),
@@ -2834,11 +2834,11 @@ class _MessageBubble extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text('$total votes${myVoted ? ' · vous avez voté' : ''}',
-                  style: const TextStyle(
+                  style:  TextStyle(
                       color: KiteColors.muted,
                       fontSize: 11,
-                      fontFamilyFallback: ['monospace'])),
-              const Text('Voir les votes',
+                      fontFamilyFallback: const ['monospace'])),
+               Text('Voir les votes',
                   style: TextStyle(color: KiteColors.accent, fontSize: 11)),
             ],
           ),
@@ -2858,7 +2858,7 @@ class _MessageBubble extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.celebration_outlined,
+               Icon(Icons.celebration_outlined,
                   size: 17, color: KiteColors.accent),
               const SizedBox(width: 8),
               Expanded(
@@ -2872,16 +2872,16 @@ class _MessageBubble extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text('${media?['date'] ?? ''} · ${media?['time'] ?? ''}',
-              style: const TextStyle(
+              style:  TextStyle(
                   color: KiteColors.muted,
                   fontSize: 12,
-                  fontFamilyFallback: ['monospace'])),
+                  fontFamilyFallback: const ['monospace'])),
           const SizedBox(height: 2),
           Text('📍 ${media?['location'] ?? ''}',
-              style: const TextStyle(color: KiteColors.muted, fontSize: 12)),
+              style: TextStyle(color: KiteColors.muted, fontSize: 12)),
           const SizedBox(height: 8),
           Text('$participants participants · $maybe peut-être',
-              style: const TextStyle(color: KiteColors.muted, fontSize: 12)),
+              style: TextStyle(color: KiteColors.muted, fontSize: 12)),
           const SizedBox(height: 8),
           Row(
             children: [
@@ -2943,10 +2943,10 @@ class _MessageBubble extends StatelessWidget {
                             fontWeight: FontWeight.w600, fontSize: 14)),
                     if (phone.isNotEmpty)
                       Text(phone,
-                          style: const TextStyle(
+                          style:  TextStyle(
                               color: KiteColors.muted,
                               fontSize: 12,
-                              fontFamilyFallback: ['monospace'])),
+                              fontFamilyFallback: const ['monospace'])),
                   ],
                 ),
               ),
@@ -2986,14 +2986,14 @@ class _MessageBubble extends StatelessWidget {
                 ),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(Icons.location_on,
+              child:  Icon(Icons.location_on,
                   size: 34, color: KiteColors.accent),
             ),
             const SizedBox(height: 6),
             Text(name,
                 style:
                     const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-            const Text('Carte simulée · aucun GPS nécessaire',
+             Text('Carte simulée · aucun GPS nécessaire',
                 style: TextStyle(color: KiteColors.muted, fontSize: 11)),
           ],
         ),
@@ -3338,8 +3338,8 @@ class _SwipeToReplyState extends State<SwipeToReply>
       children: [
         Opacity(
           opacity: (_drag / _threshold).clamp(0.0, 1.0),
-          child: const Padding(
-            padding: EdgeInsets.only(left: 14),
+          child:  Padding(
+            padding: const EdgeInsets.only(left: 14),
             child: Icon(Icons.reply, size: 20, color: KiteColors.muted),
           ),
         ),
@@ -3537,7 +3537,7 @@ class _VoiceReviewSheetState extends State<_VoiceReviewSheet> {
         children: [
           Row(
             children: [
-              const Icon(Icons.graphic_eq, size: 18, color: KiteColors.accent),
+              Icon(Icons.graphic_eq, size: 18, color: KiteColors.accent),
               const SizedBox(width: 8),
               const Text(
                 'Écouter avant d’envoyer',
@@ -3545,10 +3545,10 @@ class _VoiceReviewSheetState extends State<_VoiceReviewSheet> {
               ),
               const Spacer(),
               Text(_time,
-                  style: const TextStyle(
+                  style:  TextStyle(
                       color: KiteColors.muted,
                       fontSize: 12,
-                      fontFamilyFallback: ['monospace'])),
+                      fontFamilyFallback: const ['monospace'])),
             ],
           ),
           const SizedBox(height: 14),

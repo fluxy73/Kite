@@ -480,9 +480,9 @@ class _LockGateState extends State<LockGate> {
           context: context,
           builder: (dialogCtx) => AlertDialog(
             backgroundColor: KiteColors.surface,
-            title: const Text('Déverrouillage biométrique',
+            title:  Text('Déverrouillage biométrique',
                 style: TextStyle(color: KiteColors.fg)),
-            content: const Text(
+            content:  Text(
                 'Utiliser l’empreinte ou le visage pour ouvrir cette '
                 'discussion ? Le code reste la solution de secours.',
                 style: TextStyle(color: KiteColors.muted)),
@@ -529,7 +529,7 @@ class _LockGateState extends State<LockGate> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.lock_outline,
+               Icon(Icons.lock_outline,
                   size: 44, color: KiteColors.accent),
               const SizedBox(height: 12),
               Text(
@@ -540,7 +540,7 @@ class _LockGateState extends State<LockGate> {
               const SizedBox(height: 4),
               Text(title,
                   style:
-                      const TextStyle(color: KiteColors.muted, fontSize: 13)),
+                      TextStyle(color: KiteColors.muted, fontSize: 13)),
               const SizedBox(height: 18),
               // Points du code saisi.
               Row(
@@ -574,9 +574,9 @@ class _LockGateState extends State<LockGate> {
                   ChatLockStore.instance.biometricsFor(widget.chatId))
                 TextButton.icon(
                   onPressed: _bioPromptOpen ? null : _authenticate,
-                  icon: const Icon(Icons.fingerprint,
+                  icon:  Icon(Icons.fingerprint,
                       size: 26, color: KiteColors.accent),
-                  label: const Text('Utiliser la biométrie',
+                  label:  Text('Utiliser la biométrie',
                       style: TextStyle(color: KiteColors.accent)),
                 ),
               if (!isSetup)
@@ -775,9 +775,9 @@ class _AppLockGateState extends State<AppLockGate> {
           context: context,
           builder: (dialogCtx) => AlertDialog(
             backgroundColor: KiteColors.surface,
-            title: const Text('Déverrouillage biométrique',
+            title:  Text('Déverrouillage biométrique',
                 style: TextStyle(color: KiteColors.fg)),
-            content: const Text(
+            content:  Text(
                 "Utiliser l'empreinte ou le visage pour ouvrir Kite ? "
                 'Le code reste la solution de secours.',
                 style: TextStyle(color: KiteColors.muted)),
@@ -824,7 +824,7 @@ class _AppLockGateState extends State<AppLockGate> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.shield_outlined,
+               Icon(Icons.shield_outlined,
                   size: 44, color: KiteColors.accent),
               const SizedBox(height: 12),
               const Text('Kite',
@@ -833,7 +833,7 @@ class _AppLockGateState extends State<AppLockGate> {
               const SizedBox(height: 4),
               Text(title,
                   style:
-                      const TextStyle(color: KiteColors.muted, fontSize: 13)),
+                      TextStyle(color: KiteColors.muted, fontSize: 13)),
               const SizedBox(height: 18),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -866,9 +866,9 @@ class _AppLockGateState extends State<AppLockGate> {
                   ChatLockStore.instance.appBiometricsEnabled)
                 TextButton.icon(
                   onPressed: _bioPromptOpen ? null : _authenticate,
-                  icon: const Icon(Icons.fingerprint,
+                  icon:  Icon(Icons.fingerprint,
                       size: 26, color: KiteColors.accent),
-                  label: const Text('Utiliser la biométrie',
+                  label:  Text('Utiliser la biométrie',
                       style: TextStyle(color: KiteColors.accent)),
                 ),
             ],

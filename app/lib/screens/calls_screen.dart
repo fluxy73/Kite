@@ -69,8 +69,8 @@ class CallsScreen extends StatelessWidget {
 
   Widget _favoritesRow(BuildContext context, List<User> favorites) {
     if (favorites.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      return  Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: Text('Aucun favori pour l’instant', style: TextStyle(color: KiteColors.muted)),
       );
     }
@@ -129,7 +129,7 @@ class CallsScreen extends StatelessWidget {
               padding: EdgeInsets.fromLTRB(20, 16, 20, 8),
               child: Text('Nouvel appel', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
             ),
-            const ListTile(
+             ListTile(
               leading: Icon(Icons.link, color: KiteColors.accent),
               title: Text('Créer un lien d’appel', style: TextStyle(color: KiteColors.fg)),
             ),
@@ -139,19 +139,19 @@ class CallsScreen extends StatelessWidget {
                   backgroundColor: KiteColors.surface2,
                   child: Text(_initials(u.name), style: const TextStyle(fontSize: 12)),
                 ),
-                title: Text(u.name, style: const TextStyle(color: KiteColors.fg)),
+                title: Text(u.name, style: TextStyle(color: KiteColors.fg)),
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.call_outlined, color: KiteColors.tint2),
+                      icon: Icon(Icons.call_outlined, color: KiteColors.tint2),
                       onPressed: () {
                         Navigator.pop(sheetCtx);
                         _contactCall(context, u.id, name: u.name);
                       },
                     ),
                     IconButton(
-                      icon: const Icon(Icons.videocam_outlined, color: KiteColors.tint1),
+                      icon: Icon(Icons.videocam_outlined, color: KiteColors.tint1),
                       onPressed: () {
                         Navigator.pop(sheetCtx);
                         _contactCall(context, u.id, name: u.name, video: true);
@@ -161,14 +161,14 @@ class CallsScreen extends StatelessWidget {
                 ),
               ),
             if (groups.isNotEmpty) ...[
-              const Padding(
-                padding: EdgeInsets.fromLTRB(20, 8, 20, 4),
+               Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
                 child: Text('Appel de groupe', style: TextStyle(color: KiteColors.muted, fontSize: 13)),
               ),
               for (final g in groups.take(4))
                 ListTile(
-                  leading: const Icon(Icons.groups_outlined, color: KiteColors.accent),
-                  title: Text(g.name, style: const TextStyle(color: KiteColors.fg)),
+                  leading: Icon(Icons.groups_outlined, color: KiteColors.accent),
+                  title: Text(g.name, style: TextStyle(color: KiteColors.fg)),
                   onTap: () {
                     Navigator.pop(sheetCtx);
                     _contactCall(context, g.id, name: g.name, group: true);
@@ -250,7 +250,7 @@ class CallsScreen extends StatelessWidget {
                     const SizedBox(height: 16),
                     TextField(
                       controller: titleCtrl,
-                      style: const TextStyle(color: KiteColors.fg),
+                      style: TextStyle(color: KiteColors.fg),
                       decoration: const InputDecoration(
                         labelText: 'Titre',
                         hintText: "Ex. Point d'équipe",
@@ -292,7 +292,7 @@ class CallsScreen extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 8),
-                    Text(_ScheduledCard.fmt(dt: picked), style: const TextStyle(color: KiteColors.accent, fontSize: 13)),
+                    Text(_ScheduledCard.fmt(dt: picked), style: TextStyle(color: KiteColors.accent, fontSize: 13)),
                     const SizedBox(height: 12),
                     SegmentedButton<bool>(
                       segments: const [
@@ -307,12 +307,12 @@ class CallsScreen extends StatelessWidget {
                       contentPadding: EdgeInsets.zero,
                       value: reminder,
                       onChanged: (v) => setSheet(() => reminder = v),
-                      title: const Text('Rappel', style: TextStyle(color: KiteColors.fg)),
-                      subtitle: const Text("Notifier avant l'appel", style: TextStyle(color: KiteColors.muted, fontSize: 12)),
+                      title: Text('Rappel', style: TextStyle(color: KiteColors.fg)),
+                      subtitle: Text("Notifier avant l'appel", style: TextStyle(color: KiteColors.muted, fontSize: 12)),
                       secondary: const Icon(Icons.notifications_outlined),
                     ),
                     const SizedBox(height: 4),
-                    const Text('Participants', style: TextStyle(color: KiteColors.muted, fontWeight: FontWeight.w600, fontSize: 13)),
+                    Text('Participants', style: TextStyle(color: KiteColors.muted, fontWeight: FontWeight.w600, fontSize: 13)),
                     const SizedBox(height: 4),
                     ...contacts.map((u) => CheckboxListTile(
                           dense: true,
@@ -325,7 +325,7 @@ class CallsScreen extends StatelessWidget {
                               selected.remove(u.id);
                             }
                           }),
-                          title: Text(u.name, style: const TextStyle(color: KiteColors.fg)),
+                          title: Text(u.name, style: TextStyle(color: KiteColors.fg)),
                         )),
                     const SizedBox(height: 16),
                     SizedBox(
@@ -333,7 +333,7 @@ class CallsScreen extends StatelessWidget {
                       child: FilledButton(
                         style: FilledButton.styleFrom(backgroundColor: KiteColors.accent),
                         onPressed: submit,
-                        child: const Text('Planifier', style: TextStyle(color: KiteColors.accentInk)),
+                        child: Text('Planifier', style: TextStyle(color: KiteColors.accentInk)),
                       ),
                     ),
                   ],
@@ -365,10 +365,10 @@ class CallsScreen extends StatelessWidget {
       builder: (dCtx) => AlertDialog(
         backgroundColor: KiteColors.surface,
         title: const Text("Supprimer l'appel ?"),
-        content: Text('« ${sc.title} » sera supprimé.', style: const TextStyle(color: KiteColors.fg)),
+        content: Text('« ${sc.title} » sera supprimé.', style: TextStyle(color: KiteColors.fg)),
         actions: [
           TextButton(onPressed: () => Navigator.pop(dCtx, false), child: const Text('Annuler')),
-          TextButton(onPressed: () => Navigator.pop(dCtx, true), child: const Text('Supprimer', style: TextStyle(color: KiteColors.danger))),
+          TextButton(onPressed: () => Navigator.pop(dCtx, true), child: Text('Supprimer', style: TextStyle(color: KiteColors.danger))),
         ],
       ),
     );
@@ -426,14 +426,14 @@ class CallsScreen extends StatelessWidget {
           child: ListView(
             shrinkWrap: true,
             children: [
-              const Padding(
-                padding: EdgeInsets.fromLTRB(20, 16, 20, 8),
+               Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
                 child: Text('Contacts sur Kite',
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: KiteColors.fg)),
               ),
               if (matches.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.all(20),
+                 Padding(
+                  padding: const EdgeInsets.all(20),
                   child: Text('Aucun de vos contacts n’est sur Kite',
                       style: TextStyle(color: KiteColors.muted)),
                 ),
@@ -444,21 +444,21 @@ class CallsScreen extends StatelessWidget {
                     child: Text(_initials(m.userName),
                         style: const TextStyle(fontSize: 12)),
                   ),
-                  title: Text(m.userName, style: const TextStyle(color: KiteColors.fg)),
+                  title: Text(m.userName, style: TextStyle(color: KiteColors.fg)),
                   subtitle: Text('via ${m.via} · ${m.name}',
-                      style: const TextStyle(color: KiteColors.muted, fontSize: 12)),
+                      style: TextStyle(color: KiteColors.muted, fontSize: 12)),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
-                        icon: const Icon(Icons.call_outlined, color: KiteColors.tint2),
+                        icon: Icon(Icons.call_outlined, color: KiteColors.tint2),
                         onPressed: () {
                           Navigator.pop(sheetCtx);
                           _contactCall(context, m.userId, name: m.userName);
                         },
                       ),
                       IconButton(
-                        icon: const Icon(Icons.videocam_outlined, color: KiteColors.tint1),
+                        icon: Icon(Icons.videocam_outlined, color: KiteColors.tint1),
                         onPressed: () {
                           Navigator.pop(sheetCtx);
                           _contactCall(context, m.userId, name: m.userName, video: true);
@@ -610,7 +610,7 @@ class _Header extends StatelessWidget {
             children: [
               const Text('Lien d’appel', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
               const SizedBox(height: 12),
-              SelectableText(url, style: const TextStyle(color: KiteColors.accent)),
+              SelectableText(url, style: TextStyle(color: KiteColors.accent)),
               const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
@@ -622,8 +622,8 @@ class _Header extends StatelessWidget {
                       const SnackBar(content: Text('Lien copié dans le presse-papiers')),
                     );
                   },
-                  icon: const Icon(Icons.copy, color: KiteColors.accentInk),
-                  label: const Text('Copier', style: TextStyle(color: KiteColors.accentInk)),
+                  icon: Icon(Icons.copy, color: KiteColors.accentInk),
+                  label: Text('Copier', style: TextStyle(color: KiteColors.accentInk)),
                 ),
               ),
             ],
@@ -643,7 +643,7 @@ class _SectionTitle extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
       child: Text(title,
-          style: const TextStyle(color: KiteColors.muted, fontWeight: FontWeight.w600, fontSize: 13)),
+          style: TextStyle(color: KiteColors.muted, fontWeight: FontWeight.w600, fontSize: 13)),
     );
   }
 }
@@ -670,7 +670,7 @@ class _ScheduledSection extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Row(
           children: [
-            const Text('Aucun appel planifié', style: TextStyle(color: KiteColors.muted)),
+            Text('Aucun appel planifié', style: TextStyle(color: KiteColors.muted)),
             const Spacer(),
             TextButton.icon(onPressed: onPlan, icon: const Icon(Icons.event, size: 16), label: const Text('Planifier')),
           ],
@@ -727,15 +727,15 @@ class _ScheduledCard extends StatelessWidget {
               const SizedBox(width: 6),
               Expanded(
                 child: Text(call.title, maxLines: 1, overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w600, color: KiteColors.fg)),
+                    style: TextStyle(fontWeight: FontWeight.w600, color: KiteColors.fg)),
               ),
             ],
           ),
           const SizedBox(height: 6),
-          Text(fmt(dt: dt), style: const TextStyle(color: KiteColors.muted, fontSize: 12)),
+          Text(fmt(dt: dt), style: TextStyle(color: KiteColors.muted, fontSize: 12)),
           const SizedBox(height: 2),
           Text(call.memberIds.isEmpty ? 'Juste moi' : '${call.memberIds.length} participant(s)',
-              style: const TextStyle(color: KiteColors.muted, fontSize: 11)),
+              style: TextStyle(color: KiteColors.muted, fontSize: 11)),
           const Spacer(),
           Row(
             children: [
@@ -746,12 +746,12 @@ class _ScheduledCard extends StatelessWidget {
                     Icon(call.reminder ? Icons.notifications_active : Icons.notifications_none,
                         size: 16, color: call.reminder ? KiteColors.tint2 : KiteColors.muted),
                     const SizedBox(width: 4),
-                    const Text('Rappel', style: TextStyle(color: KiteColors.muted, fontSize: 11)),
+                    Text('Rappel', style: TextStyle(color: KiteColors.muted, fontSize: 11)),
                   ],
                 ),
               ),
               const Spacer(),
-              InkWell(onTap: onDelete, child: const Icon(Icons.delete_outline, size: 18, color: KiteColors.danger)),
+              InkWell(onTap: onDelete, child: Icon(Icons.delete_outline, size: 18, color: KiteColors.danger)),
             ],
           ),
         ],
@@ -786,13 +786,13 @@ class _FavoriteAvatar extends StatelessWidget {
             child: _Avatar(name: user.name, size: 56),
           ),
           Text(user.name.split(' ').first,
-              maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: KiteColors.fg)),
+              maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: KiteColors.fg)),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              InkWell(onTap: onAudio, child: const Icon(Icons.call, size: 16, color: KiteColors.tint2)),
+              InkWell(onTap: onAudio, child: Icon(Icons.call, size: 16, color: KiteColors.tint2)),
               const SizedBox(width: 10),
-              InkWell(onTap: onVideo, child: const Icon(Icons.videocam, size: 16, color: KiteColors.tint1)),
+              InkWell(onTap: onVideo, child: Icon(Icons.videocam, size: 16, color: KiteColors.tint1)),
             ],
           ),
         ],
@@ -822,7 +822,7 @@ class _CallRow extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(call.name,
-                      style: const TextStyle(fontWeight: FontWeight.w600, color: KiteColors.fg)),
+                      style: TextStyle(fontWeight: FontWeight.w600, color: KiteColors.fg)),
                   const SizedBox(height: 2),
                   Row(
                     children: [
@@ -839,7 +839,7 @@ class _CallRow extends StatelessWidget {
                 ],
               ),
             ),
-            Text(_timeOf(call.createdAt), style: const TextStyle(color: KiteColors.muted, fontSize: 12)),
+            Text(_timeOf(call.createdAt), style: TextStyle(color: KiteColors.muted, fontSize: 12)),
           ],
         ),
       ),
@@ -871,7 +871,7 @@ class _CallRow extends StatelessWidget {
         color: KiteColors.danger.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(999),
       ),
-      child: const Text('Manqué',
+      child:  Text('Manqué',
           style: TextStyle(
               color: KiteColors.danger, fontSize: 11, fontWeight: FontWeight.w600)),
     );
@@ -920,12 +920,12 @@ class _EmptyCalls extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
+    return  Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(Icons.call_outlined, size: 44, color: KiteColors.muted),
-          SizedBox(height: 10),
+          const SizedBox(height: 10),
           Text('Aucun appel', style: TextStyle(color: KiteColors.muted)),
         ],
       ),
@@ -1158,23 +1158,23 @@ class _InCallScreenState extends State<InCallScreen> {
                 leading: _Avatar(name: name, size: 36),
                 title: Row(
                   children: [
-                    Text(name, style: const TextStyle(color: KiteColors.fg)),
+                    Text(name, style: TextStyle(color: KiteColors.fg)),
                     if (name == 'Moi') ...[
                       const SizedBox(width: 6),
-                      const Text('(vous)', style: TextStyle(color: KiteColors.muted, fontSize: 12)),
+                      Text('(vous)', style: TextStyle(color: KiteColors.muted, fontSize: 12)),
                     ],
                   ],
                 ),
                 subtitle: name == 'Lucas Martin'
-                    ? const Row(children: [
+                    ?  Row(children: [
                         Icon(Icons.mic_off, size: 13, color: KiteColors.danger),
-                        SizedBox(width: 4),
+                        const SizedBox(width: 4),
                         Text('En sourdine', style: TextStyle(color: KiteColors.muted, fontSize: 12)),
                       ])
                     : null,
                 trailing: PopupMenuButton<String>(
                   color: KiteColors.surface2,
-                  icon: const Icon(Icons.more_vert, color: KiteColors.muted),
+                  icon: Icon(Icons.more_vert, color: KiteColors.muted),
                   onSelected: (v) {
                     if (v == 'share') {
                       Navigator.pop(sheetCtx);
@@ -1186,8 +1186,8 @@ class _InCallScreenState extends State<InCallScreen> {
                   },
                   itemBuilder: (_) => [
                     if (name != 'Moi')
-                      const PopupMenuItem(value: 'share', child: Text('Lui donner l’écran', style: TextStyle(color: KiteColors.fg))),
-                    const PopupMenuItem(value: 'msg', child: Text('Envoyer un message', style: TextStyle(color: KiteColors.fg))),
+                      PopupMenuItem(value: 'share', child: Text('Lui donner l’écran', style: TextStyle(color: KiteColors.fg))),
+                    PopupMenuItem(value: 'msg', child: Text('Envoyer un message', style: TextStyle(color: KiteColors.fg))),
                   ],
                 ),
               ),
@@ -1220,7 +1220,7 @@ class _InCallScreenState extends State<InCallScreen> {
                 const SizedBox(height: 14),
                 _HangupButton(onTap: _hangUp),
                 const SizedBox(height: 16),
-                const Text('🔒 Chiffré de bout en bout',
+                 Text('🔒 Chiffré de bout en bout',
                     style: TextStyle(color: KiteColors.muted, fontSize: 11)),
                 const SizedBox(height: 10),
               ],
@@ -1261,7 +1261,7 @@ class _InCallScreenState extends State<InCallScreen> {
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontSize: 17, fontFamilyFallback: kDisplayFont, fontWeight: FontWeight.w500)),
                 const SizedBox(height: 2),
-                Text(_statusText, style: const TextStyle(color: KiteColors.muted, fontSize: 13)),
+                Text(_statusText, style: TextStyle(color: KiteColors.muted, fontSize: 13)),
               ],
             ),
           ),
@@ -1382,7 +1382,7 @@ class _InCallScreenState extends State<InCallScreen> {
                 children: [
                   _Avatar(name: widget.name, size: 56),
                   const SizedBox(height: 10),
-                  Text(_statusText, style: const TextStyle(color: KiteColors.muted, fontSize: 13)),
+                  Text(_statusText, style: TextStyle(color: KiteColors.muted, fontSize: 13)),
                 ],
               ),
             ),
@@ -1402,13 +1402,13 @@ class _InCallScreenState extends State<InCallScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.screen_share, size: 15, color: KiteColors.tint2),
+              Icon(Icons.screen_share, size: 15, color: KiteColors.tint2),
               const SizedBox(width: 6),
               Flexible(
                 child: Text('$sharer partage son écran',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: KiteColors.muted, fontSize: 13)),
+                    style: TextStyle(color: KiteColors.muted, fontSize: 13)),
               ),
             ],
           ),
@@ -1421,12 +1421,12 @@ class _InCallScreenState extends State<InCallScreen> {
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: KiteColors.tint2.withValues(alpha: 0.5)),
             ),
-            child: const Center(
+            child:  Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(Icons.monitor, size: 42, color: KiteColors.muted),
-                  SizedBox(height: 8),
+                  const SizedBox(height: 8),
                   Text('Contenu de l’écran partagé',
                       style: TextStyle(color: KiteColors.muted, fontSize: 13)),
                 ],
@@ -1587,7 +1587,7 @@ class _ParticipantTile extends StatelessWidget {
               child: _Avatar(name: name, size: compact ? 40 : 56),
             )
           else
-            const Center(
+             Center(
               child: Icon(Icons.videocam_off, size: 30, color: KiteColors.muted),
             ),
           Positioned(
@@ -1601,18 +1601,18 @@ class _ParticipantTile extends StatelessWidget {
               ),
               child: Text(
                 isMe ? '$name (vous)' : name,
-                style: const TextStyle(fontSize: 11, color: KiteColors.fg),
+                style: TextStyle(fontSize: 11, color: KiteColors.fg),
               ),
             ),
           ),
           if (muted)
-            const Positioned(
+             Positioned(
               top: 8,
               right: 8,
               child: Icon(Icons.mic_off, size: 16, color: KiteColors.danger),
             ),
           if (speaking)
-            const Positioned(
+             Positioned(
               top: 8,
               right: 8,
               child: Icon(Icons.graphic_eq, size: 18, color: KiteColors.tint2),
@@ -1686,14 +1686,14 @@ class _SelfVideoPip extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          if (videoOn) video else const Center(child: Icon(Icons.videocam_off, size: 26, color: KiteColors.muted)),
-          const Positioned(
+          if (videoOn) video else Center(child: Icon(Icons.videocam_off, size: 26, color: KiteColors.muted)),
+           Positioned(
             left: 6,
             bottom: 5,
             child: Text('Moi', style: TextStyle(fontSize: 11, color: KiteColors.fg)),
           ),
           if (muted)
-            const Positioned(top: 6, right: 6, child: Icon(Icons.mic_off, size: 14, color: KiteColors.danger)),
+            Positioned(top: 6, right: 6, child: Icon(Icons.mic_off, size: 14, color: KiteColors.danger)),
         ],
       ),
     );
@@ -1735,11 +1735,11 @@ class _SelfPip extends StatelessWidget {
           Center(
             child: videoOn
                 ? const _Avatar(name: 'Moi', size: 44)
-                : const Icon(Icons.videocam_off, size: 26, color: KiteColors.muted),
+                : Icon(Icons.videocam_off, size: 26, color: KiteColors.muted),
           ),
-          const Positioned(left: 6, bottom: 5, child: Text('Moi', style: TextStyle(fontSize: 11, color: KiteColors.fg))),
+          Positioned(left: 6, bottom: 5, child: Text('Moi', style: TextStyle(fontSize: 11, color: KiteColors.fg))),
           if (muted)
-            const Positioned(top: 6, right: 6, child: Icon(Icons.mic_off, size: 14, color: KiteColors.danger)),
+            Positioned(top: 6, right: 6, child: Icon(Icons.mic_off, size: 14, color: KiteColors.danger)),
           if (blur)
             Positioned(
               top: 6,
@@ -1750,7 +1750,7 @@ class _SelfPip extends StatelessWidget {
                   color: Colors.black.withValues(alpha: 0.5),
                   borderRadius: BorderRadius.circular(999),
                 ),
-                child: const Text('Flou', style: TextStyle(fontSize: 9, color: KiteColors.fg)),
+                child: Text('Flou', style: TextStyle(fontSize: 9, color: KiteColors.fg)),
               ),
             ),
         ],
@@ -1787,7 +1787,7 @@ class _Control extends StatelessWidget {
               child: Icon(icon, size: 20, color: active ? KiteColors.accentInk : KiteColors.fg),
             ),
             const SizedBox(height: 4),
-            Text(label, style: const TextStyle(color: KiteColors.muted, fontSize: 11)),
+            Text(label, style: TextStyle(color: KiteColors.muted, fontSize: 11)),
           ],
         ),
       ),
@@ -1805,7 +1805,7 @@ class _HangupButton extends StatelessWidget {
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(16),
-        decoration: const BoxDecoration(color: KiteColors.danger, shape: BoxShape.circle),
+        decoration: BoxDecoration(color: KiteColors.danger, shape: BoxShape.circle),
         child: const Icon(Icons.call_end, size: 26, color: Colors.white),
       ),
     );

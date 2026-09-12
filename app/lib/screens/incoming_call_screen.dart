@@ -186,7 +186,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
             ),
             const SizedBox(height: 10),
             Text(_remaining <= 1 ? 'Sonnerie...' : 'Sans réponse dans $_remaining s',
-                style: const TextStyle(color: KiteColors.muted, fontSize: 13)),
+                style: TextStyle(color: KiteColors.muted, fontSize: 13)),
             const SizedBox(height: 4),
             Text(call.callerName,
                 style: const TextStyle(
@@ -197,7 +197,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
             const SizedBox(height: 8),
             Text(
               call.isVideo ? 'Appel vidéo entrant…' : 'Appel entrant…',
-              style: const TextStyle(color: KiteColors.muted, fontSize: 15),
+              style: TextStyle(color: KiteColors.muted, fontSize: 15),
             ),
             const Spacer(),
             Row(
@@ -218,7 +218,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
               ],
             ),
             const SizedBox(height: 30),
-            const Text('🔒 Chiffré de bout en bout',
+             Text('🔒 Chiffré de bout en bout',
                 style: TextStyle(color: KiteColors.muted, fontSize: 11)),
             const SizedBox(height: 20),
           ],
@@ -256,7 +256,7 @@ class _ActionButton extends StatelessWidget {
               child: Icon(icon, size: 28, color: Colors.white),
             ),
             const SizedBox(height: 8),
-            Text(label, style: const TextStyle(color: KiteColors.muted, fontSize: 12)),
+            Text(label, style: TextStyle(color: KiteColors.muted, fontSize: 12)),
           ],
         ),
       ),

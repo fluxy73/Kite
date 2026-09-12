@@ -76,11 +76,11 @@ class _HomeShellState extends State<HomeShell> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.cloud_off, size: 44, color: KiteColors.danger),
+              Icon(Icons.cloud_off, size: 44, color: KiteColors.danger),
               const SizedBox(height: 10),
               Padding(
                 padding: const EdgeInsets.all(24),
-                child: Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: KiteColors.muted)),
+                child: Text(_error!, textAlign: TextAlign.center, style: TextStyle(color: KiteColors.muted)),
               ),
               FilledButton.icon(
                 onPressed: _load,
@@ -144,11 +144,11 @@ class _HomeShellState extends State<HomeShell> {
             onChatSelected: (chat) => setState(() => _selectedChat = chat),
           ),
         ),
-        const VerticalDivider(width: 1, color: KiteColors.border),
+        VerticalDivider(width: 1, color: KiteColors.border),
         Expanded(
           child: _selectedChat != null
               ? ConversationScreen(api: widget.api, chat: _selectedChat!)
-              : const Center(
+              :  Center(
                   child: Text(
                     'Sélectionnez une discussion',
                     style: TextStyle(color: KiteColors.muted),
@@ -161,7 +161,7 @@ class _HomeShellState extends State<HomeShell> {
 
   Widget _tabBar(int unreadTotal) {
     return Container(
-      decoration: const BoxDecoration(
+      decoration:  BoxDecoration(
         color: KiteColors.bg,
         border: Border(top: BorderSide(color: KiteColors.border)),
       ),

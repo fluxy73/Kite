@@ -102,7 +102,7 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
           ? Center(
               child: Text('Recherche impossible\n$_error',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(color: KiteColors.muted)),
+                  style: TextStyle(color: KiteColors.muted)),
             )
           : _buildResults(),
     );
@@ -110,7 +110,7 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
 
   Widget _buildResults() {
     if (_query.trim().isEmpty) {
-      return const Center(
+      return  Center(
         child: Text('Tapez pour rechercher',
             style: TextStyle(color: KiteColors.muted)),
       );
@@ -121,7 +121,7 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
       return const Center(child: CircularProgressIndicator());
     }
     if (chats.isEmpty && messages.isEmpty) {
-      return const Center(
+      return  Center(
         child: Text('Aucun résultat', style: TextStyle(color: KiteColors.muted)),
       );
     }
@@ -131,13 +131,13 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
           const _SectionLabel('Discussions'),
           for (final c in chats)
             ListTile(
-              leading: const Icon(Icons.chat_bubble_outline, color: KiteColors.tint2),
-              title: Text(c.name, style: const TextStyle(color: KiteColors.fg)),
+              leading: Icon(Icons.chat_bubble_outline, color: KiteColors.tint2),
+              title: Text(c.name, style: TextStyle(color: KiteColors.fg)),
               subtitle: c.lastMessage?.text != null
                   ? Text(c.lastMessage!.text,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: KiteColors.muted, fontSize: 12))
+                      style: TextStyle(color: KiteColors.muted, fontSize: 12))
                   : null,
               onTap: () => _openHit(context, c),
             ),
@@ -146,13 +146,13 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
           const _SectionLabel('Messages'),
           for (final h in messages)
             ListTile(
-              leading: const Icon(Icons.notes, color: KiteColors.muted),
+              leading: Icon(Icons.notes, color: KiteColors.muted),
               title: Text(h.message.text,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: KiteColors.fg)),
+                  style: TextStyle(color: KiteColors.fg)),
               subtitle: Text('${h.senderName} · ${h.chat.name}',
-                  style: const TextStyle(color: KiteColors.muted, fontSize: 12)),
+                  style: TextStyle(color: KiteColors.muted, fontSize: 12)),
               onTap: () => _openHit(context, h.chat),
             ),
         ],
@@ -177,7 +177,7 @@ class _SectionLabel extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
       child: Text(label.toUpperCase(),
-          style: const TextStyle(
+          style:  TextStyle(
               color: KiteColors.muted, fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 0.5)),
     );
   }

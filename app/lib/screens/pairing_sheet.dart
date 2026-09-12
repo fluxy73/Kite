@@ -127,8 +127,8 @@ class _PairingSheetState extends State<PairingSheet>
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(20, 14, 20, 6),
+           Padding(
+            padding: const EdgeInsets.fromLTRB(20, 14, 20, 6),
             child: Align(
               alignment: Alignment.centerLeft,
               child: Text('Se connecter à quelqu’un',
@@ -201,7 +201,7 @@ class _PairingSheetState extends State<PairingSheet>
             ),
           ),
           const SizedBox(height: 16),
-          const Text('Votre code de jumelage',
+           Text('Votre code de jumelage',
               style: TextStyle(color: KiteColors.muted, fontSize: 12.5)),
           const SizedBox(height: 4),
           Container(
@@ -212,14 +212,14 @@ class _PairingSheetState extends State<PairingSheet>
               border: Border.all(color: KiteColors.border),
             ),
             child: Text(_myCode,
-                style: const TextStyle(
+                style:  TextStyle(
                     fontWeight: FontWeight.w700,
                     letterSpacing: 1.2,
                     fontSize: 15,
                     color: KiteColors.fg)),
           ),
           const SizedBox(height: 10),
-          const Text(
+           Text(
             'Faites-le scanner par la personne en face de vous —\nla conversation s’ouvre directement.',
             textAlign: TextAlign.center,
             style: TextStyle(
@@ -255,7 +255,7 @@ class _PairingSheetState extends State<PairingSheet>
                   Icon(Icons.qr_code_scanner,
                       size: 44, color: KiteColors.muted.withValues(alpha: 0.6)),
                   const SizedBox(height: 10),
-                  const Text('Saisie par code — la caméra optique arrive '
+                   Text('Saisie par code — la caméra optique arrive '
                       'avec le transport P2P',
                       textAlign: TextAlign.center,
                       style: TextStyle(
@@ -263,9 +263,9 @@ class _PairingSheetState extends State<PairingSheet>
                           fontSize: 12.5,
                           height: 1.4)),
                   const SizedBox(height: 4),
-                  const Text('Demandez le code affiché sur l\'autre téléphone :',
+                  Text('Demandez le code affiché sur l\'autre téléphone :',
                       style: TextStyle(
-                          color: Color(0xFF8A8F98),
+                          color: KiteColors.muted,
                           fontSize: 11.5)),
                 ],
               ),
@@ -277,27 +277,27 @@ class _PairingSheetState extends State<PairingSheet>
             keyboardType: TextInputType.text,
             textInputAction: TextInputAction.go,
             onSubmitted: (_) => _openPeer(_byCode(_manual.text)),
-            style: const TextStyle(color: KiteColors.fg, letterSpacing: 1),
+            style: TextStyle(color: KiteColors.fg, letterSpacing: 1),
             decoration: InputDecoration(
               hintText: 'ex : julien-42',
-              hintStyle: const TextStyle(color: KiteColors.muted),
+              hintStyle: TextStyle(color: KiteColors.muted),
               errorText: _manualError,
               filled: true,
               fillColor: KiteColors.surface2,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
-                borderSide: const BorderSide(color: KiteColors.border),
+                borderSide: BorderSide(color: KiteColors.border),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
-                borderSide: const BorderSide(color: KiteColors.border),
+                borderSide: BorderSide(color: KiteColors.border),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
-                borderSide: const BorderSide(color: KiteColors.accent),
+                borderSide: BorderSide(color: KiteColors.accent),
               ),
               suffixIcon: IconButton(
-                icon: const Icon(Icons.arrow_forward,
+                icon:  Icon(Icons.arrow_forward,
                     color: KiteColors.accent),
                 onPressed: () => _openPeer(_byCode(_manual.text)),
               ),
@@ -422,7 +422,7 @@ class _PeerRadarTabState extends State<PeerRadarTab>
                     ? 'Recherche de personnes à proximité sur ce réseau…'
                     : '${peers.length} personne(s) détectée(s) sur ce réseau',
             textAlign: TextAlign.center,
-            style: const TextStyle(color: KiteColors.muted, fontSize: 12.5),
+            style: TextStyle(color: KiteColors.muted, fontSize: 12.5),
           ),
           const SizedBox(height: 14),
           for (final u in peers) _PeerTile(user: u, onPick: widget.onPick),
@@ -462,7 +462,7 @@ class _PeerTile extends StatelessWidget {
                         KiteColors.sage.withValues(alpha: 0.15),
                     child: Text(
                       user.name.isNotEmpty ? user.name[0] : '?',
-                      style: const TextStyle(
+                      style:  TextStyle(
                           color: KiteColors.sage,
                           fontWeight: FontWeight.w700),
                     ),
@@ -470,7 +470,7 @@ class _PeerTile extends StatelessWidget {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(user.name,
-                        style: const TextStyle(
+                        style:  TextStyle(
                             color: KiteColors.fg,
                             fontWeight: FontWeight.w600)),
                   ),
@@ -481,7 +481,7 @@ class _PeerTile extends StatelessWidget {
                       color: KiteColors.sage.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(999),
                     ),
-                    child: const Text('présent',
+                    child:  Text('présent',
                         style: TextStyle(
                             color: KiteColors.sage, fontSize: 11)),
                   ),
