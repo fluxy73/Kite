@@ -131,6 +131,10 @@ class OfflineApi implements KiteApi {
     Map<String, dynamic>? media,
     String? replyTo,
   }) async {
+    // Parité serveur : pas de message textuel vide (voice/media OK sans texte).
+    if (type == 'text' && text.trim().isEmpty) {
+      throw ArgumentError('text requis');
+    }
     final m =
         _s.addMessage(chatId, meId, type, text, media: media, replyTo: replyTo);
     _maybeEcho(chatId);
@@ -141,6 +145,12 @@ class OfflineApi implements KiteApi {
   Future<Chat> createChat(String type, String name, List<String> memberIds) =>
       Future.value(_s.createChat(type, name, [meId, ...memberIds]));
 
+  @override
+  Future<User> upsertUser(User u) async {
+    _s.upsertUser(u);
+    return u;
+  }
+
   // ---------- Actions sur messages ----------
 
   @override
@@ -148,8 +158,20 @@ class OfflineApi implements KiteApi {
       _s.toggleReaction(messageId, meId, emoji);
 
   @override
-  Future<void> editMessage(String messageId, String text) async =>
-      _s.editMessage(messageId, meId, text);
+  Future<void> editMessage(String messageId, String text) async {
+    // Mêmes erreurs honnêtes que le serveur (404/403/400 → StateError).
+    final m = _s.messageById(messageId);
+    if (m == null) {
+      throw StateError('message introuvable');
+    }
+    if (m.senderId != meId) {
+      throw StateError("seul l'expéditeur peut modifier");
+    }
+    if (m.type != 'text') {
+      throw StateError('ce type de message ne peut pas être modifié');
+    }
+    _s.editMessage(messageId, meId, text);
+  }
 
   @override
   Future<void> deleteMessage(String messageId, {required String mode}) async =>

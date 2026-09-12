@@ -547,6 +547,26 @@ func (s *Store) addUser(name string) User {
 	return u
 }
 
+// upsertUser enregistre un contact issu du jumelage de pairs : le pair
+// est ajouté s'il est inconnu, actualisé sinon (id = source de vérité).
+func (s *Store) upsertUser(u User) User {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i := range s.state.Users {
+		if s.state.Users[i].ID == u.ID {
+			if u.Name != "" {
+				s.state.Users[i].Name = u.Name
+			}
+			s.state.Users[i].Phone = u.Phone
+			_ = s.save()
+			return s.state.Users[i]
+		}
+	}
+	s.state.Users = append(s.state.Users, u)
+	_ = s.save()
+	return u
+}
+
 func (s *Store) createCall(chatID, callerID, callerName, kind string) CallRecord {
 	c := CallRecord{
 		ID:         newID("call"),
@@ -1142,6 +1162,11 @@ func (s *Store) editMessage(msgID, userID, text string) (*Message, bool) {
 		if m.SenderID != userID {
 			return nil, false
 		}
+		// Seuls les messages textuels sont éditables (le client n'offre
+		// l'édition que pour type="text").
+		if m.Type != "text" {
+			return nil, false
+		}
 		m.Text = text
 		m.Edited = true
 		_ = s.save()
@@ -1190,6 +1215,14 @@ func (s *Store) votePoll(msgID, userID string, optionIndex int) (*Message, bool)
 		if !inSliceAny(voters, userID) {
 			voters = append(voters, userID)
 			m.Media["voters"] = voters
+			// Comptage réel du vote : le client affiche `votes` comme tally.
+			if votes, ok := m.Media["votes"].([]any); ok && optionIndex < len(votes) {
+				if n, ok := votes[optionIndex].(float64); ok {
+					votes[optionIndex] = n + 1
+				} else if n, ok := votes[optionIndex].(int); ok {
+					votes[optionIndex] = n + 1
+				}
+			}
 			_ = s.save()
 		}
 		return m, true

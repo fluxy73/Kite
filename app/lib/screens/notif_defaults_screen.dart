@@ -22,7 +22,7 @@ class NotifPrefsEditor extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Priorité',
+         Text('Priorité',
             style: TextStyle(color: KiteColors.muted, fontSize: 12)),
         RadioGroup<NotifPriority>(
           groupValue: prefs.priority,
@@ -47,7 +47,7 @@ class NotifPrefsEditor extends StatelessWidget {
             ],
           ),
         ),
-        const Divider(color: KiteColors.border),
+        Divider(color: KiteColors.border),
         SwitchListTile(
           dense: true,
           contentPadding: EdgeInsets.zero,
@@ -59,7 +59,7 @@ class NotifPrefsEditor extends StatelessWidget {
           dense: true,
           contentPadding: EdgeInsets.zero,
           title: const Text('Aperçu du message'),
-          subtitle: const Text('Masque le texte dans la notification',
+          subtitle:  Text('Masque le texte dans la notification',
               style: TextStyle(fontSize: 12, color: KiteColors.muted)),
           value: prefs.previewOn,
           onChanged: (v) => onChanged(prefs.copyWith(preview: v)),
@@ -142,7 +142,7 @@ class _NotifDefaultsScreenState extends State<NotifDefaultsScreen> {
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                const Text(
+                 Text(
                   'Défauts pour toutes les conversations. Un réglage propre '
                   'à une conversation (fiche infos) prime sur ces défauts.',
                   style: TextStyle(color: KiteColors.muted, fontSize: 13),

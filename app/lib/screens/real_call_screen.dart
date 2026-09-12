@@ -130,10 +130,10 @@ class _RealCallScreenState extends State<RealCallScreen> {
             const SizedBox(height: 8),
             Text(
               widget.video ? 'Appel vidéo…' : 'Appel audio…',
-              style: const TextStyle(color: KiteColors.muted, fontSize: 15),
+              style: TextStyle(color: KiteColors.muted, fontSize: 15),
             ),
             const SizedBox(height: 18),
-            const Text('Sonnerie…',
+             Text('Sonnerie…',
                 style: TextStyle(color: KiteColors.accent, fontSize: 14)),
             const Spacer(),
             InkWell(
@@ -146,7 +146,7 @@ class _RealCallScreenState extends State<RealCallScreen> {
               },
               child: Container(
                 padding: const EdgeInsets.all(16),
-                decoration: const BoxDecoration(color: KiteColors.danger, shape: BoxShape.circle),
+                decoration: BoxDecoration(color: KiteColors.danger, shape: BoxShape.circle),
                 child: const Icon(Icons.call_end, size: 26, color: Colors.white),
               ),
             ),

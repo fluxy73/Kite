@@ -118,7 +118,7 @@ class _MediaTile extends StatelessWidget {
               (message.media?['name'] as String?) ?? message.type,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 11, color: KiteColors.muted),
+              style: TextStyle(fontSize: 11, color: KiteColors.muted),
             ),
           ],
         ),
@@ -138,7 +138,7 @@ class _StarredTile extends StatelessWidget {
         ? (message.media?['name'] as String?) ?? message.type
         : message.text;
     return ListTile(
-      leading: const Icon(Icons.star, color: KiteColors.accent),
+      leading: Icon(Icons.star, color: KiteColors.accent),
       title: Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis),
       subtitle: Text(isMine ? 'Vous' : message.senderId,
           style: const TextStyle(fontSize: 11.5)),
@@ -242,7 +242,7 @@ Future<String?> showWallpaperPicker(BuildContext context, String current) {
               title: Text(kWallpapers[key]!.label,
                   style: const TextStyle(fontSize: 14.5)),
               trailing: key == current
-                  ? const Icon(Icons.check, color: KiteColors.accent)
+                  ? Icon(Icons.check, color: KiteColors.accent)
                   : null,
               onTap: () => Navigator.pop(ctx, key),
             ),
@@ -262,7 +262,7 @@ Future<(String, String)?> showReportDialog(BuildContext context) {
     context: context,
     builder: (ctx) => AlertDialog(
       backgroundColor: KiteColors.surface,
-      title: const Text('Signaler la conversation',
+      title:  Text('Signaler la conversation',
           style: TextStyle(color: KiteColors.fg)),
       content: StatefulBuilder(
         builder: (ctx, setDialogState) => Column(
@@ -286,8 +286,8 @@ Future<(String, String)?> showReportDialog(BuildContext context) {
             TextField(
               controller: detailsCtrl,
               maxLines: 2,
-              style: const TextStyle(color: KiteColors.fg, fontSize: 13.5),
-              decoration: const InputDecoration(
+              style: TextStyle(color: KiteColors.fg, fontSize: 13.5),
+              decoration:  InputDecoration(
                   hintText: 'Détails (optionnel)',
                   hintStyle: TextStyle(color: KiteColors.muted)),
             ),
@@ -317,9 +317,9 @@ class _Empty extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.inbox_outlined, size: 46, color: KiteColors.muted),
+            Icon(Icons.inbox_outlined, size: 46, color: KiteColors.muted),
             const SizedBox(height: 10),
-            Text(text, style: const TextStyle(color: KiteColors.muted)),
+            Text(text, style: TextStyle(color: KiteColors.muted)),
           ],
         ),
       );

@@ -71,8 +71,20 @@ func (a *api) handleUsers(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPost:
 		var body struct {
 			Name string `json:"name"`
+			User string `json:"user"` // jumelage de pairs : id+name imposés
 		}
-		if err := readJSON(r, &body); err != nil || strings.TrimSpace(body.Name) == "" {
+		if err := readJSON(r, &body); err != nil {
+			httpError(w, 400, "corps invalide")
+			return
+		}
+		// Corps {user, name} : upsert du pair jumelé (id préservé).
+		// Corps {name} seul : création d'un utilisateur (comportement initial).
+		if strings.TrimSpace(body.User) != "" && strings.TrimSpace(body.Name) != "" {
+			u := a.store.upsertUser(User{ID: strings.TrimSpace(body.User), Name: strings.TrimSpace(body.Name)})
+			wJSON(w, 200, u)
+			return
+		}
+		if strings.TrimSpace(body.Name) == "" {
 			httpError(w, 400, "name requis")
 			return
 		}
@@ -217,6 +229,10 @@ func (a *api) handleMessages(w http.ResponseWriter, r *http.Request) {
 		}
 		if body.Type == "" {
 			body.Type = "text"
+		}
+		if body.Type == "text" && strings.TrimSpace(body.Text) == "" {
+			httpError(w, 400, "text requis")
+			return
 		}
 		m := a.store.addMessage(chatID, uid, body.Type, body.Text, body.Media, body.ReplyTo)
 		chat, _ := a.store.chatByID(chatID)
@@ -572,7 +588,7 @@ func (a *api) handleCallLog(w http.ResponseWriter, r *http.Request) {
 			text = "📞 Appel manqué"
 		}
 	}
-	m := a.store.addMessage(body.ChatID, a.meID, "call", text, map[string]any{
+	m := a.store.addMessage(body.ChatID, uid, "call", text, map[string]any{
 		"kind": body.Kind, "direction": body.Direction,
 	}, "")
 	chat, _ := a.store.chatByID(body.ChatID)
@@ -611,6 +627,12 @@ func (a *api) handleScheduledCalls(w http.ResponseWriter, r *http.Request) {
 		}
 		if body.ScheduledAt == 0 {
 			body.ScheduledAt = time.Now().Add(24 * time.Hour).UnixMilli()
+		}
+		// Une date passée déclencherait un rappel fantôme immédiat —
+		// même règle que les messages programmés.
+		if body.ScheduledAt <= time.Now().UnixMilli() {
+			httpError(w, 400, "date de programmation passée")
+			return
 		}
 		kind := body.Kind
 		if kind != "video" {
@@ -916,7 +938,7 @@ func (a *api) handleMessageAction(w http.ResponseWriter, r *http.Request) {
 		}
 		updated, ok := a.store.editMessage(msgID, uid, text)
 		if !ok {
-			httpError(w, 404, "message introuvable")
+			httpError(w, 400, "ce type de message ne peut pas être modifié")
 			return
 		}
 		a.hub.broadcastToUsers(chat.MemberIDs, Event{Type: "edit", ChatID: m.ChatID, Data: mustJSON(updated)})

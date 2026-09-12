@@ -158,6 +158,14 @@ class KiteApi {
     return Chat.fromJson(raw as Map<String, dynamic>);
   }
 
+  /// Enregistre/actualise un contact issu du jumelage de pairs (serveur :
+  /// liste d'utilisateurs étendue côté Go).
+  Future<User> upsertUser(User u) async {
+    final raw = await _send('POST', '/api/users',
+        query: {'userId': meId}, body: {'user': u.id, 'name': u.name});
+    return User.fromJson(raw as Map<String, dynamic>);
+  }
+
   // ---------- Actions sur messages ----------
 
   Future<void> toggleReaction(String messageId, String emoji) async {

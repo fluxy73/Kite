@@ -46,10 +46,16 @@ class _KiteAppState extends State<KiteApp> with WidgetsBindingObserver {
   bool _appLocked = false;
   DateTime _lastUnlock = DateTime.fromMillisecondsSinceEpoch(0);
 
+  /// Incrémenté à chaque changement de réglage de thème pour rebuild.
+  int _themeTick = 0;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // Applique la palette persistée (dark/light/system) avant le 1er frame.
+    KiteColors.applyMode();
+    KiteColors.revision.addListener(_onThemeChanged);
     // Porte d'app au démarrage si un verrou est posé.
     _appLocked = ChatLockStore.instance.appLockEnabled;
     // Sonde de connectivité : l'indicateur En ligne / Hors ligne (barre
@@ -100,8 +106,18 @@ class _KiteAppState extends State<KiteApp> with WidgetsBindingObserver {
   }
 
   @override
+  void didChangePlatformBrightness() {
+    super.didChangePlatformBrightness();
+    // Mode « Système » : re-résout la palette quand l'appareil bascule.
+    if (ThemePrefs.mode == 'system') {
+      KiteColors.applyMode();
+    }
+  }
+
+  @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    KiteColors.revision.removeListener(_onThemeChanged);
     ServerStatus.instance.stop();
     CallCenter.instance.current.removeListener(_onIncomingCall);
     ScheduledReminderCenter.instance.next.removeListener(_onScheduledReminder);
@@ -141,13 +157,13 @@ class _KiteAppState extends State<KiteApp> with WidgetsBindingObserver {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(n.senderName, style: const TextStyle(fontWeight: FontWeight.w700, color: KiteColors.fg)),
+            Text(n.senderName, style: TextStyle(fontWeight: FontWeight.w700, color: KiteColors.fg)),
             if (n.chatName.isNotEmpty) ...[
               const SizedBox(height: 2),
-              Text(n.chatName, style: const TextStyle(color: KiteColors.muted, fontSize: 12)),
+              Text(n.chatName, style: TextStyle(color: KiteColors.muted, fontSize: 12)),
             ],
             const SizedBox(height: 4),
-            Text(n.body, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: KiteColors.fg)),
+            Text(n.body, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: KiteColors.fg)),
           ],
         ),
         action: SnackBarAction(
@@ -191,11 +207,11 @@ class _KiteAppState extends State<KiteApp> with WidgetsBindingObserver {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(sc.title, style: const TextStyle(fontWeight: FontWeight.w600, color: KiteColors.fg)),
+            Text(sc.title, style: TextStyle(fontWeight: FontWeight.w600, color: KiteColors.fg)),
             const SizedBox(height: 6),
-            Text('Dans moins d’une heure · ${_fmtReminder(sc.scheduledAt)}', style: const TextStyle(color: KiteColors.muted, fontSize: 13)),
+            Text('Dans moins d’une heure · ${_fmtReminder(sc.scheduledAt)}', style: TextStyle(color: KiteColors.muted, fontSize: 13)),
             const SizedBox(height: 4),
-            Text(sc.kind == 'video' ? 'Appel vidéo' : 'Appel audio', style: const TextStyle(color: KiteColors.muted, fontSize: 13)),
+            Text(sc.kind == 'video' ? 'Appel vidéo' : 'Appel audio', style: TextStyle(color: KiteColors.muted, fontSize: 13)),
           ],
         ),
         actions: [
@@ -212,6 +228,12 @@ class _KiteAppState extends State<KiteApp> with WidgetsBindingObserver {
     return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')} $h:$min';
   }
 
+  /// Rebuild sur changement de réglage (la palette est déjà résolue par
+  /// l'appelant via KiteColors.applyMode).
+  void _onThemeChanged() {
+    if (mounted) setState(() => _themeTick++);
+  }
+
   @override
   Widget build(BuildContext context) {
     final lockOn = ChatLockStore.instance.appLockEnabled;
@@ -220,9 +242,13 @@ class _KiteAppState extends State<KiteApp> with WidgetsBindingObserver {
       navigatorKey: _nav,
       title: 'Kite',
       debugShowCheckedModeBanner: false,
-      theme: kiteDarkTheme(),
+      theme: kiteLightTheme(),
       darkTheme: kiteDarkTheme(),
-      themeMode: ThemeMode.dark,
+      themeMode: switch (ThemePrefs.mode) {
+        'light' => ThemeMode.light,
+        'system' => ThemeMode.system,
+        _ => ThemeMode.dark,
+      },
       home: gating
           ? Scaffold(
               backgroundColor: KiteColors.bg,

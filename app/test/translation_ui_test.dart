@@ -31,6 +31,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Traduire'), findsOneWidget);
+    // Le menu est scrollable : amener l'entrée à l'écran avant d'appuyer.
+    await tester.ensureVisible(find.text('Traduire'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Traduire'));
     await tester.pump(); // lance le Future + setState '…'
     await tester.pump(const Duration(milliseconds: 50));
@@ -41,6 +44,8 @@ void main() {
 
     // Re-tap sur Traduire -> bascule, la traduction disparaît.
     await tester.longPress(find.text('Bonjour le monde').last);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Traduire'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Traduire'));
     await tester.pump();

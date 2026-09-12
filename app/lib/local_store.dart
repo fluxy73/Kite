@@ -787,6 +787,8 @@ class LocalStore {
   bool editMessage(String messageId, String userId, String text) {
     final m = messageById(messageId);
     if (m == null || m.senderId != userId) return false;
+    // Seuls les messages textuels sont éditables (parité serveur).
+    if (m.type != 'text') return false;
     upsertMessage(m.copyWith(text: text, edited: true));
     return true;
   }
@@ -813,6 +815,11 @@ class LocalStore {
     if (options is! List || optionIndex < 0 || optionIndex >= options.length) {
       return false;
     }
+    // Idempotence par votant (parité serveur) : un votant connu ne
+    // recompte pas, même s'il change d'option.
+    final voters =
+        List<String>.from((media['voters'] as List? ?? []).cast<String>());
+    if (voters.contains(userId)) return true;
     final votes = List<int>.from(
         (media['votes'] as List? ?? []).map<int>((v) => v as int));
     if (optionIndex < votes.length) {
@@ -824,12 +831,34 @@ class LocalStore {
       votes.add(1);
     }
     media['votes'] = votes;
-    final voters =
-        List<String>.from((media['voters'] as List? ?? []).cast<String>());
-    if (!voters.contains(userId)) voters.add(userId);
+    voters.add(userId);
     media['voters'] = voters;
     upsertMessage(m.copyWith(media: media));
     return true;
+  }
+
+  /// Ajoute ou actualise un utilisateur connu (jumelage de pairs : un
+  /// contact découvert sur le réseau devient un contact de l'app).
+  void upsertUser(User u) {
+    final i = users.indexWhere((x) => x.id == u.id);
+    if (i >= 0) {
+      users[i] = u;
+    } else {
+      users.add(u);
+    }
+    _persist();
+  }
+
+  /// DM existante avec [userId], s'il y en a une.
+  Chat? findDmWith(String userId, String meId) {
+    for (final c in chats) {
+      if (c.type == 'dm' &&
+          c.memberIds.contains(userId) &&
+          c.memberIds.contains(meId)) {
+        return c;
+      }
+    }
+    return null;
   }
 
   Chat createChat(String type, String name, List<String> memberIds) {
@@ -888,6 +917,10 @@ class LocalStore {
     String chatId = '',
     bool reminder = false,
   }) {
+    // Parité serveur : une date passée déclencherait un rappel fantôme.
+    if (scheduledAt <= DateTime.now().millisecondsSinceEpoch) {
+      throw ArgumentError('date de programmation passée');
+    }
     final sc = ScheduledCall(
       id: 'sc-${DateTime.now().microsecondsSinceEpoch}',
       title: title,
@@ -957,6 +990,10 @@ class LocalStore {
     required int scheduledAt,
     String replyTo = '',
   }) {
+    // Parité serveur (message introuvable côté serveur si passé).
+    if (scheduledAt <= DateTime.now().millisecondsSinceEpoch) {
+      throw ArgumentError('date de programmation passée');
+    }
     final sm = ScheduledMessage(
       id: 'sm-${DateTime.now().microsecondsSinceEpoch}',
       chatId: chatId,

@@ -95,7 +95,7 @@ class ConnectionBadge extends StatelessWidget {
                 decoration: BoxDecoration(color: color, shape: BoxShape.circle),
               ),
               const SizedBox(width: 6),
-              Text(label, style: const TextStyle(fontSize: 11, color: KiteColors.fg)),
+              Text(label, style: TextStyle(fontSize: 11, color: KiteColors.fg)),
             ],
           ),
         );
