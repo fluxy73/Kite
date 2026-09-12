@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
-import 'package:flutter/scheduler.dart';
 
 /// Physique de ressort commune — dynamics naturels, jamais linéaires.
 /// dampingRatio 0.8 : léger overshoot organique ; stiffness 380 : réactif
@@ -11,80 +10,31 @@ final SpringDescription kKiteSpring = SpringDescription.withDampingRatio(
   stiffness: 380,
 );
 
+/// Retour au repos : amorti plus fort, sans overshoot (retour calme).
 final SpringDescription kKiteSpringSoft = SpringDescription.withDampingRatio(
   mass: 1,
   ratio: 0.95,
   stiffness: 260,
 );
 
-/// Simulation d'un spring 1D pilotée par un Ticker — pour les valeurs
-/// dérivées (offsets de swipe, seuils) partagées entre widgets.
-class SpringValue {
-  SpringValue({this.value = 0, this.velocity = 0});
-
-  double value;
-  double velocity;
-  Ticker? _ticker;
-  SpringSimulation? _sim;
-  final List<VoidCallback> _listeners = [];
-
-  void addListener(VoidCallback l) => _listeners.add(l);
-  void removeListener(VoidCallback l) => _listeners.remove(l);
-
-  void _notify() {
-    for (final l in List.of(_listeners)) {
-      l();
-    }
-  }
-
-  /// Anime vers [target] avec le ressort [spring] (défaut : kKiteSpring).
-  void animateTo(double target, {SpringDescription? spring}) {
-    stop();
-    _sim = SpringSimulation(spring ?? kKiteSpring, value, target, velocity);
-    _ticker = Ticker(_tick)..start();
-  }
-
-  void _tick(Duration elapsed) {
-    final sim = _sim;
-    if (sim == null) return;
-    final t = elapsed.inMicroseconds / Duration.microsecondsPerSecond;
-    velocity = sim.dx(t);
-    value = sim.x(t);
-    if (sim.isDone(t)) {
-      velocity = 0;
-      stop();
-    }
-    _notify();
-  }
-
-  /// Arrête l'animation en conservant la valeur courante.
-  void stop() {
-    _ticker?.dispose();
-    _ticker = null;
-    _sim = null;
-  }
-
-  void dispose() {
-    stop();
-    _listeners.clear();
-  }
-
-  /// Fixe instantanément (pas d'animation).
-  void jumpTo(double v) {
-    stop();
-    value = v;
-    velocity = 0;
-    _notify();
-  }
+/// Anime un contrôleur avec le ressort [spring] — durée pilotée par la
+/// simulation physique (settle), pas par une durée fixe.
+TickerFuture animateWithSpring(
+  AnimationController c, {
+  double from = 0,
+  double to = 1,
+  SpringDescription? spring,
+}) {
+  return c.animateWith(SpringSimulation(spring ?? kKiteSpring, from, to, 0));
 }
 
-/// Scale élastique à l'appui : descente vers [pressedScale] en pressé,
-/// retour avec rebond au relâchement.
+/// Scale élastique à l'appui : descente ressort vers [pressedScale],
+/// retour au repos sur kKiteSpringSoft (calme, sans rebond nerveux).
 class SpringScale extends StatefulWidget {
   const SpringScale({
     super.key,
     required this.child,
-    this.pressedScale = 0.96,
+    this.pressedScale = 0.94,
     this.onTap,
   });
 
@@ -98,14 +48,9 @@ class SpringScale extends StatefulWidget {
 
 class _SpringScaleState extends State<SpringScale>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 180),
-  );
-  late final Animation<double> _a = Tween<double>(
-    begin: 1,
-    end: widget.pressedScale,
-  ).animate(CurvedAnimation(parent: _c, curve: Curves.easeOutCubic));
+  late final AnimationController _c = AnimationController(vsync: this);
+  late final Animation<double> _a =
+      Tween<double>(begin: 1, end: widget.pressedScale).animate(_c);
 
   @override
   void dispose() {
@@ -116,9 +61,12 @@ class _SpringScaleState extends State<SpringScale>
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTapDown: (_) => _c.forward(),
-      onTapUp: (_) => _c.reverse(),
-      onTapCancel: () => _c.reverse(),
+      onTapDown: (_) =>
+          animateWithSpring(_c, from: _c.value, to: 1, spring: kKiteSpring),
+      onTapUp: (_) =>
+          animateWithSpring(_c, from: _c.value, to: 0, spring: kKiteSpringSoft),
+      onTapCancel: () =>
+          animateWithSpring(_c, from: _c.value, to: 0, spring: kKiteSpringSoft),
       onTap: widget.onTap,
       child: ScaleTransition(scale: _a, child: widget.child),
     );

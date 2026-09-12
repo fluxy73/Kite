@@ -59,9 +59,11 @@ void main() {
         findsOneWidget,
       );
 
-      await tester.pumpAndSettle(); // 200 ms écoulées
+      await tester.pumpAndSettle(); // le ressort a atteint son settle
       final fade = tester.widget<FadeTransition>(find.byType(FadeTransition));
-      expect(fade.opacity.value, 1.0);
+      // Settle asymptotique de la simulation physique (~0.9999993) —
+      // indiscernable de 1 à l'écran.
+      expect(fade.opacity.value, moreOrLessEquals(1.0, epsilon: 1e-3));
     });
   });
 
@@ -104,17 +106,19 @@ void main() {
       expect(dragOffset(tester), moreOrLessEquals(0, epsilon: 0.5));
 
       // Swipe 2 : 20 px bruts (sous le seuil, pas de réponse). Avec le
-      // défaut, le listener orphelin du swipe 1 tirerait l'offset vers la
-      // position du premier retour ; corrigé, l'offset suit le second
-      // swipe (easeOutBack : départ rapide, ~8 px à 40 ms pour un dépôt
-      // à 20 px).
+      // défaut, le listener orphelin du swipe 1 rejouerait le profil du
+      // premier retour (easeOutBack en overshoot négatif) : l'offset
+      // repartirait sous 0 (~-20 px à 60 ms). Corrigé, le retour élastique
+      // part de SA position : le ressort descend de ~20 vers 0 (~15 px
+      // restants à 60 ms).
       await swipe(tester, [20]);
       await tester.pump(); // démarre le retour élastique
-      await tester.pump(const Duration(milliseconds: 40));
+      await tester.pump(const Duration(milliseconds: 60));
 
       expect(replies, 1, reason: 'sous le seuil : pas de réponse');
-      expect(dragOffset(tester), lessThan(15),
-          reason: 'le retour suit la position du second swipe');
+      expect(dragOffset(tester), greaterThan(5),
+          reason: 'le retour suit la position du second swipe '
+              '(un listener orphelin le tirerait sous 0)');
 
       await tester.pumpAndSettle();
       expect(dragOffset(tester), moreOrLessEquals(0, epsilon: 0.5));

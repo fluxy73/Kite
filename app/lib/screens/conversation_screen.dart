@@ -830,7 +830,7 @@ class _ConversationScreenState extends State<ConversationScreen>
           if (_replyTo != null) _replyBar(_replyTo!),
           if (_editing != null) _editBar(_editing!),
           if (_recording)
-            _recordingBar()
+            _SpringReveal(child: _recordingBar())
           else
             Row(
               children: [
@@ -883,32 +883,22 @@ class _ConversationScreenState extends State<ConversationScreen>
                   ),
                 ),
                 const SizedBox(width: 8),
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 180),
-                  switchInCurve: Curves.easeOutBack,
-                  switchOutCurve: Curves.easeIn,
-                  transitionBuilder: (child, anim) => ScaleTransition(
-                    scale: anim,
-                    child: child,
+                _SpringMorph(
+                  showSecond: canSend,
+                  first: _RoundBtn(
+                    icon: Icons.mic,
+                    tooltip: 'Enregistrer un vocal',
+                    onTap: _toggleRecording,
                   ),
-                  child: canSend
-                      ? _RoundBtn(
-                          key: const ValueKey('send'),
-                          icon: _scheduleAt != null
-                              ? Icons.schedule_send
-                              : Icons.send,
-                          tooltip: _scheduleAt != null
-                              ? 'Programmer l\'envoi'
-                              : 'Envoyer',
-                          accent: true,
-                          onTap: _send,
-                        )
-                      : _RoundBtn(
-                          key: const ValueKey('mic'),
-                          icon: Icons.mic,
-                          tooltip: 'Enregistrer un vocal',
-                          onTap: _toggleRecording,
-                        ),
+                  second: _RoundBtn(
+                    icon: _scheduleAt != null
+                        ? Icons.schedule_send
+                        : Icons.send,
+                    tooltip:
+                        _scheduleAt != null ? 'Programmer l\'envoi' : 'Envoyer',
+                    accent: true,
+                    onTap: _send,
+                  ),
                 ),
               ],
             ),
@@ -2058,7 +2048,6 @@ class _VoicePlayer {
 
 class _RoundBtn extends StatelessWidget {
   const _RoundBtn({
-    super.key,
     required this.icon,
     required this.tooltip,
     required this.onTap,
@@ -2072,9 +2061,10 @@ class _RoundBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    // Pressage = ressort (scale-down, retour calme) — la même physique que
+    // le reste du design system.
+    return SpringScale(
       onTap: onTap,
-      customBorder: const CircleBorder(),
       child: Container(
         width: 40,
         height: 40,
@@ -2088,6 +2078,129 @@ class _RoundBtn extends StatelessWidget {
           color: accent ? KiteColors.accentInk : KiteColors.muted,
         ),
       ),
+    );
+  }
+}
+
+/// Bascule micro ↔ envoi : crossfade + échelle pilotés par le ressort
+/// commun (pas de durée fixe). Les deux enfants restent dans l'arbre ;
+/// seul le côté actif est touchable (dès le flip d'état, pas à mi-chemin).
+class _SpringMorph extends StatefulWidget {
+  const _SpringMorph({
+    required this.showSecond,
+    required this.first,
+    required this.second,
+  });
+
+  final bool showSecond;
+  final Widget first;
+  final Widget second;
+
+  @override
+  State<_SpringMorph> createState() => _SpringMorphState();
+}
+
+class _SpringMorphState extends State<_SpringMorph>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this)
+    ..value = widget.showSecond ? 1 : 0;
+
+  @override
+  void didUpdateWidget(_SpringMorph old) {
+    super.didUpdateWidget(old);
+    if (old.showSecond != widget.showSecond) {
+      animateWithSpring(
+        _c,
+        from: _c.value,
+        to: widget.showSecond ? 1 : 0,
+        spring: kKiteSpring,
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _c,
+      builder: (context, _) {
+        final v = _c.value.clamp(0.0, 1.0);
+        return SizedBox(
+          width: 40,
+          height: 40,
+          child: Stack(
+            children: [
+              IgnorePointer(
+                ignoring: widget.showSecond,
+                child: Opacity(
+                  opacity: 1 - v,
+                  child: Transform.scale(
+                      scale: 1 - 0.35 * v, child: widget.first),
+                ),
+              ),
+              IgnorePointer(
+                ignoring: !widget.showSecond,
+                child: Opacity(
+                  opacity: v,
+                  child: Transform.scale(
+                      scale: 0.65 + 0.35 * v, child: widget.second),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Apparition en expansion : la barre s'ouvre verticalement (heightFactor)
+/// avec le ressort commun — la « poche » du dictaphone se déploie.
+class _SpringReveal extends StatefulWidget {
+  const _SpringReveal({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_SpringReveal> createState() => _SpringRevealState();
+}
+
+class _SpringRevealState extends State<_SpringReveal>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this);
+  late final Animation<double> _fade =
+      CurvedAnimation(parent: _c, curve: Curves.easeOut);
+
+  @override
+  void initState() {
+    super.initState();
+    animateWithSpring(_c);
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _c,
+      builder: (context, child) {
+        final v = _c.value.clamp(0.0, 1.0);
+        return Align(
+          heightFactor: v,
+          alignment: Alignment.bottomCenter,
+          child: Opacity(opacity: _fade.value.clamp(0.0, 1.0), child: child),
+        );
+      },
+      child: widget.child,
     );
   }
 }
@@ -3156,10 +3269,8 @@ class _SwipeToReplyState extends State<SwipeToReply>
     with SingleTickerProviderStateMixin {
   static const double _threshold = 56;
 
-  late final AnimationController _snap = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 260),
-  );
+  // Retour élastique piloté par ressort (durée = settle de la simulation).
+  late final AnimationController _snap = AnimationController(vsync: this);
   double _drag = 0;
   bool _fired = false;
 
@@ -3197,15 +3308,22 @@ class _SwipeToReplyState extends State<SwipeToReply>
         _snap.removeListener(snapTick);
         return;
       }
+      // Simulation physique : le ressort relâché à [from] redescend vers
+      // 0 ; on n'écrase pas la vitesse interne du contrôleur.
       setState(() {
-        _drag = from * (1 - Curves.easeOutBack.transform(_snap.value));
+        _drag = from * (1 - _snap.value);
       });
     }
 
     // Exactement un listener par retour élastique, retiré à la fin —
     // l'accumulation ferait courir N closures par frame après N swipes.
     _snap.addListener(snapTick);
-    _snap.forward(from: 0).whenComplete(() {
+    animateWithSpring(
+      _snap,
+      from: 0,
+      to: 1,
+      spring: kKiteSpringSoft,
+    ).whenComplete(() {
       _snap.removeListener(snapTick);
       if (mounted) {
         setState(() => _drag = 0);
@@ -3281,20 +3399,17 @@ class _SpringEmoji extends StatefulWidget {
 
 class _SpringEmojiState extends State<_SpringEmoji>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 420),
-  );
-  late final Animation<double> _scale = TweenSequence<double>([
-    TweenSequenceItem(tween: Tween(begin: 0.3, end: 1.14), weight: 55),
-    TweenSequenceItem(tween: Tween(begin: 1.14, end: 1.0), weight: 45),
-  ]).animate(CurvedAnimation(parent: _c, curve: Curves.easeOutCubic));
+  late final AnimationController _c = AnimationController(vsync: this);
+  late final Animation<double> _scale = Tween<double>(
+    begin: 0.0,
+    end: 1.0,
+  ).animate(_c);
 
   @override
   void initState() {
     super.initState();
     Future.delayed(Duration(milliseconds: widget.delay), () {
-      if (mounted) _c.forward();
+      if (mounted) animateWithSpring(_c);
     });
   }
 
