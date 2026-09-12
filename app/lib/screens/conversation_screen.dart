@@ -295,7 +295,11 @@ class _ConversationScreenState extends State<ConversationScreen>
           if (data['deleted'] == true) {
             return m.copyWith(deleted: true);
           }
-          return m.copyWith(deletedFor: [...m.deletedFor, widget.api.meId]);
+          // Idempotent : l'écho temps réel peut suivre la mise à jour
+          // optimiste déjà faite par _deleteMessage.
+          return m.deletedFor.contains(widget.api.meId)
+              ? m
+              : m.copyWith(deletedFor: [...m.deletedFor, widget.api.meId]);
         });
       case 'expired':
         // Éphémères : le serveur (ou l'app locale) signale les messages disparus.
@@ -511,6 +515,18 @@ class _ConversationScreenState extends State<ConversationScreen>
   Future<void> _deleteMessage(Message m, String mode) async {
     try {
       await widget.api.deleteMessage(m.id, mode: mode);
+      if (!mounted) return;
+      setState(() {
+        if (mode == 'all') {
+          _messages.removeWhere((e) => e.id == m.id);
+        } else {
+          final idx = _messages.indexWhere((e) => e.id == m.id);
+          if (idx >= 0) {
+            _messages[idx] =
+                _messages[idx].copyWith(deletedFor: [..._messages[idx].deletedFor, widget.api.meId]);
+          }
+        }
+      });
     } catch (e) {
       _toast('Suppression impossible : $e');
     }
@@ -1195,7 +1211,6 @@ class _ConversationScreenState extends State<ConversationScreen>
   }
 
   Future<void> _confirmDelete(BuildContext ctx, Message m, String mode) async {
-    Navigator.pop(ctx);
     final choice = await showDialog<String>(
       context: context,
       builder: (dialogCtx) => AlertDialog(
