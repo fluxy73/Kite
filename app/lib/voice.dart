@@ -23,6 +23,11 @@ class VoiceRecorder {
     }
   }
 
+  /// Flux d'amplitude pendant l'enregistrement (dBFS, ~-50..0) — alimente
+  /// la waveform vivante du composer. Erreurs propagées à l'abonné.
+  Stream<Amplitude> onAmplitudeChanged(Duration interval) =>
+      _recorder.onAmplitudeChanged(interval);
+
   /// Démarre l'enregistrement ; retourne false si le micro est refusé.
   Future<bool> start() async {
     try {

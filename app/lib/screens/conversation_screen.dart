@@ -13,6 +13,7 @@ import '../drafts.dart';
 import '../message_notifier.dart';
 import '../models.dart';
 import '../theme.dart';
+import '../ui/ui.dart';
 import 'notif_defaults_screen.dart';
 
 /// Conversation temps réel : tous les types de messages, réactions,
@@ -58,10 +59,13 @@ class _ConversationScreenState extends State<ConversationScreen>
   Timer? _typingClear;
   Timer? _typingThrottle;
 
-  // Enregistrement vocal simulé
+  // Enregistrement vocal (waveform = amplitudes réelles du micro)
   bool _recording = false;
   int _recSec = 0;
   Timer? _recTimer;
+  StreamSubscription<dynamic>? _ampSub;
+  final List<double> _amp = List.filled(34, 0.0);
+  double _liveAmp = 0;
 
   // Lecture vocale simulée
   final Map<String, _VoicePlayer> _players = {};
@@ -173,6 +177,7 @@ class _ConversationScreenState extends State<ConversationScreen>
     MessageNotifier.instance.closeChat(widget.chat.id);
     _sse?.cancel();
     _recTimer?.cancel();
+    _ampSub?.cancel();
     _typingClear?.cancel();
     _typingThrottle?.cancel();
     for (final p in _players.values) {
@@ -323,6 +328,7 @@ class _ConversationScreenState extends State<ConversationScreen>
   // ---------- Envoi / réponse / édition ----------
 
   Future<void> _send() async {
+    KiteHaptics.send();
     final text = _input.text.trim();
     if (text.isEmpty) return;
     final editing = _editing;
@@ -420,6 +426,7 @@ class _ConversationScreenState extends State<ConversationScreen>
         _toast('Micro indisponible — envoi simulé');
       }
     }
+    KiteHaptics.recordStart();
     setState(() {
       _recording = true;
       _recSec = 0;
@@ -429,10 +436,28 @@ class _ConversationScreenState extends State<ConversationScreen>
         setState(() => _recSec++);
       }
     });
+    // Waveform vivante : amplitudes réelles du micro (20 mesures/seconde,
+    // 34 barres glissantes).
+    _ampSub?.cancel();
+    _ampSub = _voiceRecorder
+        .onAmplitudeChanged(const Duration(milliseconds: 50))
+        .listen(
+      (a) {
+        if (!mounted) return;
+        final norm = ((a.current + 50) / 50).clamp(0.0, 1.0);
+        _amp
+          ..removeAt(0)
+          ..add(norm);
+        _liveAmp = norm;
+      },
+      onError: (_) {},
+    );
   }
 
   void _stopRecording() {
     _recTimer?.cancel();
+    _ampSub?.cancel();
+    _ampSub = null;
     setState(() {
       _recording = false;
     });
@@ -465,6 +490,7 @@ class _ConversationScreenState extends State<ConversationScreen>
   // ---------- Actions message ----------
 
   Future<void> _react(Message m, String emoji) async {
+    KiteHaptics.reactTick();
     try {
       await widget.api.toggleReaction(m.id, emoji);
     } catch (e) {
@@ -616,7 +642,7 @@ class _ConversationScreenState extends State<ConversationScreen>
           ),
           if (widget.chat.disappearing > 0)
             IconButton(
-              icon: const Icon(Icons.timer_outlined, color: KiteColors.accent),
+              icon: const Icon(Icons.timer_outlined, color: KiteColors.ephemeral),
               tooltip: 'Messages éphémères actifs',
               onPressed: () => _showDisappearingPicker(context),
             ),
@@ -644,9 +670,12 @@ class _ConversationScreenState extends State<ConversationScreen>
     }
     return ListView.builder(
       controller: _scroll,
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
       itemCount: visible.length,
-      itemBuilder: (context, i) => _MessageBubble(
+      itemBuilder: (context, i) => MessageEntrance(
+        child: SwipeToReply(
+          onReply: () => _startReply(visible[i]),
+          child: _MessageBubble(
         key: ValueKey(visible[i].id),
         message: visible[i],
         chat: widget.chat,
@@ -669,6 +698,8 @@ class _ConversationScreenState extends State<ConversationScreen>
         rsvpYes: _rsvpYes.contains(visible[i].id),
         rsvpMaybe: _rsvpMaybe.contains(visible[i].id),
         translation: _translations[visible[i].id],
+          ),
+        ),
       ),
     );
   }
@@ -758,41 +789,75 @@ class _ConversationScreenState extends State<ConversationScreen>
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: TextField(
-                    controller: _input,
-                    focusNode: _inputFocus,
-                    minLines: 1,
-                    maxLines: 5,
-                    onChanged: _onInputChanged,
-                    onSubmitted: (_) => _send(),
-                    style: const TextStyle(color: KiteColors.fg),
-                    decoration: InputDecoration(
-                      hintText: _editing != null
-                          ? 'Modifier le message…'
-                          : 'Message…',
-                      hintStyle: const TextStyle(color: KiteColors.muted),
-                      isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 10),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: KiteColors.surface,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: KiteColors.border),
+                    ),
+                    child: Row(
+                      children: [
+                        const SizedBox(width: 6),
+                        PressableField(
+                          child: Expanded(
+                            child: TextField(
+                              controller: _input,
+                              focusNode: _inputFocus,
+                              minLines: 1,
+                              maxLines: 5,
+                              onChanged: _onInputChanged,
+                              onSubmitted: (_) => _send(),
+                              style: const TextStyle(
+                                  color: KiteColors.fg, height: 1.45),
+                              decoration: InputDecoration(
+                                hintText: _editing != null
+                                    ? 'Modifier le message…'
+                                    : 'Message…',
+                                hintStyle: const TextStyle(
+                                    color: KiteColors.muted),
+                                isDense: true,
+                                filled: false,
+                                border: InputBorder.none,
+                                enabledBorder: InputBorder.none,
+                                focusedBorder: InputBorder.none,
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 12),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
                 const SizedBox(width: 8),
-                if (canSend)
-                  _RoundBtn(
-                    icon:
-                        _scheduleAt != null ? Icons.schedule_send : Icons.send,
-                    tooltip:
-                        _scheduleAt != null ? 'Programmer l\'envoi' : 'Envoyer',
-                    accent: true,
-                    onTap: _send,
-                  )
-                else
-                  _RoundBtn(
-                    icon: Icons.mic,
-                    tooltip: 'Enregistrer un vocal',
-                    onTap: _toggleRecording,
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 180),
+                  switchInCurve: Curves.easeOutBack,
+                  switchOutCurve: Curves.easeIn,
+                  transitionBuilder: (child, anim) => ScaleTransition(
+                    scale: anim,
+                    child: child,
                   ),
+                  child: canSend
+                      ? _RoundBtn(
+                          key: const ValueKey('send'),
+                          icon: _scheduleAt != null
+                              ? Icons.schedule_send
+                              : Icons.send,
+                          tooltip: _scheduleAt != null
+                              ? 'Programmer l\'envoi'
+                              : 'Envoyer',
+                          accent: true,
+                          onTap: _send,
+                        )
+                      : _RoundBtn(
+                          key: const ValueKey('mic'),
+                          icon: Icons.mic,
+                          tooltip: 'Enregistrer un vocal',
+                          onTap: _toggleRecording,
+                        ),
+                ),
               ],
             ),
         ],
@@ -944,16 +1009,19 @@ class _ConversationScreenState extends State<ConversationScreen>
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
               color: KiteColors.surface,
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(24),
               border: Border.all(color: KiteColors.border),
+              boxShadow: KiteColors.softShadow(),
             ),
             child: Row(
               children: [
-                Container(
-                  width: 8,
-                  height: 8,
+                // Point d'enregistrement qui respire avec l'amplitude.
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 90),
+                  width: 8 + _liveAmp * 5,
+                  height: 8 + _liveAmp * 5,
                   decoration: const BoxDecoration(
-                      color: KiteColors.danger, shape: BoxShape.circle),
+                      color: KiteColors.ephemeral, shape: BoxShape.circle),
                 ),
                 const SizedBox(width: 10),
                 Text('$mm:$ss',
@@ -962,17 +1030,15 @@ class _ConversationScreenState extends State<ConversationScreen>
                         color: KiteColors.fg)),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      for (final h in [6, 14, 22, 10, 18, 24, 12, 16])
-                        Container(
-                            width: 2.5,
-                            height: h.toDouble(),
-                            decoration: BoxDecoration(
-                                color: KiteColors.accent.withValues(alpha: 0.7),
-                                borderRadius: BorderRadius.circular(2)))
-                    ],
+                  child: CustomPaint(
+                    size: const Size(double.infinity, 28),
+                    painter: _WaveformPainter(
+                      bars: _amp,
+                      progress: 1,
+                      playedColor: KiteColors.accent,
+                      pendingColor:
+                          KiteColors.accent.withValues(alpha: 0.38),
+                    ),
                   ),
                 ),
               ],
@@ -1007,23 +1073,12 @@ class _ConversationScreenState extends State<ConversationScreen>
             mainAxisSize: MainAxisSize.min,
             children: [
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  for (final e in const ['❤️', '👍', '😂', '😮', '😢', '🙏'])
-                    InkWell(
-                      borderRadius: BorderRadius.circular(999),
-                      onTap: () {
-                        Navigator.pop(sheetCtx);
-                        _react(m, e);
-                      },
-                      child: Padding(
-                        padding: const EdgeInsets.all(10),
-                        child: Text(e, style: const TextStyle(fontSize: 26)),
-                      ),
-                    ),
-                ],
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              child: SpringReactionBar(
+                onPick: (e) {
+                  Navigator.pop(sheetCtx);
+                  _react(m, e);
+                },
               ),
             ),
             const Divider(height: 1, color: KiteColors.border),
@@ -1906,6 +1961,7 @@ class _VoicePlayer {
 
 class _RoundBtn extends StatelessWidget {
   const _RoundBtn({
+    super.key,
     required this.icon,
     required this.tooltip,
     required this.onTap,
@@ -2153,10 +2209,10 @@ class _MessageBubble extends StatelessWidget {
               decoration: BoxDecoration(
                 color: bubbleColor,
                 borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(18),
-                  topRight: const Radius.circular(18),
-                  bottomLeft: Radius.circular(mine ? 18 : 6),
-                  bottomRight: Radius.circular(mine ? 6 : 18),
+                  topLeft: const Radius.circular(20),
+                  topRight: const Radius.circular(20),
+                  bottomLeft: Radius.circular(mine ? 20 : 4),
+                  bottomRight: Radius.circular(mine ? 4 : 20),
                 ),
                 border: Border.all(
                   color: mine
@@ -2921,4 +2977,222 @@ class _EventCreateDialogState extends State<_EventCreateDialog> {
       ],
     );
   }
+}
+
+// ---------- Tactile & motion (warm-organic) ----------
+
+/// Swipe horizontal vers la droite sur une bulle → répondre.
+/// Résistance rubber-band au-delà du seuil, haptique au franchissement,
+/// retour élastique au relâchement.
+class SwipeToReply extends StatefulWidget {
+  const SwipeToReply({super.key, required this.child, required this.onReply});
+
+  final Widget child;
+  final VoidCallback onReply;
+
+  @override
+  State<SwipeToReply> createState() => _SwipeToReplyState();
+}
+
+class _SwipeToReplyState extends State<SwipeToReply>
+    with SingleTickerProviderStateMixin {
+  static const double _threshold = 56;
+
+  late final AnimationController _snap = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 260),
+  );
+  double _drag = 0;
+  bool _fired = false;
+
+  @override
+  void dispose() {
+    _snap.dispose();
+    super.dispose();
+  }
+
+  void _onUpdate(DragUpdateDetails d) {
+    setState(() {
+      _drag = (_drag + d.delta.dx).clamp(0.0, _threshold + 28);
+      // Rubber-band : résistance progressive au-delà du seuil.
+      if (_drag > _threshold) {
+        _drag = _threshold + (_drag - _threshold) * 0.35;
+      }
+      if (_drag >= _threshold && !_fired) {
+        _fired = true;
+        KiteHaptics.threshold();
+      } else if (_drag < _threshold) {
+        _fired = false;
+      }
+    });
+  }
+
+  void _onEnd(DragEndDetails d) {
+    if (_fired) {
+      widget.onReply();
+      KiteHaptics.tap();
+    }
+    _fired = false;
+    final from = _drag;
+    _snap.addListener(() {
+      if (mounted) {
+        setState(() => _drag = from * (1 - Curves.easeOutBack.transform(_snap.value)));
+      }
+    });
+    _snap.forward(from: 0).whenComplete(() {
+      if (mounted) setState(() => _drag = 0);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      alignment: Alignment.centerLeft,
+      children: [
+        Opacity(
+          opacity: (_drag / _threshold).clamp(0.0, 1.0),
+          child: const Padding(
+            padding: EdgeInsets.only(left: 14),
+            child: Icon(Icons.reply, size: 20, color: KiteColors.muted),
+          ),
+        ),
+        Transform.translate(
+          offset: Offset(_drag, 0),
+          child: GestureDetector(
+            onHorizontalDragStart: (_) {},
+            onHorizontalDragUpdate: _onUpdate,
+            onHorizontalDragEnd: _onEnd,
+            child: widget.child,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Barre de réactions flottante : les emojis apparaissent avec un rebond
+/// de ressort (cascade douce).
+class SpringReactionBar extends StatelessWidget {
+  const SpringReactionBar({super.key, required this.onPick});
+
+  final void Function(String emoji) onPick;
+
+  static const _emojis = ['❤️', '👍', '😂', '😮', '😢', '🙏'];
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: [
+        for (var i = 0; i < _emojis.length; i++)
+          _SpringEmoji(
+            emoji: _emojis[i],
+            delay: i * 40,
+            onTap: () => onPick(_emojis[i]),
+          ),
+      ],
+    );
+  }
+}
+
+class _SpringEmoji extends StatefulWidget {
+  const _SpringEmoji({
+    required this.emoji,
+    required this.delay,
+    required this.onTap,
+  });
+
+  final String emoji;
+  final int delay;
+  final VoidCallback onTap;
+
+  @override
+  State<_SpringEmoji> createState() => _SpringEmojiState();
+}
+
+class _SpringEmojiState extends State<_SpringEmoji>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 420),
+  );
+  late final Animation<double> _scale = TweenSequence<double>([
+    TweenSequenceItem(tween: Tween(begin: 0.3, end: 1.14), weight: 55),
+    TweenSequenceItem(tween: Tween(begin: 1.14, end: 1.0), weight: 45),
+  ]).animate(CurvedAnimation(parent: _c, curve: Curves.easeOutCubic));
+
+  @override
+  void initState() {
+    super.initState();
+    Future.delayed(Duration(milliseconds: widget.delay), () {
+      if (mounted) _c.forward();
+    });
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(999),
+      onTap: () {
+        KiteHaptics.reactTick();
+        widget.onTap();
+      },
+      child: Padding(
+        padding: const EdgeInsets.all(10),
+        child: ScaleTransition(
+          scale: _scale,
+          child:
+              Text(widget.emoji, style: const TextStyle(fontSize: 26)),
+        ),
+      ),
+    );
+  }
+}
+
+/// Waveform organique : barres arrondies à hauteur d'amplitude, portion
+/// jouée en pleine couleur, à venir en atténué.
+class _WaveformPainter extends CustomPainter {
+  _WaveformPainter({
+    required this.bars,
+    required this.progress,
+    required this.playedColor,
+    required this.pendingColor,
+  });
+
+  final List<double> bars;
+  final double progress;
+  final Color playedColor;
+  final Color pendingColor;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (bars.isEmpty) return;
+    const gap = 2.0;
+    final barW = size.width / bars.length - gap;
+    final mid = size.height / 2;
+    final playedUpTo = size.width * progress.clamp(0.0, 1.0);
+    final paint = Paint()..strokeCap = StrokeCap.round;
+    for (var i = 0; i < bars.length; i++) {
+      final x = i * (barW + gap) + barW / 2;
+      final h = (6.0 + bars[i] * (size.height - 6))
+          .clamp(4.0, size.height)
+          .toDouble();
+      paint.color =
+          x <= playedUpTo ? playedColor : pendingColor;
+      paint.strokeWidth = barW.clamp(1.5, 4.0);
+      canvas.drawLine(Offset(x, mid - h / 2), Offset(x, mid + h / 2), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_WaveformPainter old) =>
+      old.progress != progress ||
+      old.bars != bars ||
+      old.playedColor != playedColor;
 }
