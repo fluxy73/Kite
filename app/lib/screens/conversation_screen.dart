@@ -96,6 +96,9 @@ class _ConversationScreenState extends State<ConversationScreen>
 
   void _onInputChanged(String text) {
     DraftStore.instance.save(widget.chat.id, text);
+    // Rebuild : sans lui, le morph micro↔envoi reste sur l'ancien état
+    // (l'utilisateur tape puis déclenche un enregistrement au lieu d'envoyer).
+    if (mounted) setState(() {});
     // Indicateur de saisie : au plus 1 signal toutes les 3 s.
     if (text.trim().isNotEmpty &&
         (_typingThrottle == null || !_typingThrottle!.isActive)) {

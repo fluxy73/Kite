@@ -1162,6 +1162,11 @@ func (s *Store) editMessage(msgID, userID, text string) (*Message, bool) {
 		if m.SenderID != userID {
 			return nil, false
 		}
+		// Seuls les messages textuels sont éditables (le client n'offre
+		// l'édition que pour type="text").
+		if m.Type != "text" {
+			return nil, false
+		}
 		m.Text = text
 		m.Edited = true
 		_ = s.save()
@@ -1210,6 +1215,14 @@ func (s *Store) votePoll(msgID, userID string, optionIndex int) (*Message, bool)
 		if !inSliceAny(voters, userID) {
 			voters = append(voters, userID)
 			m.Media["voters"] = voters
+			// Comptage réel du vote : le client affiche `votes` comme tally.
+			if votes, ok := m.Media["votes"].([]any); ok && optionIndex < len(votes) {
+				if n, ok := votes[optionIndex].(float64); ok {
+					votes[optionIndex] = n + 1
+				} else if n, ok := votes[optionIndex].(int); ok {
+					votes[optionIndex] = n + 1
+				}
+			}
 			_ = s.save()
 		}
 		return m, true
