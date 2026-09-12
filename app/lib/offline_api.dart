@@ -141,6 +141,12 @@ class OfflineApi implements KiteApi {
   Future<Chat> createChat(String type, String name, List<String> memberIds) =>
       Future.value(_s.createChat(type, name, [meId, ...memberIds]));
 
+  @override
+  Future<User> upsertUser(User u) async {
+    _s.upsertUser(u);
+    return u;
+  }
+
   // ---------- Actions sur messages ----------
 
   @override

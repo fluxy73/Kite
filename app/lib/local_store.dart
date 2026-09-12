@@ -832,6 +832,30 @@ class LocalStore {
     return true;
   }
 
+  /// Ajoute ou actualise un utilisateur connu (jumelage de pairs : un
+  /// contact découvert sur le réseau devient un contact de l'app).
+  void upsertUser(User u) {
+    final i = users.indexWhere((x) => x.id == u.id);
+    if (i >= 0) {
+      users[i] = u;
+    } else {
+      users.add(u);
+    }
+    _persist();
+  }
+
+  /// DM existante avec [userId], s'il y en a une.
+  Chat? findDmWith(String userId, String meId) {
+    for (final c in chats) {
+      if (c.type == 'dm' &&
+          c.memberIds.contains(userId) &&
+          c.memberIds.contains(meId)) {
+        return c;
+      }
+    }
+    return null;
+  }
+
   Chat createChat(String type, String name, List<String> memberIds) {
     final c = Chat(
       id: 'c-${DateTime.now().microsecondsSinceEpoch}',

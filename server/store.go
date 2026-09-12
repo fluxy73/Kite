@@ -547,6 +547,26 @@ func (s *Store) addUser(name string) User {
 	return u
 }
 
+// upsertUser enregistre un contact issu du jumelage de pairs : le pair
+// est ajouté s'il est inconnu, actualisé sinon (id = source de vérité).
+func (s *Store) upsertUser(u User) User {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i := range s.state.Users {
+		if s.state.Users[i].ID == u.ID {
+			if u.Name != "" {
+				s.state.Users[i].Name = u.Name
+			}
+			s.state.Users[i].Phone = u.Phone
+			_ = s.save()
+			return s.state.Users[i]
+		}
+	}
+	s.state.Users = append(s.state.Users, u)
+	_ = s.save()
+	return u
+}
+
 func (s *Store) createCall(chatID, callerID, callerName, kind string) CallRecord {
 	c := CallRecord{
 		ID:         newID("call"),

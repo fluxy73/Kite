@@ -71,8 +71,20 @@ func (a *api) handleUsers(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPost:
 		var body struct {
 			Name string `json:"name"`
+			User string `json:"user"` // jumelage de pairs : id+name imposés
 		}
-		if err := readJSON(r, &body); err != nil || strings.TrimSpace(body.Name) == "" {
+		if err := readJSON(r, &body); err != nil {
+			httpError(w, 400, "corps invalide")
+			return
+		}
+		// Corps {user, name} : upsert du pair jumelé (id préservé).
+		// Corps {name} seul : création d'un utilisateur (comportement initial).
+		if strings.TrimSpace(body.User) != "" && strings.TrimSpace(body.Name) != "" {
+			u := a.store.upsertUser(User{ID: strings.TrimSpace(body.User), Name: strings.TrimSpace(body.Name)})
+			wJSON(w, 200, u)
+			return
+		}
+		if strings.TrimSpace(body.Name) == "" {
 			httpError(w, 400, "name requis")
 			return
 		}

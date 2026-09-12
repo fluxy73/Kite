@@ -6,17 +6,20 @@ import 'package:qr_flutter/qr_flutter.dart';
 
 import '../api.dart';
 import '../models.dart';
+import '../pairing_discovery.dart';
 import '../theme.dart';
 import '../ui/ui.dart';
 
 /// Feuille de jumelage & découverte de pairs :
 /// - « Mon code » : QR d'identité (partageable) ;
-/// - « Scanner » : caméra (repli saisie manuelle sans caméra) ;
-/// - « À proximité » : radar à pairs avec anneaux pulsés.
+/// - « Scanner » : saisie du code de l'autre (caméra optique à brancher au
+///   transport P2P — la saisie fonctionne partout, sans plugin natif) ;
+/// - « À proximité » : radar alimenté par la découverte UDP réelle
+///   ([PairingDiscovery], même réseau local, sans serveur).
 ///
-/// Honnête hors-ligne : sans serveur, le radar détecte les pairs déjà
-/// connus de l'app (découverte réseau réelle à venir). La saisie de code
-/// fonctionne toujours.
+/// Résolution d'un code → contact enregistré ([KiteApi.upsertUser]) →
+/// ouverture de la DM. Le transport des messages reste celui de l'app
+/// (hors-ligne simulé ou serveur Go) — le jumelage crée le contact.
 class PairingSheet extends StatefulWidget {
   const PairingSheet({super.key, required this.api, required this.users});
 
@@ -48,31 +51,56 @@ class _PairingSheetState extends State<PairingSheet>
   final TextEditingController _manual = TextEditingController();
   String? _manualError;
 
+  // Découverte réseau réelle (UDP, même réseau local, sans serveur).
+  StreamSubscription<List<User>>? _peerSub;
+  bool _netAvailable = false;
+  List<User> _discovered = const [];
+
   @override
   void initState() {
     super.initState();
     // Code d'identité court : id sans préfixe + checksum 2 caractères.
-    final raw = widget.api.meId.replaceAll(RegExp(r'^u-'), '');
-    final sum = raw.codeUnits.fold<int>(0, (a, c) => a + c) % 97;
-    _myCode = '$raw-${sum.toString().padLeft(2, '0')}';
+    _myCode = PairingDiscovery.shortCode(widget.api.meId);
     _tabs.addListener(() {
       if (mounted) setState(() {});
+    });
+    _startDiscovery();
+  }
+
+  Future<void> _startDiscovery() async {
+    final users = widget.users;
+    final me = users.where((u) => u.id == widget.api.meId).firstOrNull;
+    final ok = await PairingDiscovery.instance.start(
+      meId: widget.api.meId,
+      meName: me?.name ?? widget.api.meId,
+    );
+    if (!mounted) {
+      if (ok) PairingDiscovery.instance.stop();
+      return;
+    }
+    setState(() {
+      _netAvailable = ok;
+      _discovered = PairingDiscovery.instance.currentPeers;
+    });
+    if (!ok) return;
+    _peerSub = PairingDiscovery.instance.peers.listen((peers) {
+      if (mounted) setState(() => _discovered = peers);
     });
   }
 
   @override
   void dispose() {
+    _peerSub?.cancel();
+    // On quitte la feuille = on quitte le réseau de rencontre.
+    PairingDiscovery.instance.stop();
     _tabs.dispose();
     _manual.dispose();
     super.dispose();
   }
 
   User? _byCode(String code) {
-    final norm = code.trim().toLowerCase();
-    for (final u in widget.users) {
-      if (u.id == norm || u.id.endsWith(norm)) return u;
-    }
-    return null;
+    // D'abord les pairs vus sur le réseau, puis les contacts connus.
+    return PairingDiscovery.instance.resolveCode(code, widget.users);
   }
 
   void _openPeer(User? u) {
@@ -135,6 +163,8 @@ class _PairingSheetState extends State<PairingSheet>
                 PeerRadarTab(
                   api: widget.api,
                   users: widget.users,
+                  discovered: _discovered,
+                  netAvailable: _netAvailable,
                   onPick: _openPeer,
                 ),
               ],
@@ -209,9 +239,8 @@ class _PairingSheetState extends State<PairingSheet>
       padding: const EdgeInsets.all(24),
       child: Column(
         children: [
-          // Zone de scan : cadre caméra simulé (capture optique réelle à
-          // brancher au transport P2P) ; la saisie de code fonctionne
-          // partout, même sans caméra.
+          // Capture optique = plugin natif (risque type v0.1.8) : dégradation
+          // assumée, la saisie de code fait le même travail sans natif.
           Container(
             height: 190,
             decoration: BoxDecoration(
@@ -226,11 +255,15 @@ class _PairingSheetState extends State<PairingSheet>
                   Icon(Icons.qr_code_scanner,
                       size: 44, color: KiteColors.muted.withValues(alpha: 0.6)),
                   const SizedBox(height: 10),
-                  const Text('Caméra indisponible ici',
+                  const Text('Saisie par code — la caméra optique arrive '
+                      'avec le transport P2P',
+                      textAlign: TextAlign.center,
                       style: TextStyle(
-                          color: KiteColors.muted, fontSize: 12.5)),
+                          color: KiteColors.muted,
+                          fontSize: 12.5,
+                          height: 1.4)),
                   const SizedBox(height: 4),
-                  const Text('Saisissez le code de votre contact :',
+                  const Text('Demandez le code affiché sur l\'autre téléphone :',
                       style: TextStyle(
                           color: Color(0xFF8A8F98),
                           fontSize: 11.5)),
@@ -276,18 +309,27 @@ class _PairingSheetState extends State<PairingSheet>
   }
 }
 
-/// Radar de pairs : anneaux pulsés (spring) + liste des pairs connus
-/// apparaissant en cascade — prêt à recevoir la découverte réseau réelle.
+/// Radar de pairs : anneaux pulsés + pairs réellement découverts sur le
+/// réseau local ([PairingDiscovery], UDP). Sans réseau : liste vide et
+/// état explicite — pas de données de démo.
 class PeerRadarTab extends StatefulWidget {
   const PeerRadarTab({
     super.key,
     required this.api,
     required this.users,
+    required this.discovered,
+    required this.netAvailable,
     required this.onPick,
   });
 
   final KiteApi api;
+
+  /// Utilisateurs connus de l'app (contacts/seed) — pour enrichir le nom.
   final List<User> users;
+
+  /// Pairs vus sur le réseau local (découverte UDP réelle).
+  final List<User> discovered;
+  final bool netAvailable;
   final void Function(User?) onPick;
 
   @override
@@ -303,14 +345,41 @@ class _PeerRadarTabState extends State<PeerRadarTab>
 
   final Set<String> _revealed = {};
 
+  /// Pairs réseau enrichis des noms connus ; fallback : contacts connus
+  /// (utile en mode serveur où la découverte UDP n'est pas le chemin
+  /// principal). Vide si aucun réseau et aucun contact.
+  List<User> get _peers {
+    final byId = {for (final u in widget.users) u.id: u};
+    final merged = <String, User>{};
+    for (final u in widget.discovered) {
+      merged[u.id] = byId[u.id] ?? u;
+    }
+    if (merged.isEmpty && widget.netAvailable == false) {
+      for (final u in widget.users) {
+        if (u.id != widget.api.meId) merged[u.id] = u;
+      }
+    }
+    return merged.values.toList();
+  }
+
   @override
   void initState() {
     super.initState();
-    // Les pairs « apparaissent » progressivement (découverte simulée).
-    for (var i = 0; i < widget.users.length; i++) {
+    // Révélation en cascade au fur et à mesure des découvertes.
+    for (var i = 0; i < widget.discovered.length; i++) {
       Future.delayed(Duration(milliseconds: 500 + i * 550), () {
-        if (mounted) setState(() => _revealed.add(widget.users[i].id));
+        if (mounted) setState(() => _revealed.add(widget.discovered[i].id));
       });
+    }
+  }
+
+  @override
+  void didUpdateWidget(PeerRadarTab old) {
+    super.didUpdateWidget(old);
+    for (final u in widget.discovered) {
+      if (!_revealed.contains(u.id)) {
+        _revealed.add(u.id); // apparition immédiate (déjà ancrée visuellement)
+      }
     }
   }
 
@@ -322,8 +391,7 @@ class _PeerRadarTabState extends State<PeerRadarTab>
 
   @override
   Widget build(BuildContext context) {
-    final peers =
-        widget.users.where((u) => u.id != widget.api.meId).toList();
+    final peers = _peers;
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -337,7 +405,7 @@ class _PeerRadarTabState extends State<PeerRadarTab>
                 return CustomPaint(
                   painter: _RadarPainter(
                     t: _pulse.value,
-                    count: _revealed.length,
+                    count: peers.length,
                     accent: KiteColors.accent,
                     border: KiteColors.border,
                     sage: KiteColors.sage,
@@ -348,16 +416,16 @@ class _PeerRadarTabState extends State<PeerRadarTab>
           ),
           const SizedBox(height: 8),
           Text(
-            peers.isEmpty
-                ? 'Recherche de personnes à proximité…'
-                : '${_revealed.length} personne(s) détectée(s) autour de vous',
+            !widget.netAvailable
+                ? 'Réseau local indisponible — contacts connus affichés'
+                : peers.isEmpty
+                    ? 'Recherche de personnes à proximité sur ce réseau…'
+                    : '${peers.length} personne(s) détectée(s) sur ce réseau',
+            textAlign: TextAlign.center,
             style: const TextStyle(color: KiteColors.muted, fontSize: 12.5),
           ),
           const SizedBox(height: 14),
-          for (final u in peers)
-            _revealed.contains(u.id)
-                ? _PeerTile(user: u, onPick: widget.onPick)
-                : const SizedBox(height: 0),
+          for (final u in peers) _PeerTile(user: u, onPick: widget.onPick),
         ],
       ),
     );
