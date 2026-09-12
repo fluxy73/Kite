@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:kite/screens/conversation_screen.dart';
 import 'package:kite/ui/entrance.dart';
+import 'package:kite/ui/swipe_to_reply.dart';
 
 /// Régressions des trois défauts du passage warm-organic :
 /// 1. l'entrée de message ne se rejoue pas au scroll-back (état « joué »

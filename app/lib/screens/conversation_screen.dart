@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import '../api.dart';
 import '../translation.dart';
 import '../voice.dart';
-import 'package:just_audio/just_audio.dart';
 import '../chat_lock.dart';
 import 'chat_extras.dart';
 import '../drafts.dart';
@@ -14,7 +13,9 @@ import '../message_notifier.dart';
 import '../models.dart';
 import '../theme.dart';
 import '../ui/ui.dart';
+import '../voice_player.dart';
 import 'notif_defaults_screen.dart';
+import 'voice_review_sheet.dart';
 
 /// Conversation temps réel : tous les types de messages, réactions,
 /// réponse, édition, suppression, pièces jointes (workflows simulés).
@@ -50,6 +51,7 @@ class _ConversationScreenState extends State<ConversationScreen>
   late final TranslationService _translator =
       widget.translator ?? TranslationService();
   final VoiceRecorder _voiceRecorder = VoiceRecorder();
+  late final VoiceRecording _recording = VoiceRecording(_voiceRecorder);
   bool _micAvailable = true; // micro indisponible (desktop) -> envoi simulé
   final Map<String, String> _translations = {}; // messageId -> texte traduit
   StreamSubscription<ServerEvent>? _sse;
@@ -59,16 +61,8 @@ class _ConversationScreenState extends State<ConversationScreen>
   Timer? _typingClear;
   Timer? _typingThrottle;
 
-  // Enregistrement vocal (waveform = amplitudes réelles du micro)
-  bool _recording = false;
-  int _recSec = 0;
-  Timer? _recTimer;
-  StreamSubscription<dynamic>? _ampSub;
-  final List<double> _amp = List.filled(34, 0.0);
-  double _liveAmp = 0;
-
-  // Lecture vocale simulée
-  final Map<String, _VoicePlayer> _players = {};
+  // Lecture vocale (fichier réel, repli timeline simulée)
+  final Map<String, VoicePlayer> _players = {};
 
   /// Ids de messages dont l'animation d'entrée a déjà été jouée — survit
   /// au recyclage des enfants de ListView.builder (pas de re-jeu au
@@ -181,8 +175,7 @@ class _ConversationScreenState extends State<ConversationScreen>
     DraftStore.instance.flushIfNeeded(); // brouillon écrit sur disque
     MessageNotifier.instance.closeChat(widget.chat.id);
     _sse?.cancel();
-    _recTimer?.cancel();
-    _ampSub?.cancel();
+    _recording.dispose();
     _typingClear?.cancel();
     _typingThrottle?.cancel();
     for (final p in _players.values) {
@@ -421,7 +414,7 @@ class _ConversationScreenState extends State<ConversationScreen>
   // ---------- Vocal (enregistrement simulé) ----------
 
   Future<void> _toggleRecording() async {
-    if (_recording) {
+    if (_recording.active.value) {
       _stopRecording();
       return;
     }
@@ -432,45 +425,16 @@ class _ConversationScreenState extends State<ConversationScreen>
       }
     }
     KiteHaptics.recordStart();
-    setState(() {
-      _recording = true;
-      _recSec = 0;
-    });
-    _recTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) {
-        setState(() => _recSec++);
-      }
-    });
-    // Waveform vivante : amplitudes réelles du micro (20 mesures/seconde,
-    // 34 barres glissantes).
-    _ampSub?.cancel();
-    _ampSub = _voiceRecorder
-        .onAmplitudeChanged(const Duration(milliseconds: 50))
-        .listen(
-      (a) {
-        if (!mounted) return;
-        final norm = ((a.current + 50) / 50).clamp(0.0, 1.0);
-        _amp
-          ..removeAt(0)
-          ..add(norm);
-        _liveAmp = norm;
-      },
-      onError: (_) {},
-    );
+    setState(_recording.start);
   }
 
   void _stopRecording() {
-    _recTimer?.cancel();
-    _ampSub?.cancel();
-    _ampSub = null;
-    setState(() {
-      _recording = false;
-    });
+    setState(_recording.stop);
   }
 
   Future<void> _sendVoice() async {
-    final dur = _recSec;
-    final bars = List.of(_amp);
+    final dur = _recording.seconds.value;
+    final bars = _recording.snapshotBars();
     _stopRecording();
     String? path;
     if (_micAvailable) {
@@ -511,18 +475,14 @@ class _ConversationScreenState extends State<ConversationScreen>
     required List<double> bars,
     required int durationSec,
   }) async {
-    final player = _VoicePlayer();
+    final player = VoicePlayer();
     player.play(durationSec: durationSec, path: path);
-    final ok = await showModalBottomSheet<bool>(
-      context: context,
-      backgroundColor: KiteColors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (sheetCtx) => SafeArea(
-        child: _VoiceReviewSheet(player: player, bars: bars, durationSec: durationSec),
-      ),
-    ).then((v) => v ?? false);
+    final ok = await showVoiceReviewSheet(
+      context,
+      player: player,
+      bars: bars,
+      durationSec: durationSec,
+    );
     await player.hardStop();
     player.dispose();
     return ok;
@@ -757,7 +717,7 @@ class _ConversationScreenState extends State<ConversationScreen>
   }
 
   void _toggleVoice(Message m) {
-    final p = _players.putIfAbsent(m.id, () => _VoicePlayer());
+    final p = _players.putIfAbsent(m.id, () => VoicePlayer());
     setState(() {
       if (p.playing.value) {
         p.pause();
@@ -804,7 +764,8 @@ class _ConversationScreenState extends State<ConversationScreen>
   // ---------- Composer ----------
 
   Widget _composerZone() {
-    final canSend = _input.text.trim().isNotEmpty || _recording;
+    final canSend =
+        _input.text.trim().isNotEmpty || _recording.active.value;
     return Container(
       decoration:  BoxDecoration(
         border: Border(top: BorderSide(color: KiteColors.border)),
@@ -829,12 +790,12 @@ class _ConversationScreenState extends State<ConversationScreen>
           if (_scheduleAt != null) _scheduleBar(),
           if (_replyTo != null) _replyBar(_replyTo!),
           if (_editing != null) _editBar(_editing!),
-          if (_recording)
+          if (_recording.active.value)
             _SpringReveal(child: _recordingBar())
           else
             Row(
               children: [
-                _RoundBtn(
+                KiteRoundBtn(
                   icon: Icons.add,
                   tooltip: 'Pièces jointes',
                   onTap: () => _showAttachments(context),
@@ -885,12 +846,12 @@ class _ConversationScreenState extends State<ConversationScreen>
                 const SizedBox(width: 8),
                 _SpringMorph(
                   showSecond: canSend,
-                  first: _RoundBtn(
+                  first: KiteRoundBtn(
                     icon: Icons.mic,
                     tooltip: 'Enregistrer un vocal',
                     onTap: _toggleRecording,
                   ),
-                  second: _RoundBtn(
+                  second: KiteRoundBtn(
                     icon: _scheduleAt != null
                         ? Icons.schedule_send
                         : Icons.send,
@@ -1037,11 +998,30 @@ class _ConversationScreenState extends State<ConversationScreen>
   }
 
   Widget _recordingBar() {
-    final mm = (_recSec ~/ 60).toString().padLeft(2, '0');
-    final ss = (_recSec % 60).toString().padLeft(2, '0');
+    return ValueListenableBuilder<List<double>>(
+      valueListenable: _recording.bars,
+      builder: (context, bars, _) {
+        return ValueListenableBuilder<int>(
+          valueListenable: _recording.seconds,
+          builder: (context, sec, _) {
+            return ValueListenableBuilder<double>(
+              valueListenable: _recording.liveAmp,
+              builder: (context, amp, _) {
+                return _recordingBarInner(bars, sec, amp);
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _recordingBarInner(List<double> bars, int recSec, double liveAmp) {
+    final mm = (recSec ~/ 60).toString().padLeft(2, '0');
+    final ss = (recSec % 60).toString().padLeft(2, '0');
     return Row(
       children: [
-        _RoundBtn(
+        KiteRoundBtn(
             icon: Icons.delete_outline,
             tooltip: 'Annuler',
             onTap: _stopRecording),
@@ -1060,8 +1040,8 @@ class _ConversationScreenState extends State<ConversationScreen>
                 // Point d'enregistrement qui respire avec l'amplitude.
                 AnimatedContainer(
                   duration: const Duration(milliseconds: 90),
-                  width: 8 + _liveAmp * 5,
-                  height: 8 + _liveAmp * 5,
+                  width: 8 + liveAmp * 5,
+                  height: 8 + liveAmp * 5,
                   decoration:  BoxDecoration(
                       color: KiteColors.ephemeral, shape: BoxShape.circle),
                 ),
@@ -1074,8 +1054,8 @@ class _ConversationScreenState extends State<ConversationScreen>
                 Expanded(
                   child: CustomPaint(
                     size: const Size(double.infinity, 28),
-                    painter: _WaveformPainter(
-                      bars: _amp,
+                    painter: KiteWaveformPainter(
+                      bars: bars,
                       progress: 1,
                       playedColor: KiteColors.accent,
                       pendingColor:
@@ -1088,7 +1068,7 @@ class _ConversationScreenState extends State<ConversationScreen>
           ),
         ),
         const SizedBox(width: 8),
-        _RoundBtn(
+        KiteRoundBtn(
             icon: Icons.send,
             tooltip: 'Envoyer le vocal',
             accent: true,
@@ -1916,172 +1896,6 @@ class _ConversationScreenState extends State<ConversationScreen>
 // ═══════════════════════ Widgets de support ═══════════════════════
 
 /// Lecteur vocal : lecture réelle du fichier (.m4a via just_audio) quand un
-/// chemin existe (enregistrement réel), sinon timeline simulée (vocals des
-/// données de seed). Position exposée pour la barre de progression.
-class _VoicePlayer {
-  final ValueNotifier<double> progress = ValueNotifier(0);
-  final ValueNotifier<bool> playing = ValueNotifier(false);
-  Timer? _t;
-  int _total = 0;
-  int _elapsed = 0;
-  final AudioPlayer _audio = AudioPlayer();
-  StreamSubscription<Duration>? _posSub;
-  String? _loadedPath;
-
-  bool get isPlaying => playing.value;
-
-  void play({required int durationSec, String? path}) {
-    _total = durationSec;
-    if (path != null && path.isNotEmpty && File(path).existsSync()) {
-      _playFile(path);
-      return;
-    }
-    // Fallback : timeline simulée (seed / vocal sans fichier).
-    _elapsed = 0;
-    playing.value = true;
-    progress.value = 0;
-    _t?.cancel();
-    _t = Timer.periodic(const Duration(milliseconds: 200), (_) {
-      _elapsed++;
-      if (_elapsed >= _total * 5) {
-        pause();
-        return;
-      }
-      progress.value = _elapsed / (_total * 5);
-    });
-  }
-
-  Future<void> _playFile(String path) async {
-    try {
-      if (_loadedPath != path) {
-        await _audio.setFilePath(path);
-        _loadedPath = path;
-      }
-      _posSub?.cancel();
-      _posSub = _audio.positionStream.listen((p) {
-        final d = _audio.duration;
-        if (d != null && d.inMilliseconds > 0) {
-          progress.value = p.inMilliseconds / d.inMilliseconds;
-        }
-      });
-      _audio.playerStateStream.listen((s) {
-        playing.value = s.playing;
-        if (s.processingState == ProcessingState.completed) {
-          playing.value = false;
-          progress.value = 0;
-          _audio.seek(Duration.zero);
-          _audio.pause();
-        }
-      });
-      await _audio.play();
-    } catch (_) {
-      // Fichier illisible/effacé : repli timeline.
-      playing.value = false;
-      play(durationSec: _total);
-    }
-  }
-
-  /// Reprend la lecture là où elle en est (après pause/scrub) : fichier
-  /// réel → just_audio joue depuis la position seekée ; repli timeline
-  /// simulée uniquement si aucun fichier lisible.
-  Future<void> resume() async {
-    if (_loadedPath != null) {
-      await _audio.play();
-      return;
-    }
-    playing.value = true;
-    _t?.cancel();
-    _t = Timer.periodic(const Duration(milliseconds: 200), (_) {
-      _elapsed++;
-      if (_elapsed >= _total * 5) {
-        pause();
-        return;
-      }
-      progress.value = _elapsed / (_total * 5);
-    });
-  }
-
-  void pause() {
-    _t?.cancel();
-    if (_loadedPath != null) {
-      _audio.pause();
-    } else {
-      playing.value = false;
-    }
-  }
-
-  Future<void> setSpeed(double s) => _audio.setSpeed(s);
-
-  /// Positionne la lecture à [fraction] (0..1) de la durée totale —
-  /// scrubbing sur la waveform (fichier réel) ou timeline simulée.
-  Future<void> seekTo(double fraction) async {
-    final f = fraction.clamp(0.0, 1.0);
-    if (_loadedPath != null) {
-      final d = _audio.duration;
-      if (d != null) {
-        await _audio.seek(d * f);
-      }
-    } else {
-      _elapsed = (f * _total * 5).round();
-      progress.value = f;
-    }
-  }
-
-  /// Stoppe tout (utilisé à la fermeture de la pré-écoute).
-  Future<void> hardStop() async {
-    _t?.cancel();
-    _posSub?.cancel();
-    try {
-      await _audio.stop();
-    } catch (_) {}
-    playing.value = false;
-  }
-
-  void dispose() {
-    _t?.cancel();
-    _posSub?.cancel();
-    _audio.dispose();
-    progress.dispose();
-    playing.dispose();
-  }
-}
-
-class _RoundBtn extends StatelessWidget {
-  const _RoundBtn({
-    required this.icon,
-    required this.tooltip,
-    required this.onTap,
-    this.accent = false,
-  });
-
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback onTap;
-  final bool accent;
-
-  @override
-  Widget build(BuildContext context) {
-    // Pressage = ressort (scale-down, retour calme) — la même physique que
-    // le reste du design system.
-    return SpringScale(
-      onTap: onTap,
-      child: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: accent ? KiteColors.accent : Colors.transparent,
-          shape: BoxShape.circle,
-        ),
-        child: Icon(
-          icon,
-          size: 21,
-          color: accent ? KiteColors.accentInk : KiteColors.muted,
-        ),
-      ),
-    );
-  }
-}
-
 /// Bascule micro ↔ envoi : crossfade + échelle pilotés par le ressort
 /// commun (pas de durée fixe). Les deux enfants restent dans l'arbre ;
 /// seul le côté actif est touchable (dès le flip d'état, pas à mi-chemin).
@@ -3250,113 +3064,6 @@ class _EventCreateDialogState extends State<_EventCreateDialog> {
   }
 }
 
-// ---------- Tactile & motion (warm-organic) ----------
-
-/// Swipe horizontal vers la droite sur une bulle → répondre.
-/// Résistance rubber-band au-delà du seuil, haptique au franchissement,
-/// retour élastique au relâchement.
-class SwipeToReply extends StatefulWidget {
-  const SwipeToReply({super.key, required this.child, required this.onReply});
-
-  final Widget child;
-  final VoidCallback onReply;
-
-  @override
-  State<SwipeToReply> createState() => _SwipeToReplyState();
-}
-
-class _SwipeToReplyState extends State<SwipeToReply>
-    with SingleTickerProviderStateMixin {
-  static const double _threshold = 56;
-
-  // Retour élastique piloté par ressort (durée = settle de la simulation).
-  late final AnimationController _snap = AnimationController(vsync: this);
-  double _drag = 0;
-  bool _fired = false;
-
-  @override
-  void dispose() {
-    _snap.dispose();
-    super.dispose();
-  }
-
-  void _onUpdate(DragUpdateDetails d) {
-    setState(() {
-      _drag = (_drag + d.delta.dx).clamp(0.0, _threshold + 28);
-      // Rubber-band : résistance progressive au-delà du seuil.
-      if (_drag > _threshold) {
-        _drag = _threshold + (_drag - _threshold) * 0.35;
-      }
-      if (_drag >= _threshold && !_fired) {
-        _fired = true;
-        KiteHaptics.threshold();
-      } else if (_drag < _threshold) {
-        _fired = false;
-      }
-    });
-  }
-
-  void _onEnd(DragEndDetails d) {
-    if (_fired) {
-      widget.onReply();
-      KiteHaptics.tap();
-    }
-    _fired = false;
-    final from = _drag;
-    void snapTick() {
-      if (!mounted) {
-        _snap.removeListener(snapTick);
-        return;
-      }
-      // Simulation physique : le ressort relâché à [from] redescend vers
-      // 0 ; on n'écrase pas la vitesse interne du contrôleur.
-      setState(() {
-        _drag = from * (1 - _snap.value);
-      });
-    }
-
-    // Exactement un listener par retour élastique, retiré à la fin —
-    // l'accumulation ferait courir N closures par frame après N swipes.
-    _snap.addListener(snapTick);
-    animateWithSpring(
-      _snap,
-      from: 0,
-      to: 1,
-      spring: kKiteSpringSoft,
-    ).whenComplete(() {
-      _snap.removeListener(snapTick);
-      if (mounted) {
-        setState(() => _drag = 0);
-      }
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      alignment: Alignment.centerLeft,
-      children: [
-        Opacity(
-          opacity: (_drag / _threshold).clamp(0.0, 1.0),
-          child:  Padding(
-            padding: const EdgeInsets.only(left: 14),
-            child: Icon(Icons.reply, size: 20, color: KiteColors.muted),
-          ),
-        ),
-        Transform.translate(
-          offset: Offset(_drag, 0),
-          child: GestureDetector(
-            onHorizontalDragStart: (_) {},
-            onHorizontalDragUpdate: _onUpdate,
-            onHorizontalDragEnd: _onEnd,
-            child: widget.child,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 /// Barre de réactions flottante : les emojis apparaissent avec un rebond
 /// de ressort (cascade douce).
 class SpringReactionBar extends StatelessWidget {
@@ -3431,232 +3138,8 @@ class _SpringEmojiState extends State<_SpringEmoji>
         padding: const EdgeInsets.all(10),
         child: ScaleTransition(
           scale: _scale,
-          child:
-              Text(widget.emoji, style: const TextStyle(fontSize: 26)),
+          child: Text(widget.emoji, style: const TextStyle(fontSize: 26)),
         ),
-      ),
-    );
-  }
-}
-
-/// Waveform organique : barres arrondies à hauteur d'amplitude, portion
-/// jouée en pleine couleur, à venir en atténué.
-class _WaveformPainter extends CustomPainter {
-  _WaveformPainter({
-    required this.bars,
-    required this.progress,
-    required this.playedColor,
-    required this.pendingColor,
-  });
-
-  final List<double> bars;
-  final double progress;
-  final Color playedColor;
-  final Color pendingColor;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (bars.isEmpty) return;
-    const gap = 2.0;
-    final barW = size.width / bars.length - gap;
-    final mid = size.height / 2;
-    final playedUpTo = size.width * progress.clamp(0.0, 1.0);
-    final paint = Paint()..strokeCap = StrokeCap.round;
-    for (var i = 0; i < bars.length; i++) {
-      final x = i * (barW + gap) + barW / 2;
-      final h = (6.0 + bars[i] * (size.height - 6))
-          .clamp(4.0, size.height)
-          .toDouble();
-      paint.color =
-          x <= playedUpTo ? playedColor : pendingColor;
-      paint.strokeWidth = barW.clamp(1.5, 4.0);
-      canvas.drawLine(Offset(x, mid - h / 2), Offset(x, mid + h / 2), paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(_WaveformPainter old) =>
-      old.progress != progress ||
-      old.bars != bars ||
-      old.playedColor != playedColor;
-}
-
-/// Pré-écoute d'un vocal avant envoi : lecture/pause, scrub sur la waveform
-/// (amplitudes captées pendant l'enregistrement), vitesse, abandon.
-class _VoiceReviewSheet extends StatefulWidget {
-  const _VoiceReviewSheet({
-    required this.player,
-    required this.bars,
-    required this.durationSec,
-  });
-
-  final _VoicePlayer player;
-  final List<double> bars;
-  final int durationSec;
-
-  @override
-  State<_VoiceReviewSheet> createState() => _VoiceReviewSheetState();
-}
-
-class _VoiceReviewSheetState extends State<_VoiceReviewSheet> {
-  double _speed = 1.0;
-  double _scrub = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    widget.player.progress.addListener(_onProgress);
-  }
-
-  void _onProgress() {
-    if (mounted) setState(() => _scrub = widget.player.progress.value);
-  }
-
-  @override
-  void dispose() {
-    widget.player.progress.removeListener(_onProgress);
-    super.dispose();
-  }
-
-  String get _time {
-    final total = widget.durationSec;
-    final pos = (total * _scrub).round();
-    final p = '${(pos ~/ 60).toString().padLeft(2, '0')}:${(pos % 60).toString().padLeft(2, '0')}';
-    final t = '${(total ~/ 60).toString().padLeft(2, '0')}:${(total % 60).toString().padLeft(2, '0')}';
-    return '$p / $t';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final player = widget.player;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 18, 16, 18),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.graphic_eq, size: 18, color: KiteColors.accent),
-              const SizedBox(width: 8),
-              const Text(
-                'Écouter avant d’envoyer',
-                style: TextStyle(fontWeight: FontWeight.w600),
-              ),
-              const Spacer(),
-              Text(_time,
-                  style:  TextStyle(
-                      color: KiteColors.muted,
-                      fontSize: 12,
-                      fontFamilyFallback: const ['monospace'])),
-            ],
-          ),
-          const SizedBox(height: 14),
-          // Waveform scrubbable (les vraies amplitudes captées).
-          GestureDetector(
-            onHorizontalDragUpdate: (d) async {
-              final box = context.findRenderObject() as RenderBox?;
-              if (box == null) return;
-              final f = (d.localPosition.dx / box.size.width).clamp(0.0, 1.0);
-              await player.seekTo(f);
-            },
-            onHorizontalDragEnd: (_) {
-              if (!player.playing.value) {
-                player.resume();
-              }
-            },
-            child: SizedBox(
-              height: 44,
-              child: CustomPaint(
-                painter: _WaveformPainter(
-                  bars: widget.bars,
-                  progress: _scrub,
-                  playedColor: KiteColors.accent,
-                  pendingColor: KiteColors.accent.withValues(alpha: 0.32),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // Pause / reprise.
-              ValueListenableBuilder<bool>(
-                valueListenable: player.playing,
-                builder: (_, playing, __) => _RoundBtn(
-                  icon: playing ? Icons.pause : Icons.play_arrow,
-                  tooltip: playing ? 'Pause' : 'Reprendre',
-                  accent: true,
-                  onTap: () {
-                    if (playing) {
-                      player.pause();
-                    } else {
-                      player.resume();
-                    }
-                  },
-                ),
-              ),
-              const SizedBox(width: 18),
-              // Vitesse cyclée 1x → 1,5x → 2x.
-              InkWell(
-                borderRadius: BorderRadius.circular(999),
-                onTap: () async {
-                  KiteHaptics.tap();
-                  final next = _speed == 1.0 ? 1.5 : (_speed == 1.5 ? 2.0 : 1.0);
-                  setState(() => _speed = next);
-                  await player.setSpeed(next);
-                },
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: KiteColors.surface2,
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: KiteColors.border),
-                  ),
-                  child: Text(
-                    '${_speed}x',
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w600, fontSize: 13),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: KiteColors.ephemeral,
-                    side: BorderSide(
-                        color: KiteColors.ephemeral.withValues(alpha: 0.5)),
-                  ),
-                  onPressed: () => Navigator.pop(context, false),
-                  icon: const Icon(Icons.delete_outline, size: 18),
-                  label: const Text('Abandonner'),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: FilledButton.icon(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: KiteColors.accent,
-                    foregroundColor: KiteColors.accentInk,
-                  ),
-                  onPressed: () {
-                    KiteHaptics.send();
-                    Navigator.pop(context, true);
-                  },
-                  icon: const Icon(Icons.send, size: 18),
-                  label: const Text('Envoyer'),
-                ),
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }
