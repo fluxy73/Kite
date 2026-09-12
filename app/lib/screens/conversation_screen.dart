@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../api.dart';
 import '../translation.dart';
@@ -815,7 +816,9 @@ class _ConversationScreenState extends State<ConversationScreen>
                       children: [
                         const SizedBox(width: 6),
                         Expanded(
-                          child: PressableField(
+                          child: Listener(
+                            onPointerDown: (_) =>
+                                HapticFeedback.selectionClick(),
                             child: TextField(
                               controller: _input,
                               focusNode: _inputFocus,

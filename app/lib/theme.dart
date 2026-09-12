@@ -110,7 +110,6 @@ class KiteColors {
   /// Police UI : Inter (humaniste, terminaisons rondes), avec repli natif
   /// par plateforme si la ressource manque.
   static const uiFont = 'Inter';
-  static const fontFallback = ['SF Pro Text', 'Segoe UI', 'Roboto'];
 }
 
 /// Construction du textTheme : couleurs Kite + hauteurs 1.4–1.5 (lisible,
