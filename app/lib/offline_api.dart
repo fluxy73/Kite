@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 
+import 'api.dart';
 import 'local_store.dart';
 import 'models.dart';
 
@@ -11,12 +12,18 @@ import 'models.dart';
 /// Les messages envoyés sont persistés localement ; un écho simulé d'un
 /// correspondant arrive après quelques secondes pour rendre la conversation
 /// vivante même hors ligne.
-class OfflineApi {
+class OfflineApi implements KiteApi {
   OfflineApi({this.meId = 'u-julien'}) {
     _init();
   }
 
+  @override
   final String meId;
+
+  /// Pas de serveur en mode hors-ligne.
+  @override
+  final String baseUrl = '';
+
   LocalStore? _store;
 
   Future<void> _init() async {
@@ -54,11 +61,14 @@ class OfflineApi {
 
   // ---------- Lecture ----------
 
+  @override
   Future<List<Chat>> fetchChats() async => _s.shellFor(meId).chats;
 
+  @override
   Future<AppShell> fetchAppShell() async => _s.shellFor(meId);
 
   /// Matching de contacts 100% local : par téléphone (normalisé) puis par nom.
+  @override
   Future<List<Map<String, dynamic>>> matchContacts(
       List<Map<String, dynamic>> contacts) async {
     String normalize(String p) {
@@ -107,11 +117,13 @@ class OfflineApi {
     return out;
   }
 
+  @override
   Future<List<Message>> fetchMessages(String chatId) async =>
       _s.messagesFor(chatId, meId);
 
   // ---------- Envoi ----------
 
+  @override
   Future<Message> sendMessage(
     String chatId, {
     String type = 'text',
@@ -125,45 +137,57 @@ class OfflineApi {
     return m;
   }
 
+  @override
   Future<Chat> createChat(String type, String name, List<String> memberIds) =>
       Future.value(_s.createChat(type, name, [meId, ...memberIds]));
 
   // ---------- Actions sur messages ----------
 
+  @override
   Future<void> toggleReaction(String messageId, String emoji) async =>
       _s.toggleReaction(messageId, meId, emoji);
 
+  @override
   Future<void> editMessage(String messageId, String text) async =>
       _s.editMessage(messageId, meId, text);
 
+  @override
   Future<void> deleteMessage(String messageId, {required String mode}) async =>
       _s.deleteMessage(messageId, meId, mode);
 
+  @override
   Future<void> votePoll(String messageId, int optionIndex) async =>
       _s.votePoll(messageId, meId, optionIndex);
 
+  @override
   Future<bool> toggleStar(String messageId) async =>
       _s.toggleStar(messageId, meId);
 
+  @override
   Future<void> setChatArchived(String chatId, {required bool archived}) async {
     _s.setArchived(chatId, meId, archived);
   }
 
+  @override
   Future<void> setChatPinned(String chatId, {required bool pinned}) async {
     _s.setPinned(chatId, meId, pinned);
   }
 
+  @override
   Future<void> deleteChat(String chatId) async =>
       _s.deleteChatFor(chatId, meId);
 
+  @override
   Future<void> setChatMuted(String chatId, {String? duration}) async {
     _s.setMute(chatId, meId, duration);
   }
 
+  @override
   Future<void> setChatNotifs(String chatId, {NotifPrefs? prefs}) async {
     _s.setNotifs(chatId, meId, prefs);
   }
 
+  @override
   Future<void> setChatDisappearing(String chatId, int ms) async {
     _s.setDisappearing(chatId, ms);
     _events.add(ServerEvent('shell', {'userId': meId}));
@@ -172,49 +196,62 @@ class OfflineApi {
   // ---------- Dossiers (façon Telegram) ----------
 
   /// Dossiers de l'utilisateur courant.
+  @override
   Future<List<ChatFolder>> fetchFolders() async => _s.folders;
 
+  @override
   Future<ChatFolder> createFolder(String name) async {
     _s.createFolder(name);
     return _s.folders.last;
   }
 
+  @override
   Future<void> renameFolder(String folderId, String name) async =>
       _s.renameFolder(folderId, name);
 
+  @override
   Future<void> deleteFolder(String folderId) async => _s.deleteFolder(folderId);
 
+  @override
   Future<void> folderMembership(String folderId, String chatId,
           {required bool add}) async =>
       _s.folderMembership(folderId, chatId, add: add);
 
+  @override
   Future<void> setChatWallpaper(String chatId, String key) async =>
       _s.setWallpaper(chatId, key);
 
+  @override
   Future<bool> isBlocked(String chatId) async => _s.blockedFor(chatId, meId);
 
+  @override
   Future<void> setBlocked(String chatId, {required bool blocked}) async =>
       _s.setBlocked(chatId, meId, value: blocked);
 
+  @override
   Future<void> reportChat(String chatId,
           {required String reason, String details = ''}) async =>
       _s.addReport(chatId, reason, details, meId);
 
+  @override
   Future<void> setNotifDefaults({NotifPrefs? prefs}) async {
     _s.setNotifDefaults(meId, prefs);
   }
 
+  @override
   Future<void> sendTyping(String chatId) async {}
   // Hors-ligne, il n'y a personne d'autre à qui signaler la saisie.
 
   // ---------- Appels ----------
 
+  @override
   Future<void> logCall(String chatId,
       {String kind = 'audio', String direction = 'outgoing'}) async {
     _s.logCall(chatId, meId, kind: kind, direction: direction);
   }
 
   /// Appel "entrant" simulé localement (l'app est autonome).
+  @override
   Future<Map<String, dynamic>> initiateCall(String chatId,
       {String kind = 'audio'}) async {
     final chat = _s.chats.where((c) => c.id == chatId).firstOrNull;
@@ -233,6 +270,7 @@ class OfflineApi {
     };
   }
 
+  @override
   Future<void> respondCall(String callId, String status) async {
     // Hors ligne, l'appel simulé se termine immédiatement (journal local).
     _s.logCall(_s.chats.isNotEmpty ? _s.chats.first.id : '', meId,
@@ -241,10 +279,12 @@ class OfflineApi {
 
   // ---------- Appels planifiés ----------
 
+  @override
   Future<List<ScheduledCall>> fetchScheduledCalls() async => _s.scheduledCalls
       .where((s) => s.userId == meId || s.memberIds.contains(meId))
       .toList();
 
+  @override
   Future<ScheduledCall> createScheduledCall({
     required String title,
     required int scheduledAt,
@@ -264,6 +304,7 @@ class OfflineApi {
     );
   }
 
+  @override
   Future<ScheduledCall> toggleScheduledReminder(String id) async {
     final updated = _s.toggleScheduledReminder(id);
     if (updated == null) {
@@ -272,15 +313,18 @@ class OfflineApi {
     return updated;
   }
 
+  @override
   Future<void> deleteScheduledCall(String id) async {
     _s.deleteScheduledCall(id);
   }
 
   // ---------- Messages programmés ----------
 
+  @override
   Future<List<ScheduledMessage>> fetchScheduledMessages() async =>
       _s.scheduledMessagesFor(meId);
 
+  @override
   Future<ScheduledMessage> scheduleMessage(
     String chatId, {
     required String text,
@@ -295,6 +339,7 @@ class OfflineApi {
         replyTo: replyTo ?? '',
       ));
 
+  @override
   Future<void> deleteScheduledMessage(String id) async =>
       _s.deleteScheduledMessage(id, meId);
 
@@ -304,7 +349,26 @@ class OfflineApi {
   /// simulés). Même forme d'événements que le serveur ({type, data}).
   /// Diffusé en broadcast : plusieurs abonnés possibles (CallCenter,
   /// ConversationScreen, MessageNotifier), `lastEventId` sans effet local.
+  @override
   Stream<ServerEvent> realtime({int lastEventId = 0}) => _events.stream;
+
+  /// Aucun WebSocket hors-ligne : même flux local.
+  @override
+  Stream<ServerEvent> wsEvents({int lastEventId = 0}) => _events.stream;
+
+  /// Aucun SSE hors-ligne : même flux local.
+  @override
+  Stream<ServerEvent> events({int lastEventId = 0}) => _events.stream;
+
+  /// Rien à sonder : il n'y a pas de serveur.
+  @override
+  Future<void> pingHealth() async {}
+
+  /// Signaling d'appel : en local, les événements d'appel passent déjà
+  /// par le flux interne (CallCenter) — rien à envoyer.
+  @override
+  Future<void> sendCallSignal(
+      String callId, String kind, Map<String, dynamic> payload) async {}
 
   // ---------- Écho simulé d'un correspondant ----------
 

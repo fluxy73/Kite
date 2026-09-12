@@ -5,6 +5,7 @@ import 'package:kite/api.dart';
 import 'package:kite/main.dart';
 import 'package:kite/models.dart';
 import 'package:kite/reminder_center.dart';
+import 'package:kite/offline_api.dart';
 import 'package:kite/screens/calls_screen.dart';
 
 void main() {
@@ -74,5 +75,14 @@ void main() {
     expect(find.text('Rappel d’appel'), findsNothing);
 
     ScheduledReminderCenter.instance.stop();
+  });
+
+
+  test('OfflineApi implémente KiteApi — fix du crash de type au démarrage hors-ligne', () {
+    // Avant le fix : OfflineApi() as dynamic -> "type 'OfflineApi' is not a
+    // subtype of type 'KiteApi?'" à l'insertion dans HomeShell.api.
+    final KiteApi api = OfflineApi();
+    expect(api, isA<OfflineApi>());
+    expect(api.baseUrl, isEmpty); // mode hors-ligne : aucun serveur
   });
 }

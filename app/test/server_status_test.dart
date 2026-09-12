@@ -88,34 +88,35 @@ void main() {
 
   test('Sonde serveur sain -> online ; serveur mort -> offline', () async {
     final okApi = KiteApi('http://testserver', httpClient: _FakeClient(true));
-    ServerStatus.instance.start(okApi);
+    ServerStatus.instance.start(okApi, serverBacked: true);
     await Future<void>.delayed(Duration.zero);
     expect(ServerStatus.instance.state.value, ServerConn.online);
     expect(ServerStatus.instance.offlineMode, isFalse);
 
     // Le serveur meurt : la prochaine sonde bascule en offline.
     final deadApi = KiteApi('http://testserver', httpClient: _FakeClient(false));
-    ServerStatus.instance.start(deadApi);
+    ServerStatus.instance.start(deadApi, serverBacked: true);
     await Future<void>.delayed(Duration.zero);
     expect(ServerStatus.instance.state.value, ServerConn.offline);
   });
 
   test('Mode hors-ligne (API locale) : offline immédiat, aucune sonde', () async {
-    ServerStatus.instance.start(Object()); // pas un KiteApi
+    ServerStatus.instance.start(KiteApi('http://testserver'),
+        serverBacked: false); // API locale : pas de serveur à sonder
     expect(ServerStatus.instance.state.value, ServerConn.offline);
     expect(ServerStatus.instance.offlineMode, isTrue);
   });
 
   testWidgets('Le badge affiche En ligne / Hors ligne selon la sonde', (tester) async {
     final okApi = KiteApi('http://testserver', httpClient: _FakeClient(true));
-    ServerStatus.instance.start(okApi);
+    ServerStatus.instance.start(okApi, serverBacked: true);
     await tester.pumpWidget(const MaterialApp(home: Scaffold(body: ConnectionBadge())));
     await tester.pumpAndSettle();
     expect(find.text('En ligne'), findsOneWidget);
 
     // Le serveur devient injoignable -> le badge bascule (ValueNotifier).
     final deadApi = KiteApi('http://testserver', httpClient: _FakeClient(false));
-    ServerStatus.instance.start(deadApi);
+    ServerStatus.instance.start(deadApi, serverBacked: true);
     await tester.pumpAndSettle();
     expect(find.text('Hors ligne'), findsOneWidget);
 

@@ -6,7 +6,6 @@ import 'api.dart';
 import 'call_center.dart';
 import 'chat_lock.dart';
 import 'message_notifier.dart';
-import 'models.dart';
 import 'offline_api.dart';
 import 'os_notifications.dart';
 import 'reminder_center.dart';
@@ -21,16 +20,18 @@ void main() {
   // Pour brancher un serveur : --dart-define=KITE_API=http://host:8080
   // (émulateur Android : http://10.0.2.2:8080)
   const apiBase = String.fromEnvironment('KITE_API');
-  final api = apiBase.isNotEmpty
-      ? KiteApi(apiBase)
-      : OfflineApi() as dynamic;
-  runApp(KiteApp(api: api));
+  final KiteApi api =
+      apiBase.isNotEmpty ? KiteApi(apiBase) : OfflineApi();
+  runApp(KiteApp(api: api, serverBacked: apiBase.isNotEmpty));
 }
 
 class KiteApp extends StatefulWidget {
-  const KiteApp({super.key, required this.api});
+  const KiteApp({super.key, required this.api, this.serverBacked = false});
 
-  final dynamic api;
+  final KiteApi api;
+
+  /// true si lancé avec --dart-define=KITE_API (mode serveur).
+  final bool serverBacked;
 
   @override
   State<KiteApp> createState() => _KiteAppState();
@@ -53,7 +54,7 @@ class _KiteAppState extends State<KiteApp> with WidgetsBindingObserver {
     _appLocked = ChatLockStore.instance.appLockEnabled;
     // Sonde de connectivité : l'indicateur En ligne / Hors ligne (barre
     // d'onglets) reflète l'état réel du serveur Go.
-    ServerStatus.instance.start(widget.api);
+    ServerStatus.instance.start(widget.api, serverBacked: widget.serverBacked);
     // Écoute globale des appels entrants (WebSocket/SSE serveur ou flux local).
     CallCenter.instance.start(widget.api);
     CallCenter.instance.current.addListener(_onIncomingCall);
@@ -161,7 +162,7 @@ class _KiteAppState extends State<KiteApp> with WidgetsBindingObserver {
 
   Future<void> _openChatById(String chatId) async {
     try {
-      final chats = await (widget.api as dynamic).fetchChats() as List<Chat>;
+      final chats = await widget.api.fetchChats();
       final chat = chats.where((c) => c.id == chatId).firstOrNull;
       final ctx = _nav.currentState?.context;
       if (chat == null || ctx == null || !ctx.mounted) return;

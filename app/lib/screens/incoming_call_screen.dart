@@ -17,7 +17,7 @@ class IncomingCallScreen extends StatefulWidget {
     this.onAccepted,
   });
 
-  final dynamic api;
+  final KiteApi api;
   final IncomingCall call;
   final VoidCallback? onAccepted;
 
@@ -66,7 +66,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
     widget.onAccepted?.call();
     // Appel 1:1 temps réel (mode serveur) : moteur WebRTC côté appelé —
     // il répondra à l'offer de l'appelant via la signalisation relayée.
-    if (widget.api is KiteApi && !call.group) {
+    if (widget.api.baseUrl.isNotEmpty && !call.group) {
       final engine = CallEngine(api: widget.api, callId: call.id);
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(

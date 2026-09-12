@@ -16,7 +16,7 @@ class CallEngine {
 
   /// L'API doit être un [KiteApi] (signalisation serveur). Hors-ligne,
   /// [available] reste false et l'écran garde son rendu simulé.
-  final dynamic api;
+  final KiteApi api;
   final String callId;
 
   static const _iceServers = [
@@ -37,7 +37,7 @@ class CallEngine {
   bool _disposed = false;
 
   /// true si la signalisation serveur est disponible (mode connecté).
-  bool get available => api is KiteApi && callId.isNotEmpty;
+  bool get available => api.baseUrl.isNotEmpty && callId.isNotEmpty;
 
   /// Flux locaux (caméra + micro) et distants, observés par l'écran.
   final ValueNotifier<MediaStream?> localStream = ValueNotifier<MediaStream?>(null);
@@ -207,7 +207,7 @@ class CallEngine {
 
   Future<void> _send(String kind, Map<String, dynamic> payload) async {
     try {
-      await (api as KiteApi).sendCallSignal(callId, kind, payload);
+      await api.sendCallSignal(callId, kind, payload);
     } catch (_) {
       // Signalisation momentanément indisponible : le timeout de connexion
       // fera passer l'appel en 'failed' si les signaux ne passent pas.
@@ -238,7 +238,7 @@ class CallEngine {
   /// Raccroche : notifie le serveur (ended) et libère les ressources.
   Future<void> hangUp() async {
     try {
-      await (api as KiteApi?)?.respondCall(callId, 'ended');
+      await api.respondCall(callId, 'ended');
     } catch (_) {}
     dispose();
   }
