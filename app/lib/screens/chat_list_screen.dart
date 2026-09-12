@@ -5,6 +5,7 @@ import '../models.dart';
 import '../theme.dart';
 import 'conversation_screen.dart';
 import 'global_search_screen.dart';
+import 'pairing_sheet.dart';
 import '../chat_lock.dart';
 import 'app_lock_screen.dart';
 import 'notif_defaults_screen.dart';
@@ -188,6 +189,11 @@ class _ChatListScreenState extends State<ChatListScreen> {
                 fontWeight: FontWeight.w500,
               ),
             ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.qr_code_2),
+            tooltip: 'Se connecter à quelqu’un',
+            onPressed: () => _openPairing(context),
           ),
           IconButton(
             icon: const Icon(Icons.search),
@@ -857,6 +863,36 @@ class _ChatListScreenState extends State<ChatListScreen> {
     if (context.mounted) {
       Navigator.of(context).push(MaterialPageRoute(
           builder: (_) => const AppLockScreen()));
+    }
+  }
+
+  /// Feuille de jumelage : QR / scan / radar. Ouvre la DM avec le pair
+  /// choisi (existante ou créée).
+  Future<void> _openPairing(BuildContext context) async {
+    final users = widget.shell?.users ??
+        const <User>[]; // connus de l'app (hors-ligne inclus)
+    final peer = await PairingSheet.show(context,
+        api: widget.api, users: users);
+    if (peer == null || !context.mounted) return;
+    final shell = widget.shell;
+    final existing = (shell?.chats ?? const <Chat>[]).where((c) {
+      return !c.isGroup &&
+          c.memberIds.contains(peer.id) &&
+          c.memberIds.contains(widget.api.meId);
+    }).firstOrNull;
+    if (existing != null) {
+      _openChat(context, existing);
+      return;
+    }
+    try {
+      final chat = await widget.api.createChat('dm', peer.name, [peer.id]);
+      _refresh();
+      if (context.mounted) _openChat(context, chat);
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Création impossible')));
+      }
     }
   }
 
