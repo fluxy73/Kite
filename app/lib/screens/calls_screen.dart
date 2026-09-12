@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../api.dart';
 import '../call_engine.dart';
 import '../models.dart';
+import '../people.dart';
 import '../theme.dart';
 import 'real_call_screen.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
@@ -137,7 +138,7 @@ class CallsScreen extends StatelessWidget {
               ListTile(
                 leading: CircleAvatar(
                   backgroundColor: KiteColors.surface2,
-                  child: Text(_initials(u.name), style: const TextStyle(fontSize: 12)),
+                  child: Text(kiteInitials(u.name), style: const TextStyle(fontSize: 12)),
                 ),
                 title: Text(u.name, style: TextStyle(color: KiteColors.fg)),
                 trailing: Row(
@@ -441,7 +442,7 @@ class CallsScreen extends StatelessWidget {
                 ListTile(
                   leading: CircleAvatar(
                     backgroundColor: KiteColors.surface2,
-                    child: Text(_initials(m.userName),
+                    child: Text(kiteInitials(m.userName),
                         style: const TextStyle(fontSize: 12)),
                   ),
                   title: Text(m.userName, style: TextStyle(color: KiteColors.fg)),
@@ -531,12 +532,6 @@ class CallsScreen extends StatelessWidget {
       if (!out.contains(e)) out.add(e);
     }
     return out;
-  }
-
-  static String _initials(String name) {
-    final parts = name.split(' ').where((w) => w.isNotEmpty).toList();
-    if (parts.isEmpty) return '?';
-    return parts.take(2).map((w) => w[0].toUpperCase()).join();
   }
 }
 
