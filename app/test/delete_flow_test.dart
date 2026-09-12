@@ -60,6 +60,58 @@ void main() {
     expect(find.text('salut du voisin'), findsNothing);
   });
 
+  testWidgets('supprimer pour tout le monde : retrait optimiste de la liste',
+      (tester) async {
+    final api = _ProbeApi(meOverride: 'u-lucas');
+    await tester.pumpWidget(MaterialApp(
+      home: ConversationScreen(api: api, chat: _seedChat()),
+    ));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+
+    // Message à moi (meId = émetteur du seed) -> « pour tout le monde » ;
+    // la branche removeWhere est celle du mode 'all'.
+    await tester.longPress(find.text('salut du voisin'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Supprimer pour tout le monde'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Supprimer pour tout le monde'));
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Supprimer').last);
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.pumpAndSettle();
+    expect(api.deleted, isNotNull);
+    expect(api.deleted!['id'], 'm-101');
+    expect(api.deleted!['mode'], 'all');
+    // Le message disparaît immédiatement de la liste (mise à jour optimiste).
+    expect(find.text('salut du voisin'), findsNothing);
+  });
+
+  testWidgets('bouton app-bar Infos : la feuille infos conversation '
+      's ouvre et ses tuiles appellent les actions de l ecran', (tester) async {
+    final api = _ProbeApi();
+    await tester.pumpWidget(MaterialApp(
+      home: ConversationScreen(api: api, chat: _seedChat()),
+    ));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+
+    // Le bouton « Infos » de l'app bar (more_horiz) ouvre la feuille extraite.
+    await tester.tap(find.byIcon(Icons.more_horiz));
+    await tester.pumpAndSettle();
+    expect(find.text('Lucas Martin'), findsWidgets);
+    expect(find.text('Médias, liens et documents'), findsOneWidget);
+    expect(find.text('Notifications'), findsOneWidget);
+
+    // La tuile éphémères appelle bien le sélecteur de l'écran.
+    await tester.ensureVisible(find.text('Messages éphémères'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Messages éphémères'));
+    await tester.pumpAndSettle();
+    expect(find.text('Désactivé'), findsOneWidget);
+  });
+
   testWidgets('appui long -> Ajouter aux favoris : étoile persistée',
       (tester) async {
     final api = _ProbeApi();
@@ -106,12 +158,14 @@ Chat _seedChat() => const Chat(
     );
 
 class _ProbeApi extends KiteApi {
-  _ProbeApi() : super('http://testserver');
+  _ProbeApi({String? meOverride}) : _me = meOverride ?? 'u-julien', super('http://testserver');
 
+  final String _me;
   final List<String> starred = [];
+  Map<String, String>? deleted;
 
   @override
-  String get meId => 'u-julien';
+  String get meId => _me;
 
   @override
   Future<List<Message>> fetchMessages(String chatId) async => <Message>[
@@ -135,7 +189,9 @@ class _ProbeApi extends KiteApi {
   }
 
   @override
-  Future<void> deleteMessage(String messageId, {String mode = 'me'}) async {}
+  Future<void> deleteMessage(String messageId, {String mode = 'me'}) async {
+    deleted = {'id': messageId, 'mode': mode};
+  }
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);

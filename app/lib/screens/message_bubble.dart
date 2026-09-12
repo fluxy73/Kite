@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../formats.dart';
 import '../models.dart';
 import '../theme.dart';
 import '../ui/avatar.dart';
@@ -206,7 +207,7 @@ class KiteMessageBubble extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    '${_time(m.createdAt)}${m.edited ? ' · modifié' : ''}',
+                    '${kiteHhmm(m.createdAt)}${m.edited ? ' · modifié' : ''}',
                     style:  TextStyle(
                         color: KiteColors.muted,
                         fontSize: 10,
@@ -227,11 +228,6 @@ class KiteMessageBubble extends StatelessWidget {
   }
 
   String _name(String id) => id == meId ? 'Vous' : senderName;
-
-  static String _time(int ms) {
-    final dt = DateTime.fromMillisecondsSinceEpoch(ms);
-    return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
-  }
 
   Widget _content(BuildContext context, Message m) {
     switch (m.type) {

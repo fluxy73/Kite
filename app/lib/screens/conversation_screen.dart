@@ -11,11 +11,11 @@ import '../chat_lock.dart';
 import 'chat_extras.dart';
 import 'chat_info_sheet.dart';
 import '../drafts.dart';
+import '../formats.dart';
 import '../message_notifier.dart';
 import '../models.dart';
 import '../people.dart';
 import '../theme.dart';
-import '../ui/avatar.dart';
 import '../ui/ui.dart';
 import '../voice_player.dart';
 import 'message_menu.dart';
@@ -1242,7 +1242,7 @@ class _ConversationScreenState extends State<ConversationScreen>
   // ---------- Informations message ----------
 
   void _showInfo(BuildContext sheetCtx, Message m) {
-    final hhmm = _time(m.createdAt);
+    final hhmm = kiteHhmm(m.createdAt);
     showModalBottomSheet<void>(
       context: sheetCtx,
       backgroundColor: KiteColors.surface,
@@ -1307,11 +1307,6 @@ class _ConversationScreenState extends State<ConversationScreen>
     );
   }
 
-  static String _time(int ms) {
-    final dt = DateTime.fromMillisecondsSinceEpoch(ms);
-    return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
-  }
-
   // ---------- Infos conversation ----------
 
   void _showChatInfo(BuildContext context) {
@@ -1321,8 +1316,8 @@ class _ConversationScreenState extends State<ConversationScreen>
       isGroup: widget.chat.isGroup,
       memberIds: widget.chat.memberIds,
       adminIds: widget.chat.adminIds,
-      meId: widget.api.meId,
       chatId: widget.chat.id,
+      disappearing: widget.chat.disappearing,
       senderName: _senderName,
       isBlocked: _isBlocked,
       lockBioAvailable: _lockBioAvailable,
@@ -1412,18 +1407,7 @@ class _ConversationScreenState extends State<ConversationScreen>
   static const int _dm7d = 7 * 24 * 3600 * 1000;
   static const int _dm90d = 90 * 24 * 3600 * 1000;
 
-  static String _disappearingLabel(int ms) {
-    switch (ms) {
-      case _dm24h:
-        return '24 h';
-      case _dm7d:
-        return '7 jours';
-      case _dm90d:
-        return '90 jours';
-      default:
-        return 'désactivés';
-    }
-  }
+  static String _disappearingLabel(int ms) => kiteDisappearingLabel(ms);
 
   int _disappearingOverride = -1; // -1 = suivre widget.chat
 

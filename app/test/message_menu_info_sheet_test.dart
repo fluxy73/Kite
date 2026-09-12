@@ -211,8 +211,8 @@ void main() {
                   isGroup: true,
                   memberIds: const ['u-julien', 'u-lucas', 'u-emma'],
                   adminIds: const ['u-julien'],
-                  meId: 'u-julien',
                   chatId: 'c-nova',
+                  disappearing: 0,
                   senderName: (id) => id == 'u-julien' ? 'Vous' : id,
                   isBlocked: false,
                   lockBioAvailable: false,
@@ -279,8 +279,8 @@ void main() {
                   isGroup: false,
                   memberIds: const ['u-julien', 'u-lucas'],
                   adminIds: const [],
-                  meId: 'u-julien',
                   chatId: 'c-lucas',
+                  disappearing: 24 * 3600 * 1000,
                   senderName: (id) => id,
                   isBlocked: true,
                   lockBioAvailable: false,
@@ -304,8 +304,9 @@ void main() {
       await tester.tap(find.text('open'));
       await tester.pumpAndSettle();
 
-      // DM bloqué : libellé inversé.
+      // DM bloqué : libellé inversé + durée éphémère dynamique affichée.
       expect(find.text('Débloquer le contact'), findsOneWidget);
+      expect(find.text('Messages éphémères : 24 h'), findsOneWidget);
       await tester.ensureVisible(find.text('Débloquer le contact'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Débloquer le contact'));

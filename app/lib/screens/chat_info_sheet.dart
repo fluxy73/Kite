@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../chat_lock.dart';
+import '../formats.dart';
 import '../theme.dart';
 import '../ui/avatar.dart';
 
@@ -17,7 +18,6 @@ class ChatInfoSheet {
     required bool isGroup,
     required List<String> memberIds,
     required List<String> adminIds,
-    required String meId,
     required String chatId,
     required String Function(String id) senderName,
     required VoidCallback onMedia,
@@ -31,6 +31,7 @@ class ChatInfoSheet {
     required VoidCallback onArmLock,
     required VoidCallback onToggleBiometrics,
     required VoidCallback onDisappearing,
+    required int disappearing,
     required VoidCallback onNotifications,
   }) {
     showModalBottomSheet<void>(
@@ -161,11 +162,15 @@ class ChatInfoSheet {
                     Navigator.pop(sheetCtx);
                     onToggleBiometrics();
                   },
-                ),
-              ListTile(
-                leading: Icon(Icons.timer_outlined, color: KiteColors.muted),
-                title: const Text('Messages éphémères',
-                    style: TextStyle(fontSize: 14.5)),
+                ),            ListTile(
+              leading: Icon(Icons.timer_outlined,
+                  color: KiteColors.muted),
+              title: Text(
+                disappearing > 0
+                    ? 'Messages éphémères : ${kiteDisappearingLabel(disappearing)}'
+                    : 'Messages éphémères',
+                style: const TextStyle(fontSize: 14.5),
+              ),
                 onTap: () {
                   Navigator.pop(sheetCtx);
                   onDisappearing();
