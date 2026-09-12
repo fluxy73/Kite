@@ -465,12 +465,24 @@ class _ConversationScreenState extends State<ConversationScreen>
 
   Future<void> _sendVoice() async {
     final dur = _recSec;
+    final bars = List.of(_amp);
     _stopRecording();
     String? path;
     if (_micAvailable) {
       final rec = await _voiceRecorder.stop();
       if (rec != null) {
         (path, _) = rec;
+      }
+    }
+    // Pré-écoute : pause, scrub, vitesse, abandon — avant transmission.
+    if (path != null) {
+      final ok = await _showVoiceReview(
+          path: path, bars: bars, durationSec: dur < 1 ? 1 : dur);
+      if (!ok) {
+        try {
+          File(path).deleteSync();
+        } catch (_) {}
+        return;
       }
     }
     try {
@@ -485,6 +497,30 @@ class _ConversationScreenState extends State<ConversationScreen>
     } catch (e) {
       _toast('Vocal non envoyé : $e');
     }
+  }
+
+  /// Pré-écoute du vocal avant envoi : lecture/pause, scrub sur la
+  /// waveform, vitesse 1x/1,5x/2x, abandon. Retourne true pour envoyer.
+  Future<bool> _showVoiceReview({
+    required String path,
+    required List<double> bars,
+    required int durationSec,
+  }) async {
+    final player = _VoicePlayer();
+    player.play(durationSec: durationSec, path: path);
+    final ok = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: KiteColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetCtx) => SafeArea(
+        child: _VoiceReviewSheet(player: player, bars: bars, durationSec: durationSec),
+      ),
+    ).then((v) => v ?? false);
+    await player.hardStop();
+    player.dispose();
+    return ok;
   }
 
   // ---------- Actions message ----------
@@ -1950,6 +1986,31 @@ class _VoicePlayer {
 
   Future<void> setSpeed(double s) => _audio.setSpeed(s);
 
+  /// Positionne la lecture à [fraction] (0..1) de la durée totale —
+  /// scrubbing sur la waveform (fichier réel) ou timeline simulée.
+  Future<void> seekTo(double fraction) async {
+    final f = fraction.clamp(0.0, 1.0);
+    if (_loadedPath != null) {
+      final d = _audio.duration;
+      if (d != null) {
+        await _audio.seek(d * f);
+      }
+    } else {
+      _elapsed = (f * _total * 5).round();
+      progress.value = f;
+    }
+  }
+
+  /// Stoppe tout (utilisé à la fermeture de la pré-écoute).
+  Future<void> hardStop() async {
+    _t?.cancel();
+    _posSub?.cancel();
+    try {
+      await _audio.stop();
+    } catch (_) {}
+    playing.value = false;
+  }
+
   void dispose() {
     _t?.cancel();
     _posSub?.cancel();
@@ -3195,4 +3256,186 @@ class _WaveformPainter extends CustomPainter {
       old.progress != progress ||
       old.bars != bars ||
       old.playedColor != playedColor;
+}
+
+/// Pré-écoute d'un vocal avant envoi : lecture/pause, scrub sur la waveform
+/// (amplitudes captées pendant l'enregistrement), vitesse, abandon.
+class _VoiceReviewSheet extends StatefulWidget {
+  const _VoiceReviewSheet({
+    required this.player,
+    required this.bars,
+    required this.durationSec,
+  });
+
+  final _VoicePlayer player;
+  final List<double> bars;
+  final int durationSec;
+
+  @override
+  State<_VoiceReviewSheet> createState() => _VoiceReviewSheetState();
+}
+
+class _VoiceReviewSheetState extends State<_VoiceReviewSheet> {
+  double _speed = 1.0;
+  double _scrub = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.player.progress.addListener(_onProgress);
+  }
+
+  void _onProgress() {
+    if (mounted) setState(() => _scrub = widget.player.progress.value);
+  }
+
+  @override
+  void dispose() {
+    widget.player.progress.removeListener(_onProgress);
+    super.dispose();
+  }
+
+  String get _time {
+    final total = widget.durationSec;
+    final pos = (total * _scrub).round();
+    final p = '${(pos ~/ 60).toString().padLeft(2, '0')}:${(pos % 60).toString().padLeft(2, '0')}';
+    final t = '${(total ~/ 60).toString().padLeft(2, '0')}:${(total % 60).toString().padLeft(2, '0')}';
+    return '$p / $t';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final player = widget.player;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 18, 16, 18),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.graphic_eq, size: 18, color: KiteColors.accent),
+              const SizedBox(width: 8),
+              const Text(
+                'Écouter avant d’envoyer',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const Spacer(),
+              Text(_time,
+                  style: const TextStyle(
+                      color: KiteColors.muted,
+                      fontSize: 12,
+                      fontFamilyFallback: ['monospace'])),
+            ],
+          ),
+          const SizedBox(height: 14),
+          // Waveform scrubbable (les vraies amplitudes captées).
+          GestureDetector(
+            onHorizontalDragUpdate: (d) async {
+              final box = context.findRenderObject() as RenderBox?;
+              if (box == null) return;
+              final f = (d.localPosition.dx / box.size.width).clamp(0.0, 1.0);
+              await player.seekTo(f);
+            },
+            onHorizontalDragEnd: (_) {
+              if (!player.playing.value) {
+                player.play(durationSec: widget.durationSec, path: null);
+              }
+            },
+            child: SizedBox(
+              height: 44,
+              child: CustomPaint(
+                painter: _WaveformPainter(
+                  bars: widget.bars,
+                  progress: _scrub,
+                  playedColor: KiteColors.accent,
+                  pendingColor: KiteColors.accent.withValues(alpha: 0.32),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Pause / reprise.
+              ValueListenableBuilder<bool>(
+                valueListenable: player.playing,
+                builder: (_, playing, __) => _RoundBtn(
+                  icon: playing ? Icons.pause : Icons.play_arrow,
+                  tooltip: playing ? 'Pause' : 'Reprendre',
+                  accent: true,
+                  onTap: () {
+                    if (playing) {
+                      player.pause();
+                    } else {
+                      player.play(
+                          durationSec: widget.durationSec, path: null);
+                    }
+                  },
+                ),
+              ),
+              const SizedBox(width: 18),
+              // Vitesse cyclée 1x → 1,5x → 2x.
+              InkWell(
+                borderRadius: BorderRadius.circular(999),
+                onTap: () async {
+                  KiteHaptics.tap();
+                  final next = _speed == 1.0 ? 1.5 : (_speed == 1.5 ? 2.0 : 1.0);
+                  setState(() => _speed = next);
+                  await player.setSpeed(next);
+                },
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: KiteColors.surface2,
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: KiteColors.border),
+                  ),
+                  child: Text(
+                    '${_speed}x',
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w600, fontSize: 13),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: KiteColors.ephemeral,
+                    side: BorderSide(
+                        color: KiteColors.ephemeral.withValues(alpha: 0.5)),
+                  ),
+                  onPressed: () => Navigator.pop(context, false),
+                  icon: const Icon(Icons.delete_outline, size: 18),
+                  label: const Text('Abandonner'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: KiteColors.accent,
+                    foregroundColor: KiteColors.accentInk,
+                  ),
+                  onPressed: () {
+                    KiteHaptics.send();
+                    Navigator.pop(context, true);
+                  },
+                  icon: const Icon(Icons.send, size: 18),
+                  label: const Text('Envoyer'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 }
