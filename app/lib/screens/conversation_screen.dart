@@ -69,6 +69,11 @@ class _ConversationScreenState extends State<ConversationScreen>
 
   // Lecture vocale simulée
   final Map<String, _VoicePlayer> _players = {};
+
+  /// Ids de messages dont l'animation d'entrée a déjà été jouée — survit
+  /// au recyclage des enfants de ListView.builder (pas de re-jeu au
+  /// scroll-back). Appartient à l'écran, pas à la bulle.
+  final Set<String> _entranceDone = {};
   // RSVP d'événements (state local)
   final Set<String> _rsvpYes = {};
   final Set<String> _rsvpMaybe = {};
@@ -695,6 +700,13 @@ class _ConversationScreenState extends State<ConversationScreen>
     );
   }
 
+  /// Marque le message comme animé et retourne false au premier passage.
+  bool _claimEntrance(String id) {
+    if (_entranceDone.contains(id)) return false;
+    _entranceDone.add(id);
+    return true;
+  }
+
   Widget _messageList() {
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
@@ -712,6 +724,7 @@ class _ConversationScreenState extends State<ConversationScreen>
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
       itemCount: visible.length,
       itemBuilder: (context, i) => MessageEntrance(
+        animate: _claimEntrance(visible[i].id),
         child: SwipeToReply(
           onReply: () => _startReply(visible[i]),
           child: _MessageBubble(
@@ -1978,6 +1991,26 @@ class _VoicePlayer {
     }
   }
 
+  /// Reprend la lecture là où elle en est (après pause/scrub) : fichier
+  /// réel → just_audio joue depuis la position seekée ; repli timeline
+  /// simulée uniquement si aucun fichier lisible.
+  Future<void> resume() async {
+    if (_loadedPath != null) {
+      await _audio.play();
+      return;
+    }
+    playing.value = true;
+    _t?.cancel();
+    _t = Timer.periodic(const Duration(milliseconds: 200), (_) {
+      _elapsed++;
+      if (_elapsed >= _total * 5) {
+        pause();
+        return;
+      }
+      progress.value = _elapsed / (_total * 5);
+    });
+  }
+
   void pause() {
     _t?.cancel();
     if (_loadedPath != null) {
@@ -3159,13 +3192,24 @@ class _SwipeToReplyState extends State<SwipeToReply>
     }
     _fired = false;
     final from = _drag;
-    _snap.addListener(() {
-      if (mounted) {
-        setState(() => _drag = from * (1 - Curves.easeOutBack.transform(_snap.value)));
+    void snapTick() {
+      if (!mounted) {
+        _snap.removeListener(snapTick);
+        return;
       }
-    });
+      setState(() {
+        _drag = from * (1 - Curves.easeOutBack.transform(_snap.value));
+      });
+    }
+
+    // Exactement un listener par retour élastique, retiré à la fin —
+    // l'accumulation ferait courir N closures par frame après N swipes.
+    _snap.addListener(snapTick);
     _snap.forward(from: 0).whenComplete(() {
-      if (mounted) setState(() => _drag = 0);
+      _snap.removeListener(snapTick);
+      if (mounted) {
+        setState(() => _drag = 0);
+      }
     });
   }
 
@@ -3403,7 +3447,7 @@ class _VoiceReviewSheetState extends State<_VoiceReviewSheet> {
             },
             onHorizontalDragEnd: (_) {
               if (!player.playing.value) {
-                player.play(durationSec: widget.durationSec, path: null);
+                player.resume();
               }
             },
             child: SizedBox(
@@ -3433,8 +3477,7 @@ class _VoiceReviewSheetState extends State<_VoiceReviewSheet> {
                     if (playing) {
                       player.pause();
                     } else {
-                      player.play(
-                          durationSec: widget.durationSec, path: null);
+                      player.resume();
                     }
                   },
                 ),

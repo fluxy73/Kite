@@ -5,9 +5,14 @@ import 'package:flutter/material.dart';
 /// Ne s'anime qu'au premier build de chaque bulle — les rebuilds (réactions,
 /// traduction, timers) ne rejouent pas l'effet.
 class MessageEntrance extends StatefulWidget {
-  const MessageEntrance({super.key, required this.child});
+  const MessageEntrance({super.key, required this.child, this.animate = true});
 
   final Widget child;
+
+  /// false : rend l'enfant tel quel. L'état « déjà animé » appartient à la
+  /// liste (set d'ids) — un enfant recyclé par ListView.builder ne rejoue
+  /// jamais son entrée au scroll-back.
+  final bool animate;
 
   @override
   State<MessageEntrance> createState() => _MessageEntranceState();
@@ -20,6 +25,8 @@ class _MessageEntranceState extends State<MessageEntrance>
     duration: const Duration(milliseconds: 200),
     value: 0,
   );
+  bool _started = false;
+
   late final Animation<double> _fade =
       CurvedAnimation(parent: _c, curve: Curves.easeOut);
   late final Animation<Offset> _drift = Tween<Offset>(
@@ -30,7 +37,10 @@ class _MessageEntranceState extends State<MessageEntrance>
   @override
   void initState() {
     super.initState();
-    _c.forward();
+    if (widget.animate) {
+      _started = true;
+      _c.forward();
+    }
   }
 
   @override
@@ -41,6 +51,9 @@ class _MessageEntranceState extends State<MessageEntrance>
 
   @override
   Widget build(BuildContext context) {
+    // Jamais démarré (recréation d'un enfant déjà vu) : aucun layer
+    // d'animation, l'enfant est rendu tel quel.
+    if (!_started) return widget.child;
     return FadeTransition(
       opacity: _fade,
       child: SlideTransition(position: _drift, child: widget.child),
