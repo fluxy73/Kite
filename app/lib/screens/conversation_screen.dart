@@ -676,12 +676,15 @@ class _ConversationScreenState extends State<ConversationScreen>
             tooltip: 'Appel vocal',
             onPressed: () => _toast('Appel vocal — workflow simulé'),
           ),
-          if (widget.chat.disappearing > 0)
-            IconButton(
-              icon: const Icon(Icons.timer_outlined, color: KiteColors.ephemeral),
-              tooltip: 'Messages éphémères actifs',
-              onPressed: () => _showDisappearingPicker(context),
+          Padding(
+            padding: const EdgeInsets.only(right: 2),
+            child: _EphemeralPill(
+              active: _disappearingOverride >= 0
+                  ? _disappearingOverride > 0
+                  : widget.chat.disappearing > 0,
+              onTap: () => _showDisappearingPicker(context),
             ),
+          ),
           IconButton(
             icon: const Icon(Icons.more_horiz),
             tooltip: 'Infos',
@@ -834,8 +837,8 @@ class _ConversationScreenState extends State<ConversationScreen>
                     child: Row(
                       children: [
                         const SizedBox(width: 6),
-                        PressableField(
-                          child: Expanded(
+                        Expanded(
+                          child: PressableField(
                             child: TextField(
                               controller: _input,
                               focusNode: _inputFocus,
@@ -2128,11 +2131,72 @@ class _NoMessages extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
-      child: Text(
-        'Les messages sont chiffrés de bout en bout.\nPersonne en dehors de cette conversation ne peut les lire.',
-        textAlign: TextAlign.center,
-        style: TextStyle(color: KiteColors.muted, fontSize: 12.5),
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: KiteColors.surface,
+                shape: BoxShape.circle,
+                border: Border.all(color: KiteColors.border),
+                boxShadow: KiteColors.softShadow(),
+              ),
+              child: const Icon(Icons.forum_outlined,
+                  size: 30, color: KiteColors.accent),
+            ),
+            const SizedBox(height: 14),
+            const Text('Cette conversation est privée.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    color: KiteColors.fg,
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w600)),
+            const SizedBox(height: 6),
+            const Text(
+                'Écrivez le premier mot — tout reste entre vous.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    color: KiteColors.muted,
+                    fontSize: 12.5,
+                    height: 1.4)),
+            const SizedBox(height: 12),
+            // Carte d'inspection : le détail technique reste disponible,
+            // sans jargon sur la surface principale.
+            Theme(
+              data: Theme.of(context)
+                  .copyWith(dividerColor: Colors.transparent),
+              child: const ExpansionTile(
+                tilePadding:
+                    EdgeInsets.symmetric(horizontal: 12),
+                childrenPadding:
+                    EdgeInsets.fromLTRB(12, 0, 12, 10),
+                backgroundColor: Colors.transparent,
+                collapsedBackgroundColor: Colors.transparent,
+                iconColor: KiteColors.muted,
+                collapsedIconColor: KiteColors.muted,
+                title: Text('Détails techniques',
+                    style: TextStyle(
+                        color: KiteColors.muted, fontSize: 12)),
+                children: [
+                  Text(
+                    'Les messages sont chiffrés de bout en bout.\n'
+                    'Personne en dehors de cette conversation '
+                    'ne peut les lire.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                        color: KiteColors.muted,
+                        fontSize: 12,
+                        height: 1.45),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -3435,6 +3499,58 @@ class _VoiceReviewSheetState extends State<_VoiceReviewSheet> {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Pilule éphémère (app bar) : bascule permanente ↔ éphémère en un appui.
+/// Teinte terracotta quand les messages s'effacent, neutre sinon.
+class _EphemeralPill extends StatelessWidget {
+  const _EphemeralPill({required this.active, required this.onTap});
+
+  final bool active;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return SpringScale(
+      onTap: onTap,
+      pressedScale: 0.92,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: active
+              ? KiteColors.ephemeral.withValues(alpha: 0.16)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: active
+                ? KiteColors.ephemeral.withValues(alpha: 0.55)
+                : KiteColors.border,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.timer_outlined,
+              size: 15,
+              color: active ? KiteColors.ephemeral : KiteColors.muted,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              active ? 'Éphémère' : 'Permanent',
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
+                color: active ? KiteColors.ephemeral : KiteColors.muted,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
