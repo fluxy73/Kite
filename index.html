@@ -429,8 +429,8 @@
       const v = select.value;
       try { localStorage.setItem('kite-screen', v); } catch (e) {}
       // iPhone + Pixel : même écran
-      document.querySelector('#frame-iphone iframe').src = v;
-      document.querySelector('#frame-android iframe').src = v;
+      document.querySelector('[data-od-id="frame-iphone"] iframe').src = v;
+      document.querySelector('[data-od-id="frame-android"] iframe').src = v;
     }
     select.addEventListener('change', loadScreen);
     if (select.value && select.value !== 'screens/chat-list.html') loadScreen();
