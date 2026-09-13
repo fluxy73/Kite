@@ -15,14 +15,42 @@ import 'screens/incoming_call_screen.dart';
 import 'screens/conversation_screen.dart';
 import 'theme.dart';
 
-void main() {
+/// API locale prête : OfflineApi charge son stockage en asynchrone depuis le
+/// constructeur ; on attend la fin (borne 3 s) pour éviter toute course au
+/// premier appel.
+Future<OfflineApi> _readyOfflineApi() async {
+  final api = OfflineApi();
+  final sw = Stopwatch()..start();
+  while (!api.ready && sw.elapsed < const Duration(seconds: 3)) {
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+  }
+  return api;
+}
+
+/// Choisit l'API au démarrage : serveur si joignable (sonde < 3 s), sinon
+/// mode autonome. L'app ne dépend jamais d'un serveur pour fonctionner.
+Future<(KiteApi, bool)> resolveApi(String apiBase) async {
+  if (apiBase.isEmpty) return (await _readyOfflineApi(), false);
+  final server = KiteApi(apiBase);
+  try {
+    await server.pingHealth().timeout(const Duration(seconds: 3));
+    return (server, true);
+  } catch (_) {
+    debugPrint('KITE_API=$apiBase injoignable au démarrage — mode hors-ligne');
+    return (await _readyOfflineApi(), false);
+  }
+}
+
+void main() async {
   // Mode hors-ligne par défaut : l'app fonctionne seule (données locales).
   // Pour brancher un serveur : --dart-define=KITE_API=http://host:8080
-  // (émulateur Android : http://10.0.2.2:8080)
-  const apiBase = String.fromEnvironment('KITE_API');
-  final KiteApi api =
-      apiBase.isNotEmpty ? KiteApi(apiBase) : OfflineApi();
-  runApp(KiteApp(api: api, serverBacked: apiBase.isNotEmpty));
+  // (émulateur Android : http://10.0.2.2:8080). Si le serveur est configuré
+  // mais injoignable au démarrage, resolveApi bascule seule en mode autonome
+  // plutôt que d'afficher un écran d'erreur bloquant.
+  WidgetsFlutterBinding.ensureInitialized();
+  final (api, serverBacked) =
+      await resolveApi(const String.fromEnvironment('KITE_API'));
+  runApp(KiteApp(api: api, serverBacked: serverBacked));
 }
 
 class KiteApp extends StatefulWidget {
