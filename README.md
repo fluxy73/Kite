@@ -71,7 +71,10 @@ Authentification mockée : paramètre `?userId=` sur chaque requête.
 
 ## Mode hors-ligne (par défaut)
 
-Sans `KITE_API`, l'app est **autonome** — aucun serveur requis :
+Sans `KITE_API`, l'app est **autonome** — aucun serveur requis. Même lancée
+avec `KITE_API`, elle bascule automatiquement en mode autonome si le serveur
+est injoignable au démarrage (sonde 3 s) et se reconnecte seule dès que
+possible — l'app ne dépend jamais d'un serveur pour fonctionner :
 
 - **Base locale JSON** (`local_store.dart`) persistée avec écriture atomique :
   `%APPDATA%/kite/kite-local.json` (Windows), `$HOME/kite/kite-local.json`

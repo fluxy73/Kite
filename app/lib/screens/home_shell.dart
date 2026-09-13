@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../api.dart';
@@ -26,6 +28,7 @@ class _HomeShellState extends State<HomeShell> {
   AppShell? _shell;
   bool _loading = true;
   String? _error;
+  Timer? _retry; // reprise auto si le serveur revient en cours de session
 
   @override
   void initState() {
@@ -36,11 +39,13 @@ class _HomeShellState extends State<HomeShell> {
 
   @override
   void dispose() {
+    _retry?.cancel();
     CallCenter.instance.callsRevision.removeListener(_load);
     super.dispose();
   }
 
   Future<void> _load() async {
+    _retry?.cancel();
     setState(() {
       _loading = true;
       _error = null;
@@ -59,6 +64,10 @@ class _HomeShellState extends State<HomeShell> {
           _error = e.toString();
           _loading = false;
         });
+        // Le serveur peut revenir : nouvelle tentative auto toutes les 5 s
+        // tant que l'écran d'erreur est affiché (l'app reste utilisable
+        // dès la première réponse).
+        _retry = Timer(const Duration(seconds: 5), _load);
       }
     }
   }
