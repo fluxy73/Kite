@@ -20,6 +20,8 @@ dependencies:
   record: ^7.1.1
   local_auth: ^3.0.2
   local_auth_android: ^2.0.10
+  image_picker: ^1.2.3
+  file_picker: ^13.0.0
 
 # path_provider_foundation >=2.5 uses native-assets build hooks (objective_c),
 # qui échouent avec un chemin de SDK contenant des espaces sur Windows.

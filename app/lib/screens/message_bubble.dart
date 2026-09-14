@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import '../formats.dart';
@@ -320,6 +322,19 @@ class KiteMessageBubble extends StatelessWidget {
   }
 
   Widget _media(Message m) {
+    final path = m.media?['path'] as String?;
+    if (m.type == 'image' && path != null && File(path).existsSync()) {
+      return GestureDetector(
+        onTap: onOpenMedia,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(14),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 232, maxHeight: 200),
+            child: Image.file(File(path), fit: BoxFit.cover, width: 232),
+          ),
+        ),
+      );
+    }
     final icon = switch (m.type) {
       'video' => Icons.videocam_outlined,
       'gif' => Icons.gif_box_outlined,
