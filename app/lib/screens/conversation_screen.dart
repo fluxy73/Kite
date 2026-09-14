@@ -3,6 +3,9 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter_contacts/flutter_contacts.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../api.dart';
 import '../translation.dart';
@@ -24,7 +27,8 @@ import 'notif_defaults_screen.dart';
 import 'voice_review_sheet.dart';
 
 /// Conversation temps réel : tous les types de messages, réactions,
-/// réponse, édition, suppression, pièces jointes (workflows simulés).
+/// réponse, édition, suppression, pièces jointes (caméra, galerie,
+/// documents, contacts — flux réels).
 class ConversationScreen extends StatefulWidget {
   const ConversationScreen(
       {super.key, required this.api, required this.chat, this.translator});
@@ -1544,17 +1548,15 @@ class _ConversationScreenState extends State<ConversationScreen>
               mainAxisSpacing: 14,
               children: [
                 _attachItem(sheetCtx, Icons.description_outlined, 'Document',
-                    () => _mockDocument(sheetCtx)),
+                    () => _pickDocument()),
                 _attachItem(sheetCtx, Icons.photo_camera_outlined, 'Caméra',
-                    () => _mockCamera(sheetCtx)),
+                    () => _pickCamera()),
                 _attachItem(sheetCtx, Icons.photo_library_outlined, 'Galerie',
-                    () => _mockGallery(sheetCtx)),
-                _attachItem(sheetCtx, Icons.mic_none, 'Audio',
-                    () => _mockAudio(sheetCtx)),
+                    () => _pickGallery()),
                 _attachItem(sheetCtx, Icons.location_on_outlined,
                     'Localisation', () => _mockLocation(sheetCtx)),
                 _attachItem(sheetCtx, Icons.person_outline, 'Contact',
-                    () => _mockContact(sheetCtx)),
+                    () => _pickContact(sheetCtx)),
                 _attachItem(sheetCtx, Icons.poll_outlined, 'Sondage',
                     () => _mockPoll(sheetCtx)),
                 _attachItem(sheetCtx, Icons.event_outlined, 'Événement',
@@ -1604,7 +1606,50 @@ class _ConversationScreenState extends State<ConversationScreen>
     );
   }
 
-  // ---------- Workflows simulés de pièces jointes ----------
+  // ---------- Pièces jointes réelles ----------
+
+  /// Chemin (absolu) -> nom de fichier court.
+  String _fileName(String path) =>
+      path.split(Platform.pathSeparator).last.split('/').last;
+
+  /// Taille lisible d'un fichier, ou null s'il est introuvable.
+  String? _fileSize(String path) {
+    try {
+      final bytes = File(path).lengthSync();
+      if (bytes < 1024) return '$bytes o';
+      if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} Ko';
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} Mo';
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _pickDocument() async {
+    final files = await FilePicker.pickFiles();
+    final path = files.isEmpty ? null : files.first.path;
+    if (path == null) return;
+    await _sendMedia('document', _fileName(path), {
+      'path': path,
+      if (_fileSize(path) case final size?) 'size': size,
+    });
+    _toast('Document envoyé 📄');
+  }
+
+  Future<void> _pickCamera() async {
+    final picked =
+        await ImagePicker().pickImage(source: ImageSource.camera, maxWidth: 1920);
+    if (picked == null) return;
+    await _sendMedia('image', '', {'path': picked.path});
+    _toast('Photo envoyée 📷');
+  }
+
+  Future<void> _pickGallery() async {
+    final picked =
+        await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 1920);
+    if (picked == null) return;
+    await _sendMedia('image', '', {'path': picked.path});
+    _toast('Photo envoyée 🖼️');
+  }
 
   Future<void> _sendMedia(String type, String text,
       [Map<String, dynamic>? media]) async {
@@ -1616,46 +1661,31 @@ class _ConversationScreenState extends State<ConversationScreen>
     }
   }
 
-  Future<void> _mockDocument(BuildContext ctx) async {
-    final names = [
-      'projet-final.pdf',
-      'specs.docx',
-      'budget.xlsx',
-      'presentation.pptx',
-      'archive.zip'
-    ];
-    final name = names[DateTime.now().millisecond % names.length];
-    final ext = name.split('.').last.toUpperCase();
-    await _sendMedia(
-        'document', name, {'ext': ext, 'size': '7,8 Mo', 'pages': 24});
-    _toast('Document envoyé 📄');
-  }
-
-  Future<void> _mockCamera(BuildContext ctx) async {
-    await _sendMedia('image', '', {'name': 'IMG_capture.jpg'});
-    _toast('Photo prise et envoyée 📷');
-  }
-
-  Future<void> _mockGallery(BuildContext ctx) async {
-    await _sendMedia('image', '', {'name': 'IMG_album.jpg', 'album': 3});
-    _toast('Album de 3 photos envoyé 🖼️');
-  }
-
-  Future<void> _mockAudio(BuildContext ctx) async {
-    await _sendMedia('voice', '', {'duration': 12});
-    _toast('Message audio envoyé 🎙️');
-  }
-
   Future<void> _mockLocation(BuildContext ctx) async {
     await _sendMedia(
         'location', '', {'name': 'Position actuelle', 'live': false});
     _toast('Localisation envoyée 📍');
   }
 
-  Future<void> _mockContact(BuildContext ctx) async {
-    await _sendMedia(
-        'contact', '', {'name': 'Lucas Martin', 'phone': '+33 6 12 34 56 78'});
-    _toast('Contact partagé 👤');
+  Future<void> _pickContact(BuildContext ctx) async {
+    if (!await FlutterContacts.requestPermission()) {
+      _toast('Permission contacts refusée');
+      return;
+    }
+    try {
+      final contacts = await FlutterContacts.getContacts(withProperties: true);
+      if (!ctx.mounted) return;
+      final picked = await showModalBottomSheet<_SharedContact>(
+        context: ctx,
+        builder: (_) => _ContactPickerSheet(contacts: contacts),
+      );
+      if (picked == null) return;
+      await _sendMedia('contact', '',
+          {'name': picked.name, if (picked.phone != null) 'phone': picked.phone});
+      _toast('Contact partagé 👤');
+    } catch (e) {
+      _toast('Contacts indisponibles : $e');
+    }
   }
 
   Future<void> _mockPoll(BuildContext ctx) async {
@@ -2154,6 +2184,61 @@ class _EphemeralPill extends StatelessWidget {
                 fontWeight: FontWeight.w600,
                 color: active ? KiteColors.ephemeral : KiteColors.muted,
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Contact choisi dans la feuille de partage (nom + téléphone principal).
+class _SharedContact {
+  const _SharedContact(this.name, this.phone);
+  final String name;
+  final String? phone;
+}
+
+/// Feuille de sélection d'un contact de l'appareil à partager.
+class _ContactPickerSheet extends StatelessWidget {
+  const _ContactPickerSheet({required this.contacts});
+
+  final List<Contact> contacts;
+
+  @override
+  Widget build(BuildContext context) {
+    final withPhone =
+        contacts.where((c) => c.phones.isNotEmpty).toList();
+    return SafeArea(
+      child: SizedBox(
+        height: 420,
+        child: Column(
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(14),
+              child: Text('Partager un contact',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+            ),
+            Expanded(
+              child: withPhone.isEmpty
+                  ? const Center(
+                      child: Text('Aucun contact avec numéro de téléphone'))
+                  : ListView.builder(
+                      itemCount: withPhone.length,
+                      itemBuilder: (_, i) {
+                        final c = withPhone[i];
+                        return ListTile(
+                          leading: KiteAvatar(name: c.displayName, group: false),
+                          title: Text(c.displayName),
+                          subtitle: Text(c.phones.first.number),
+                          onTap: () => Navigator.pop(
+                            context,
+                            _SharedContact(
+                                c.displayName, c.phones.first.number),
+                          ),
+                        );
+                      },
+                    ),
             ),
           ],
         ),

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import '../models.dart';
@@ -101,6 +103,9 @@ class _MediaTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final path = message.media?['path'] as String?;
+    final image =
+        message.type == 'image' && path != null && File(path).existsSync();
     return InkWell(
       onTap: onTap,
       child: Container(
@@ -109,12 +114,16 @@ class _MediaTile extends StatelessWidget {
           borderRadius: BorderRadius.circular(10),
           border: Border.all(color: KiteColors.border),
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(_icon, color: KiteColors.accent),
-            const SizedBox(height: 4),
-            Text(
+        clipBehavior: Clip.antiAlias,
+        child: image
+            ? Image.file(File(path), fit: BoxFit.cover, width: double.infinity,
+                height: double.infinity)
+            : Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(_icon, color: KiteColors.accent),
+                  const SizedBox(height: 4),
+                  Text(
               (message.media?['name'] as String?) ?? message.type,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -174,7 +183,15 @@ class MediaViewerScreen extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(_iconFor(m.type), size: 84, color: Colors.white70),
+            Builder(builder: (_) {
+              final path = m.media?['path'] as String?;
+              if (m.type == 'image' && path != null && File(path).existsSync()) {
+                return InteractiveViewer(
+                  maxScale: 4,
+                  child: Image.file(File(path)));
+              }
+              return Icon(_iconFor(m.type), size: 84, color: Colors.white70);
+            }),
             const SizedBox(height: 20),
             Container(
               padding: const EdgeInsets.all(14),
