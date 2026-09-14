@@ -6,6 +6,7 @@ import '../formats.dart';
 import '../models.dart';
 import '../theme.dart';
 import '../ui/avatar.dart';
+import 'location_map.dart';
 
 /// Bulle de message : rendu par type + réactions + métadonnées.
 class KiteMessageBubble extends StatelessWidget {
@@ -633,7 +634,11 @@ class KiteMessageBubble extends StatelessWidget {
   }
 
   Widget _location(Message m) {
-    final name = m.media?['name'] as String? ?? 'Localisation';
+    final media = m.media;
+    final name = media?['name'] as String? ?? 'Localisation';
+    final lat = (media?['lat'] as num?)?.toDouble();
+    final lon = (media?['lon'] as num?)?.toDouble();
+    final hasCoords = lat != null && lon != null;
     return GestureDetector(
       onTap: onOpenMedia,
       child: SizedBox(
@@ -641,26 +646,32 @@ class KiteMessageBubble extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: double.infinity,
-              height: 110,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    KiteColors.tint3.withValues(alpha: 0.3),
-                    KiteColors.tint1.withValues(alpha: 0.2)
-                  ],
+            if (hasCoords)
+              KiteLocationMap(latitude: lat, longitude: lon)
+            else
+              Container(
+                width: double.infinity,
+                height: 110,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      KiteColors.tint3.withValues(alpha: 0.3),
+                      KiteColors.tint1.withValues(alpha: 0.2)
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                borderRadius: BorderRadius.circular(12),
+                child: Icon(Icons.location_on,
+                    size: 34, color: KiteColors.accent),
               ),
-              child:  Icon(Icons.location_on,
-                  size: 34, color: KiteColors.accent),
-            ),
             const SizedBox(height: 6),
             Text(name,
                 style:
                     const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-             Text('Carte simulée · aucun GPS nécessaire',
+            Text(
+                hasCoords
+                    ? '${lat.toStringAsFixed(5)}, ${lon.toStringAsFixed(5)} · appuyer pour ouvrir la carte'
+                    : 'Position partagée sans coordonnées',
                 style: TextStyle(color: KiteColors.muted, fontSize: 11)),
           ],
         ),
