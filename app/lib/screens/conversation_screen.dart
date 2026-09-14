@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../api.dart';
@@ -1662,9 +1663,40 @@ class _ConversationScreenState extends State<ConversationScreen>
   }
 
   Future<void> _mockLocation(BuildContext ctx) async {
-    await _sendMedia(
-        'location', '', {'name': 'Position actuelle', 'live': false});
-    _toast('Localisation envoyée 📍');
+    // Position GPS réelle : permission -> service -> fix. Chaque échec est
+    // expliqué, rien n'est simulé.
+    var perm = await Geolocator.checkPermission();
+    if (perm == LocationPermission.denied) {
+      perm = await Geolocator.requestPermission();
+    }
+    if (perm == LocationPermission.denied) {
+      _toast('Permission de localisation refusée');
+      return;
+    }
+    if (perm == LocationPermission.deniedForever) {
+      _toast('Permission refusée définitivement — réglages de l app');
+      await Geolocator.openAppSettings();
+      return;
+    }
+    if (!await Geolocator.isLocationServiceEnabled()) {
+      _toast('Service de localisation désactivé');
+      await Geolocator.openLocationSettings();
+      return;
+    }
+    try {
+      final pos = await Geolocator.getCurrentPosition(
+          locationSettings:
+              const LocationSettings(accuracy: LocationAccuracy.medium));
+      await _sendMedia('location', '', {
+        'name': 'Position actuelle',
+        'lat': pos.latitude,
+        'lon': pos.longitude,
+        if (pos.accuracy case final acc) 'accuracy': acc.round(),
+      });
+      _toast('Position partagée 📍');
+    } catch (e) {
+      _toast('Position indisponible : $e');
+    }
   }
 
   Future<void> _pickContact(BuildContext ctx) async {

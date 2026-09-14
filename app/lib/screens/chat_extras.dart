@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../models.dart';
 import '../theme.dart';
+import 'location_map.dart';
 
 /// Écrans satellites de la fiche info : galerie média + messages favoris,
 /// visionneuse, sélecteur de thème et signalement.
@@ -171,6 +172,11 @@ class MediaViewerScreen extends StatelessWidget {
       if (m.media?['size'] != null) ('Taille', m.media!['size'].toString()),
       if (m.media?['duration'] != null)
         ('Durée', "${m.media!['duration']} s"),
+      if (m.media?['lat'] != null)
+        ('Coordonnées',
+            '${(m.media!['lat'] as num).toStringAsFixed(5)}, ${(m.media!['lon'] as num).toStringAsFixed(5)}'),
+      if (m.media?['accuracy'] != null)
+        ('Précision', '± ${m.media!['accuracy']} m'),
     ];
     return Scaffold(
       backgroundColor: Colors.black,
@@ -189,6 +195,15 @@ class MediaViewerScreen extends StatelessWidget {
                 return InteractiveViewer(
                   maxScale: 4,
                   child: Image.file(File(path)));
+              }
+              if (m.type == 'location' &&
+                  m.media?['lat'] != null) {
+                return KiteLocationMap(
+                  latitude: (m.media!['lat'] as num).toDouble(),
+                  longitude: (m.media!['lon'] as num).toDouble(),
+                  width: 300,
+                  height: 180,
+                );
               }
               return Icon(_iconFor(m.type), size: 84, color: Colors.white70);
             }),
